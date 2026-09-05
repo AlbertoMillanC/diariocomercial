@@ -26,7 +26,7 @@ def _totales(establecimiento, desde, hasta):
     rets = Retencion.objects.filter(
         establecimiento=establecimiento, estado="vigente", fecha__range=(desde, hasta)
     )
-    ingresos = ventas.aggregate_sum = sum((v.valor for v in ventas), Decimal("0"))
+    ingresos = sum((v.valor for v in ventas), Decimal("0"))
     egresos = sum((c.valor for c in compras), Decimal("0"))
     retenciones = sum((r.valor for r in rets), Decimal("0"))
     return ingresos, egresos, retenciones, ingresos - egresos
