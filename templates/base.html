@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DiarioComercial{% endblock %}</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
+</head>
+<body>
+  {% if user.is_authenticated %}
+  <header class="top">
+    <div class="brand">
+      <div class="logo">DC</div>
+      <div>
+        <h1>DiarioComercial</h1>
+        <small>{% if user.perfil %}{{ user.perfil.establecimiento.nombre }}{% endif %}</small>
+      </div>
+    </div>
+    <div class="userbox">
+      <b>{{ user.get_full_name|default:user.username }}</b>
+      {% if user.perfil %}{{ user.perfil.get_rol_display }}{% endif %}
+    </div>
+  </header>
+  <nav class="nav">
+    <a href="{% url 'inicio' %}">Inicio</a>
+    <form class="logout" method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit">Salir</button>
+    </form>
+  </nav>
+  {% endif %}
+  <main class="{% if user.is_authenticated %}wrap{% else %}login-body{% endif %}">
+    {% if messages %}
+      {% for m in messages %}
+        <p class="msg">{{ m }}</p>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

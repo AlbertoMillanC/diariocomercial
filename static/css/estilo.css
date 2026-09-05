@@ -1,0 +1,7 @@
+body { font-family: Arial, sans-serif; margin: 0; }
+.top { background: #12323a; color: #fff; padding: 10px 20px; }
+.nav { background: #1a444e; padding: 8px; }
+.nav a { color: #fff; margin-right: 12px; }
+.wrap { padding: 20px; }
+.login-body { padding: 40px; }
+.login-card { max-width: 360px; margin: 40px auto; border: 1px solid #ccc; padding: 20px; }

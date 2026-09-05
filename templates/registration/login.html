@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block content %}
+<div class="login-card">
+  <div class="logo">DC</div>
+  <h1>DiarioComercial</h1>
+  <p>Registro diario para comerciantes de Tunja.</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <label for="id_username">Usuario</label>
+    {{ form.username }}
+    <label for="id_password">Contraseña</label>
+    {{ form.password }}
+    <button class="btn btn-primary" type="submit">Iniciar sesión</button>
+  </form>
+</div>
+{% endblock %}
