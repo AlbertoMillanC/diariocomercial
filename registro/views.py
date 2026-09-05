@@ -1,9 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
+from .forms import VentaForm
 from .models import Compra, Retencion, Venta
 
 
@@ -64,3 +66,24 @@ def inicio(request):
             "movimientos": movimientos,
         },
     )
+
+
+@login_required
+def venta_nueva(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        messages.error(request, "El usuario no tiene establecimiento asignado.")
+        return redirect("inicio")
+    form = VentaForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        venta = form.save(commit=False)
+        venta.establecimiento = perfil.establecimiento
+        venta.usuario = request.user
+        venta.estado = "vigente"
+        if venta.valor <= 0:
+            messages.error(request, "El valor tiene que ser mayor a cero.")
+        else:
+            venta.save()
+            messages.success(request, "Venta guardada.")
+            return redirect("inicio")
+    return render(request, "venta_form.html", {"form": form})

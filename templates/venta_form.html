@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Nueva venta{% endblock %}
+{% block content %}
+<h2>Registro rápido de venta</h2>
+<p class="lead">Ojalá no sean muchos campos, para no enredarse en el mostrador.</p>
+<div class="panel">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary" type="submit">Guardar venta</button>
+    <a class="btn" href="{% url 'inicio' %}">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

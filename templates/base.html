@@ -24,6 +24,7 @@
   </header>
   <nav class="nav">
     <a href="{% url 'inicio' %}">Inicio</a>
+    <a href="{% url 'venta_nueva' %}">Ventas</a>
     <form class="logout" method="post" action="{% url 'logout' %}">
       {% csrf_token %}
       <button type="submit">Salir</button>
