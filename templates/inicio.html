@@ -13,6 +13,9 @@
   <a class="btn btn-primary" href="{% url 'venta_nueva' %}">Nueva venta</a>
   <a class="btn btn-ghost" href="{% url 'compra_nueva' %}">Nueva compra</a>
   <a class="btn btn-ghost" href="{% url 'retencion_nueva' %}">Registrar retención</a>
+  {% if user.perfil.es_propietario %}
+  <a class="btn btn-accent" href="{% url 'enviar_reporte' %}">Enviar consolidado al contador</a>
+  {% endif %}
 </div>
 <div class="panel">
   <h2 style="font-size:16px;">Últimos movimientos</h2>

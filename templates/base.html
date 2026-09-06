@@ -28,6 +28,9 @@
     <a href="{% url 'compra_nueva' %}">Compras</a>
     <a href="{% url 'retencion_nueva' %}">Retenciones</a>
     <a href="{% url 'historial' %}">Historial</a>
+    {% if user.perfil.es_propietario %}
+    <a href="{% url 'configuracion' %}">Configuración</a>
+    {% endif %}
     <form class="logout" method="post" action="{% url 'logout' %}">
       {% csrf_token %}
       <button type="submit">Salir</button>

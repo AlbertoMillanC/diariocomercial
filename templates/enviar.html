@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Enviar consolidado{% endblock %}
+{% block content %}
+<h2>Enviar consolidado al contador</h2>
+<p>Destino: <b>{{ establecimiento.correo_reportes|default:"(sin configurar)" }}</b></p>
+<p>Periodo {{ desde }} — {{ hasta }}</p>
+<ul>
+  <li>Ingresos: $ {{ ingresos }}</li>
+  <li>Compras: $ {{ egresos }}</li>
+  <li>Retenciones: $ {{ retenciones }}</li>
+  <li>Base neta: $ {{ neto }}</li>
+</ul>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-accent" type="submit">Enviar ahora</button>
+  <a href="{% url 'inicio' %}">Cancelar</a>
+</form>
+{% endblock %}

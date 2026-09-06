@@ -3,12 +3,13 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 
 from .forms import CompraForm, RetencionForm, VentaForm
-from .models import Auditoria, Compra, Retencion, Venta
+from .models import Auditoria, Compra, EnvioReporte, Establecimiento, Retencion, Venta
 
 
 def _perfil(user):
@@ -214,3 +215,79 @@ def anular_movimiento(request, tipo, pk):
         messages.success(request, "Registro anulado.")
         return redirect("historial")
     return render(request, "anular_confirm.html", {"obj": obj, "tipo": tipo})
+
+
+@login_required
+def configuracion(request):
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario configura el correo.")
+        return redirect("inicio")
+    est = perfil.establecimiento
+    if request.method == "POST":
+        correo = request.POST.get("correo_reportes", "").strip()
+        est.correo_reportes = correo
+        est.save()
+        messages.success(request, "Correo del contador actualizado.")
+        return redirect("configuracion")
+    return render(request, "configuracion.html", {"establecimiento": est})
+
+
+@login_required
+def enviar_reporte(request):
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario envía el consolidado.")
+        return redirect("inicio")
+    est = perfil.establecimiento
+    desde, hasta = _rango_mes()
+    ingresos, egresos, retenciones, neto = _totales(est, desde, hasta)
+    if request.method == "POST":
+        destino = est.correo_reportes
+        if not destino:
+            messages.error(request, "Primero configure el correo en Configuración.")
+            return redirect("configuracion")
+        cuerpo = (
+            f"Consolidado {est.nombre}\n"
+            f"Periodo: {desde} a {hasta}\n"
+            f"Ingresos: {ingresos}\n"
+            f"Compras: {egresos}\n"
+            f"Retenciones: {retenciones}\n"
+            f"Base neta estimada: {neto}\n"
+        )
+        try:
+            send_mail(
+                f"Consolidado {est.nombre} {desde} - {hasta}",
+                cuerpo,
+                None,
+                [destino],
+            )
+            estado = "enviado"
+            messages.success(request, f"Reporte enviado a {destino}.")
+        except Exception as e:
+            estado = "fallido"
+            messages.error(request, f"No se pudo enviar: {e}")
+        EnvioReporte.objects.create(
+            establecimiento=est,
+            usuario=request.user,
+            periodo_inicio=desde,
+            periodo_fin=hasta,
+            correo_destino=destino,
+            estado_envio=estado,
+            total_ingresos=ingresos,
+            total_egresos=egresos,
+        )
+        return redirect("inicio")
+    return render(
+        request,
+        "enviar.html",
+        {
+            "establecimiento": est,
+            "desde": desde,
+            "hasta": hasta,
+            "ingresos": ingresos,
+            "egresos": egresos,
+            "retenciones": retenciones,
+            "neto": neto,
+        },
+    )

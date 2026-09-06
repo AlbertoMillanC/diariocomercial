@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+{% block content %}
+<h2>Correo del asesor contable</h2>
+<div class="panel">
+  <form method="post">
+    {% csrf_token %}
+    <label>Correo para los reportes</label>
+    <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}" required>
+    <p></p>
+    <button class="btn btn-primary" type="submit">Guardar</button>
+  </form>
+</div>
+{% endblock %}
