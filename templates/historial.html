@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Historial{% endblock %}
+{% block content %}
+<h2>Historial y consolidado</h2>
+<form class="filters" method="get">
+  <div><label>Desde</label><input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"></div>
+  <div><label>Hasta</label><input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"></div>
+  <div>
+    <label>Tipo</label>
+    <select name="tipo">
+      <option value="todos" {% if tipo == 'todos' %}selected{% endif %}>Todos</option>
+      <option value="venta" {% if tipo == 'venta' %}selected{% endif %}>Ventas</option>
+      <option value="compra" {% if tipo == 'compra' %}selected{% endif %}>Compras</option>
+      <option value="retencion" {% if tipo == 'retencion' %}selected{% endif %}>Retenciones</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">Consultar</button>
+</form>
+<div class="cards">
+  <div class="card"><span>Ventas</span><strong>$ {{ ingresos|floatformat:0 }}</strong></div>
+  <div class="card"><span>Compras</span><strong>$ {{ egresos|floatformat:0 }}</strong></div>
+  <div class="card"><span>Retenciones</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
+</div>
+<div class="panel">
+  <table>
+    <thead>
+      <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Valor</th><th>Estado</th>{% if puede_editar %}<th></th>{% endif %}</tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.obj.fecha|date:"d/m/Y" }}</td>
+        <td><span class="tag {{ f.clase }}">{{ f.tipo }}</span></td>
+        <td>{{ f.detalle }}</td>
+        <td>$ {{ f.obj.valor|floatformat:0 }}</td>
+        <td>{{ f.obj.estado }}</td>
+        {% if puede_editar %}
+        <td>
+          <a href="{% url 'editar' f.key f.obj.pk %}">Editar</a>
+          {% if f.obj.estado == 'vigente' %}
+          <a href="{% url 'anular' f.key f.obj.pk %}">Anular</a>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="6">No hay movimientos en ese rango.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

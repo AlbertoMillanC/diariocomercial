@@ -3,10 +3,12 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_date
 
 from .forms import CompraForm, RetencionForm, VentaForm
-from .models import Compra, Retencion, Venta
+from .models import Auditoria, Compra, Retencion, Venta
 
 
 def _perfil(user):
@@ -117,3 +119,98 @@ def compra_nueva(request):
 @login_required
 def retencion_nueva(request):
     return _guardar_movimiento(request, RetencionForm, "retencion_form.html", "Retención guardada.")
+
+
+def _modelo(tipo):
+    if tipo == "venta":
+        return Venta, VentaForm
+    if tipo == "compra":
+        return Compra, CompraForm
+    if tipo == "retencion":
+        return Retencion, RetencionForm
+    raise Http404()
+
+
+@login_required
+def historial(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    desde = parse_date(request.GET.get("desde") or "") or _rango_mes()[0]
+    hasta = parse_date(request.GET.get("hasta") or "") or date.today()
+    tipo = request.GET.get("tipo") or "todos"
+    filas = []
+    if tipo in ("todos", "venta"):
+        for v in Venta.objects.filter(establecimiento=est, fecha__range=(desde, hasta)).order_by("-fecha"):
+            filas.append({"obj": v, "tipo": "Venta", "clase": "", "detalle": v.concepto, "key": "venta"})
+    if tipo in ("todos", "compra"):
+        for c in Compra.objects.filter(establecimiento=est, fecha__range=(desde, hasta)).order_by("-fecha"):
+            filas.append({"obj": c, "tipo": "Compra", "clase": "compra", "detalle": c.proveedor, "key": "compra"})
+    if tipo in ("todos", "retencion"):
+        for r in Retencion.objects.filter(establecimiento=est, fecha__range=(desde, hasta)).order_by("-fecha"):
+            filas.append({"obj": r, "tipo": "Retención", "clase": "ret", "detalle": r.tercero or r.get_tipo_display(), "key": "retencion"})
+    filas.sort(key=lambda x: x["obj"].fecha, reverse=True)
+    ingresos, egresos, retenciones, neto = _totales(est, desde, hasta)
+    return render(
+        request,
+        "historial.html",
+        {
+            "filas": filas,
+            "desde": desde,
+            "hasta": hasta,
+            "tipo": tipo,
+            "ingresos": ingresos,
+            "egresos": egresos,
+            "retenciones": retenciones,
+            "puede_editar": perfil.es_propietario(),
+        },
+    )
+
+
+def _audit(user, entidad, obj, accion, antes, despues, motivo=""):
+    Auditoria.objects.create(
+        usuario=user,
+        entidad_afectada=entidad,
+        id_registro=obj.pk,
+        accion=accion,
+        valor_anterior=str(antes),
+        valor_nuevo=str(despues),
+        motivo=motivo,
+    )
+
+
+@login_required
+def editar_movimiento(request, tipo, pk):
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario puede editar.")
+        return redirect("historial")
+    Modelo, Formulario = _modelo(tipo)
+    obj = get_object_or_404(Modelo, pk=pk, establecimiento=perfil.establecimiento)
+    antes = f"{obj.fecha}|{obj.valor}"
+    form = Formulario(request.POST or None, instance=obj)
+    if request.method == "POST" and form.is_valid():
+        guardado = form.save()
+        _audit(request.user, tipo, guardado, "editar", antes, f"{guardado.fecha}|{guardado.valor}")
+        messages.success(request, "Registro actualizado.")
+        return redirect("historial")
+    return render(request, "editar_form.html", {"form": form, "tipo": tipo})
+
+
+@login_required
+def anular_movimiento(request, tipo, pk):
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario puede anular.")
+        return redirect("historial")
+    Modelo, _form = _modelo(tipo)
+    obj = get_object_or_404(Modelo, pk=pk, establecimiento=perfil.establecimiento)
+    if request.method == "POST":
+        antes = obj.estado
+        obj.estado = "anulado"
+        obj.save()
+        _audit(request.user, tipo, obj, "anular", antes, "anulado")
+        messages.success(request, "Registro anulado.")
+        return redirect("historial")
+    return render(request, "anular_confirm.html", {"obj": obj, "tipo": tipo})

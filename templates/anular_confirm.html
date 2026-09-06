@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Anular{% endblock %}
+{% block content %}
+<h2>¿Anular este registro?</h2>
+<p>{{ obj }} — $ {{ obj.valor }} ({{ obj.fecha }})</p>
+<p>No se borra, queda anulado para no perder la historia.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-danger" type="submit">Sí, anular</button>
+  <a href="{% url 'historial' %}">Cancelar</a>
+</form>
+{% endblock %}
