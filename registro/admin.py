@@ -1,17 +1,20 @@
 from django.contrib import admin
 from .models import (
-    Establecimiento,
-    Perfil,
-    Venta,
-    Compra,
-    Retencion,
-    EnvioReporte,
+    ActividadCIIU,
     Auditoria,
+    Compra,
+    EnvioReporte,
+    Establecimiento,
+    MotivoVenta,
+    Perfil,
+    Retencion,
+    Venta,
 )
-
 
 admin.site.register(Establecimiento)
 admin.site.register(Perfil)
+admin.site.register(ActividadCIIU)
+admin.site.register(MotivoVenta)
 admin.site.register(Venta)
 admin.site.register(Compra)
 admin.site.register(Retencion)

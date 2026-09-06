@@ -1,14 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Configuración{% endblock %}
 {% block content %}
-<h2>Correo del asesor contable</h2>
-<div class="panel">
+<h2>Configuración del establecimiento</h2>
+<p class="lead">Al iniciar labores se registran las actividades CIIU (puede tener varias) y los motivos de venta prestablecidos.</p>
+
+<div class="panel" style="margin-bottom:16px;">
+  <h2 style="font-size:16px;">Correo del asesor contable</h2>
   <form method="post">
     {% csrf_token %}
+    <input type="hidden" name="accion" value="correo">
     <label>Correo para los reportes</label>
-    <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}" required>
+    <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}">
     <p></p>
-    <button class="btn btn-primary" type="submit">Guardar</button>
+    <button class="btn btn-primary" type="submit">Guardar correo</button>
+  </form>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
+  <h2 style="font-size:16px;">Actividades CIIU</h2>
+  <table>
+    <thead><tr><th>Código</th><th>Descripción</th><th>Tarifa ICA</th></tr></thead>
+    <tbody>
+      {% for a in actividades %}
+      <tr>
+        <td>{{ a.codigo }}</td>
+        <td>{{ a.descripcion }}</td>
+        <td>{{ a.tarifa_x_mil }} x mil</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3">Todavía no hay actividades. Agréguelas abajo.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" style="margin-top:12px;">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="ciiu">
+    {{ form_ciiu.as_p }}
+    <button class="btn btn-primary" type="submit">Agregar CIIU</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2 style="font-size:16px;">Motivos de venta prestablecidos</h2>
+  <table>
+    <thead><tr><th>CIIU</th><th>Motivo</th><th>Por defecto</th></tr></thead>
+    <tbody>
+      {% for m in motivos %}
+      <tr>
+        <td>{{ m.actividad.codigo }}</td>
+        <td>{{ m.nombre }}</td>
+        <td>{% if m.es_predeterminado %}Sí{% else %}No{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3">Sin motivos. Si es carnicería, cree «Venta de carne».</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" style="margin-top:12px;">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="motivo">
+    {{ form_motivo.as_p }}
+    <button class="btn btn-primary" type="submit">Agregar motivo</button>
   </form>
 </div>
 {% endblock %}

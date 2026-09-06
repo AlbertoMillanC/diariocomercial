@@ -6,10 +6,18 @@
 <p>Periodo {{ desde }} — {{ hasta }}</p>
 <ul>
   <li>Ingresos: $ {{ ingresos }}</li>
+  <li>ICA estimado: $ {{ ica }}</li>
   <li>Compras: $ {{ egresos }}</li>
-  <li>Retenciones: $ {{ retenciones }}</li>
-  <li>Base neta: $ {{ neto }}</li>
+  <li>Retenciones (solo ventas a empresa): $ {{ retenciones }}</li>
 </ul>
+{% if por_ciiu %}
+<p><b>Por CIIU</b></p>
+<ul>
+  {% for f in por_ciiu %}
+  <li>{{ f.actividad.codigo }} ({{ f.actividad.tarifa_x_mil }} x mil): ventas $ {{ f.bruto }} · ICA $ {{ f.ica }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
 <form method="post">
   {% csrf_token %}
   <button class="btn btn-accent" type="submit">Enviar ahora</button>

@@ -2,17 +2,34 @@
 {% block title %}Inicio{% endblock %}
 {% block content %}
 <h2>Consolidado del periodo</h2>
-<p class="lead">{{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}</p>
+<p class="lead">{{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }} · ICA estimado según tarifa CIIU (x mil)</p>
 <div class="cards">
   <div class="card"><span>Ingresos brutos</span><strong>$ {{ ingresos|floatformat:0 }}</strong></div>
+  <div class="card"><span>ICA estimado</span><strong>$ {{ ica|floatformat:0 }}</strong></div>
+  <div class="card"><span>Retenciones (empresas)</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
   <div class="card"><span>Compras y gastos</span><strong>$ {{ egresos|floatformat:0 }}</strong></div>
-  <div class="card"><span>Retenciones</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
-  <div class="card"><span>Base neta estimada</span><strong>$ {{ neto|floatformat:0 }}</strong></div>
 </div>
+{% if por_ciiu %}
+<div class="panel" style="margin-bottom:16px;">
+  <h2 style="font-size:16px;">Por actividad CIIU</h2>
+  <table>
+    <thead><tr><th>CIIU</th><th>Tarifa</th><th>Ventas</th><th>ICA</th></tr></thead>
+    <tbody>
+      {% for f in por_ciiu %}
+      <tr>
+        <td>{{ f.actividad.codigo }} — {{ f.actividad.descripcion }}</td>
+        <td>{{ f.actividad.tarifa_x_mil }} x mil</td>
+        <td>$ {{ f.bruto|floatformat:0 }}</td>
+        <td>$ {{ f.ica|floatformat:0 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 <div class="actions">
   <a class="btn btn-primary" href="{% url 'venta_nueva' %}">Nueva venta</a>
   <a class="btn btn-ghost" href="{% url 'compra_nueva' %}">Nueva compra</a>
-  <a class="btn btn-ghost" href="{% url 'retencion_nueva' %}">Registrar retención</a>
   {% if user.perfil.es_propietario %}
   <a class="btn btn-accent" href="{% url 'enviar_reporte' %}">Enviar consolidado al contador</a>
   {% endif %}
@@ -26,7 +43,7 @@
     <tbody>
       {% for m in movimientos %}
       <tr>
-        <td>{{ m.fecha|date:"d/m/Y" }}</td>
+        <td>{{ m.fecha }}</td>
         <td><span class="tag {{ m.clase }}">{{ m.tipo }}</span></td>
         <td>{{ m.detalle }}</td>
         <td>$ {{ m.valor|floatformat:0 }}</td>

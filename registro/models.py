@@ -1,5 +1,8 @@
-from django.db import models
+from decimal import Decimal
+
 from django.contrib.auth.models import User
+from django.db import models
+from django.utils import timezone
 
 
 class Establecimiento(models.Model):
@@ -30,17 +33,81 @@ class Perfil(models.Model):
         return self.rol == "propietario"
 
 
-class Venta(models.Model):
-    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
-    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
-    fecha = models.DateField()
-    valor = models.DecimalField(max_digits=14, decimal_places=2)
-    concepto = models.CharField(max_length=160)
-    observacion = models.CharField(max_length=160, blank=True)
-    estado = models.CharField(max_length=12, default="vigente")
+class ActividadCIIU(models.Model):
+    """Actividad económica del establecimiento. Un negocio puede tener varias."""
+
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="actividades"
+    )
+    codigo = models.CharField(max_length=10, help_text="Ej. 4711")
+    descripcion = models.CharField(max_length=160)
+    tarifa_x_mil = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        help_text="Tarifa ICA, por mil. Ej. 6 = 6 x mil",
+    )
+
+    class Meta:
+        unique_together = ("establecimiento", "codigo")
 
     def __str__(self):
-        return f"Venta {self.fecha} {self.valor}"
+        return f"{self.codigo} — {self.descripcion} ({self.tarifa_x_mil} x mil)"
+
+    def ica_de(self, valor):
+        if not valor:
+            return Decimal("0")
+        return (Decimal(valor) * self.tarifa_x_mil) / Decimal("1000")
+
+
+class MotivoVenta(models.Model):
+    """Motivos prestablecidos (ej. carnicería → Venta de carne)."""
+
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="motivos"
+    )
+    actividad = models.ForeignKey(
+        ActividadCIIU, on_delete=models.CASCADE, related_name="motivos"
+    )
+    nombre = models.CharField(max_length=120)
+    es_predeterminado = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.nombre
+
+
+class Venta(models.Model):
+    CLIENTES = (
+        ("particular", "Particular"),
+        ("empresa", "Empresa"),
+    )
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    actividad = models.ForeignKey(
+        ActividadCIIU, on_delete=models.PROTECT, null=True, blank=True
+    )
+    motivo = models.ForeignKey(MotivoVenta, on_delete=models.PROTECT, null=True, blank=True)
+    fecha = models.DateField()
+    fecha_hora = models.DateTimeField(default=timezone.now)
+    valor = models.DecimalField(max_digits=14, decimal_places=2)
+    concepto = models.CharField(max_length=160, blank=True)
+    observacion = models.CharField(max_length=160, blank=True)
+    tipo_cliente = models.CharField(max_length=12, choices=CLIENTES, default="particular")
+    ica_estimado = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    estado = models.CharField(max_length=12, default="vigente")
+
+    def save(self, *args, **kwargs):
+        if self.fecha_hora:
+            self.fecha = timezone.localtime(self.fecha_hora).date()
+        if self.motivo and not self.concepto:
+            self.concepto = self.motivo.nombre
+        if self.actividad:
+            self.ica_estimado = self.actividad.ica_de(self.valor)
+        else:
+            self.ica_estimado = Decimal("0")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Venta {self.fecha_hora} {self.valor}"
 
 
 class Compra(models.Model):
@@ -57,12 +124,17 @@ class Compra(models.Model):
 
 
 class Retencion(models.Model):
+    """Solo aplica cuando la venta es a una empresa."""
+
     TIPOS = (
         ("fuente", "Retención en la fuente"),
         ("ica", "Retención de ICA"),
     )
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
     usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    venta = models.OneToOneField(
+        Venta, on_delete=models.CASCADE, null=True, blank=True, related_name="retencion"
+    )
     fecha = models.DateField()
     tipo = models.CharField(max_length=20, choices=TIPOS, default="ica")
     valor = models.DecimalField(max_digits=14, decimal_places=2)

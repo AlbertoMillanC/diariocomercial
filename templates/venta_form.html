@@ -1,14 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Nueva venta{% endblock %}
 {% block content %}
-<h2>Registro rápido de venta</h2>
-<p class="lead">Ojalá no sean muchos campos, para no enredarse en el mostrador.</p>
+<h2>Registro de venta</h2>
+<p class="lead">La fecha y la hora salen solas. El motivo depende de la actividad CIIU. La retención solo aparece si vende a una empresa.</p>
 <div class="panel">
-  <form method="post">
+  <form method="post" id="form-venta">
     {% csrf_token %}
-    {{ form.as_p }}
+    {{ form.non_field_errors }}
+    <p>{{ form.fecha_hora.label_tag }} {{ form.fecha_hora }}<br><small>{{ form.fecha_hora.help_text }}</small></p>
+    <p>{{ form.actividad.label_tag }} {{ form.actividad }}</p>
+    <p>{{ form.motivo.label_tag }} {{ form.motivo }}</p>
+    <p>{{ form.nuevo_motivo.label_tag }} {{ form.nuevo_motivo }}</p>
+    <p>{{ form.valor.label_tag }} {{ form.valor }}</p>
+    <p>{{ form.tipo_cliente.label_tag }} {{ form.tipo_cliente }}</p>
+    <div id="bloque-empresa" style="display:none; background:#f8eadc; padding:12px; border-radius:8px;">
+      <p><b>Venta a empresa</b> — aquí sí puede registrar retención.</p>
+      <p>{{ form.tercero.label_tag }} {{ form.tercero }}</p>
+      <p>{{ form.retencion_tipo.label_tag }} {{ form.retencion_tipo }}</p>
+      <p>{{ form.retencion_valor.label_tag }} {{ form.retencion_valor }}</p>
+    </div>
+    <p></p>
     <button class="btn btn-primary" type="submit">Guardar venta</button>
-    <a class="btn" href="{% url 'inicio' %}">Cancelar</a>
+    <a class="btn btn-ghost" href="{% url 'inicio' %}">Cancelar</a>
   </form>
 </div>
+{{ motivos_data|json_script:"motivos-data" }}
+<script>
+const motivos = JSON.parse(document.getElementById("motivos-data").textContent);
+const selAct = document.getElementById("id_actividad");
+const selMot = document.getElementById("id_motivo");
+const selCli = document.getElementById("id_tipo_cliente");
+const bloque = document.getElementById("bloque-empresa");
+
+function filtrarMotivos() {
+  const act = selAct.value;
+  const actual = selMot.value;
+  selMot.innerHTML = '<option value="">---------</option>';
+  let pred = "";
+  motivos.forEach(function (m) {
+    if (String(m.actividad) === String(act)) {
+      const op = document.createElement("option");
+      op.value = m.id;
+      op.textContent = m.nombre;
+      if (m.predeterminado) pred = String(m.id);
+      selMot.appendChild(op);
+    }
+  });
+  if (actual && [...selMot.options].some(o => o.value === actual)) selMot.value = actual;
+  else if (pred) selMot.value = pred;
+}
+function toggleEmpresa() {
+  bloque.style.display = selCli.value === "empresa" ? "block" : "none";
+}
+selAct.addEventListener("change", filtrarMotivos);
+selCli.addEventListener("change", toggleEmpresa);
+filtrarMotivos();
+toggleEmpresa();
+</script>
 {% endblock %}

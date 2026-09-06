@@ -18,8 +18,9 @@
 </form>
 <div class="cards">
   <div class="card"><span>Ventas</span><strong>$ {{ ingresos|floatformat:0 }}</strong></div>
+  <div class="card"><span>ICA estimado</span><strong>$ {{ ica|floatformat:0 }}</strong></div>
   <div class="card"><span>Compras</span><strong>$ {{ egresos|floatformat:0 }}</strong></div>
-  <div class="card"><span>Retenciones</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
+  <div class="card"><span>Retenciones (empresas)</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
 </div>
 <div class="panel">
   <table>
