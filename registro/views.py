@@ -77,7 +77,7 @@ def venta_nueva(request):
     if not perfil:
         messages.error(request, "El usuario no tiene establecimiento asignado.")
         return redirect("inicio")
-    form = VentaForm(request.POST or None)
+    form = VentaForm(request.POST or None, initial={"fecha": date.today()})
     if request.method == "POST" and form.is_valid():
         venta = form.save(commit=False)
         venta.establecimiento = perfil.establecimiento
