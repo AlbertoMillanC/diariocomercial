@@ -1,1 +1,4 @@
 Django==6.0.8
+argon2-cffi==25.1.0
+reportlab==5.0.1
+
