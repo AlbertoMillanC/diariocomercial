@@ -10,5 +10,6 @@ urlpatterns = [
     path("historial/<str:tipo>/<int:pk>/editar/", views.editar_movimiento, name="editar"),
     path("historial/<str:tipo>/<int:pk>/anular/", views.anular_movimiento, name="anular"),
     path("configuracion/", views.configuracion, name="configuracion"),
+    path("auditoria/", views.auditoria, name="auditoria"),
     path("enviar/", views.enviar_reporte, name="enviar_reporte"),
 ]
