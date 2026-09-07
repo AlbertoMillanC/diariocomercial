@@ -1,7 +1,16 @@
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import ActividadCIIU, Compra, MotivoVenta, Retencion, Venta
+from .models import ActividadCIIU, Compra, MotivoVenta, Perfil, Retencion, Venta
+
+
+class LoginForm(AuthenticationForm):
+    error_messages = {
+        "invalid_login": "Usuario o contraseña incorrectos.",
+        "inactive": "Este usuario está inactivo. Pídale al propietario que lo active.",
+    }
 
 
 class VentaForm(forms.ModelForm):
@@ -29,7 +38,7 @@ class VentaForm(forms.ModelForm):
 
     class Meta:
         model = Venta
-        fields = ["fecha_hora", "actividad", "motivo", "valor", "tipo_cliente"]
+        fields = ["fecha_hora", "actividad", "motivo", "valor", "tipo_cliente", "observacion"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(
                 attrs={"type": "datetime-local"},
@@ -63,6 +72,9 @@ class VentaForm(forms.ModelForm):
         self.fields["tipo_cliente"].label = "¿A quién le vende?"
         self.fields["fecha_hora"].label = "Fecha y hora"
         self.fields["fecha_hora"].help_text = "Sale automática. Si necesita cambiarla, pulse el calendario."
+        self.fields["observacion"].label = "Observación (opcional)"
+        self.fields["observacion"].required = False
+        self.fields["observacion"].widget.attrs["placeholder"] = "Ej. fiado, domicilio"
 
     def clean_fecha_hora(self):
         dt = self.cleaned_data["fecha_hora"]
@@ -77,6 +89,15 @@ class CompraForm(forms.ModelForm):
         fields = ["fecha", "valor", "proveedor", "concepto"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
+            "valor": forms.NumberInput(attrs={"min": "1", "step": "1"}),
+            "proveedor": forms.TextInput(attrs={"placeholder": "Nombre del proveedor"}),
+            "concepto": forms.TextInput(attrs={"placeholder": "Mercancía o gasto del local"}),
+        }
+        labels = {
+            "fecha": "Fecha",
+            "valor": "Valor",
+            "proveedor": "Proveedor",
+            "concepto": "Concepto",
         }
 
 
@@ -86,6 +107,14 @@ class RetencionForm(forms.ModelForm):
         fields = ["fecha", "tipo", "valor", "tercero"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
+            "valor": forms.NumberInput(attrs={"min": "1", "step": "1"}),
+            "tercero": forms.TextInput(attrs={"placeholder": "Empresa que retuvo"}),
+        }
+        labels = {
+            "fecha": "Fecha",
+            "tipo": "Tipo",
+            "valor": "Valor retenido",
+            "tercero": "Empresa",
         }
 
 
@@ -103,6 +132,20 @@ class ActividadCIIUForm(forms.ModelForm):
             "descripcion": "Descripción",
             "tarifa_x_mil": "Tarifa ICA (x mil)",
         }
+
+
+class UsuarioNegocioForm(forms.Form):
+    first_name = forms.CharField(label="Nombre", max_length=80)
+    last_name = forms.CharField(label="Apellido", max_length=80, required=False)
+    username = forms.CharField(label="Usuario para entrar", max_length=80)
+    password = forms.CharField(label="Contraseña", widget=forms.PasswordInput)
+    rol = forms.ChoiceField(label="Rol", choices=Perfil.ROLES, initial="dependiente")
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Ese usuario ya existe.")
+        return username
 
 
 class MotivoVentaForm(forms.ModelForm):
