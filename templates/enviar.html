@@ -1,26 +1,62 @@
 {% extends "base.html" %}
+{% load dinero %}
 {% block title %}Enviar consolidado{% endblock %}
 {% block content %}
 <h2>Enviar consolidado al contador</h2>
-<p>Destino: <b>{{ establecimiento.correo_reportes|default:"(sin configurar)" }}</b></p>
-<p>Periodo {{ desde }} — {{ hasta }}</p>
-<ul>
-  <li>Ingresos: $ {{ ingresos }}</li>
-  <li>ICA estimado: $ {{ ica }}</li>
-  <li>Compras: $ {{ egresos }}</li>
-  <li>Retenciones (solo ventas a empresa): $ {{ retenciones }}</li>
-</ul>
-{% if por_ciiu %}
-<p><b>Por CIIU</b></p>
-<ul>
-  {% for f in por_ciiu %}
-  <li>{{ f.actividad.codigo }} ({{ f.actividad.tarifa_x_mil }} x mil): ventas $ {{ f.bruto }} · ICA $ {{ f.ica }}</li>
-  {% endfor %}
-</ul>
-{% endif %}
-<form method="post">
-  {% csrf_token %}
-  <button class="btn btn-accent" type="submit">Enviar ahora</button>
-  <a href="{% url 'inicio' %}">Cancelar</a>
+<p class="lead">Revise las cifras, elija el periodo y confirme. Si el correo falla, descargue el PDF o el CSV.</p>
+<form class="filters" method="get">
+  <div><label>Desde</label><input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"></div>
+  <div><label>Hasta</label><input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"></div>
+  <button class="btn btn-ghost" type="submit">Recalcular</button>
 </form>
+<p>Destino: <b>{{ establecimiento.correo_reportes|default:"(sin configurar)" }}</b></p>
+<div class="cards cards-5">
+  <div class="card"><span>Ingresos</span><strong>{{ ingresos|pesos }}</strong></div>
+  <div class="card"><span>ICA estimado</span><strong>{{ ica|pesos }}</strong></div>
+  <div class="card"><span>Compras</span><strong>{{ egresos|pesos }}</strong></div>
+  <div class="card"><span>Retenciones</span><strong>{{ retenciones|pesos }}</strong></div>
+  <div class="card"><span>Base neta</span><strong>{{ neto|pesos }}</strong></div>
+</div>
+{% if por_ciiu %}
+<div class="panel" style="margin-bottom:16px;">
+  <h2 style="font-size:16px;">Por CIIU</h2>
+  <ul>
+    {% for f in por_ciiu %}
+    <li>{{ f.actividad.codigo }} ({{ f.actividad.tarifa_x_mil }} x mil): ventas {{ f.bruto|pesos }} · ICA {{ f.ica|pesos }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+<div class="actions">
+  <form method="post" style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="desde" value="{{ desde|date:'Y-m-d' }}">
+    <input type="hidden" name="hasta" value="{{ hasta|date:'Y-m-d' }}">
+    <button class="btn btn-accent" type="submit">Enviar ahora</button>
+  </form>
+  <a class="btn btn-ghost" href="?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&formato=pdf">Descargar PDF</a>
+  <a class="btn btn-ghost" href="?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&formato=csv">Descargar CSV</a>
+  <a href="{% url 'inicio' %}">Cancelar</a>
+</div>
+<div class="panel">
+  <h2 style="font-size:16px;">Envíos anteriores</h2>
+  <div class="tabla-wrap">
+  <table>
+    <thead><tr><th>Fecha</th><th>Periodo</th><th>Destino</th><th>Estado</th><th>Ingresos</th></tr></thead>
+    <tbody>
+      {% for e in envios %}
+      <tr>
+        <td>{{ e.fecha_envio }}</td>
+        <td>{{ e.periodo_inicio }} — {{ e.periodo_fin }}</td>
+        <td>{{ e.correo_destino }}</td>
+        <td>{{ e.estado_envio }}</td>
+        <td>{{ e.total_ingresos|pesos }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">Todavía no hay envíos.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
 {% endblock %}

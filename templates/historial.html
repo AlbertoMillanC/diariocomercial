@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load dinero %}
 {% block title %}Historial{% endblock %}
 {% block content %}
 <h2>Historial y consolidado</h2>
@@ -15,26 +16,35 @@
     </select>
   </div>
   <button class="btn btn-primary" type="submit">Consultar</button>
+  {% if puede_editar %}
+  <a class="btn btn-accent" href="{% url 'enviar_reporte' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Enviar reporte</a>
+  {% endif %}
 </form>
-<div class="cards">
-  <div class="card"><span>Ventas</span><strong>$ {{ ingresos|floatformat:0 }}</strong></div>
-  <div class="card"><span>ICA estimado</span><strong>$ {{ ica|floatformat:0 }}</strong></div>
-  <div class="card"><span>Compras</span><strong>$ {{ egresos|floatformat:0 }}</strong></div>
-  <div class="card"><span>Retenciones (empresas)</span><strong>$ {{ retenciones|floatformat:0 }}</strong></div>
+<div class="cards cards-5">
+  <div class="card"><span>Ventas</span><strong>{{ ingresos|pesos }}</strong></div>
+  <div class="card"><span>ICA estimado</span><strong>{{ ica|pesos }}</strong></div>
+  <div class="card"><span>Compras</span><strong>{{ egresos|pesos }}</strong></div>
+  <div class="card"><span>Retenciones</span><strong>{{ retenciones|pesos }}</strong></div>
+  <div class="card"><span>Base neta</span><strong>{{ neto|pesos }}</strong></div>
 </div>
 <div class="panel">
+  <div class="tabla-wrap">
   <table>
     <thead>
-      <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Valor</th><th>Estado</th>{% if puede_editar %}<th></th>{% endif %}</tr>
+      <tr>
+        <th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Valor</th><th>Estado</th><th>Usuario</th>
+        {% if puede_editar %}<th></th>{% endif %}
+      </tr>
     </thead>
     <tbody>
       {% for f in filas %}
-      <tr>
+      <tr class="{% if f.obj.estado != 'vigente' %}anulado{% endif %}">
         <td>{{ f.obj.fecha|date:"d/m/Y" }}</td>
         <td><span class="tag {{ f.clase }}">{{ f.tipo }}</span></td>
         <td>{{ f.detalle }}</td>
-        <td>$ {{ f.obj.valor|floatformat:0 }}</td>
+        <td>{{ f.obj.valor|pesos }}</td>
         <td>{{ f.obj.estado }}</td>
+        <td>{{ f.usuario }}</td>
         {% if puede_editar %}
         <td>
           <a href="{% url 'editar' f.key f.obj.pk %}">Editar</a>
@@ -45,9 +55,10 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="6">No hay movimientos en ese rango.</td></tr>
+      <tr><td colspan="7">No hay movimientos en ese rango.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

@@ -2,10 +2,14 @@
 {% block title %}Editar{% endblock %}
 {% block content %}
 <h2>Editar {{ tipo }}</h2>
+<p class="lead">El valor original queda en auditoría. Hay que indicar por qué se cambia.</p>
 <div class="panel">
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
+    <label for="motivo_cambio">Motivo del cambio</label>
+    <input id="motivo_cambio" name="motivo_cambio" required maxlength="160" placeholder="Ej. corrección de valor">
+    <p></p>
     <button class="btn btn-primary" type="submit">Guardar cambios</button>
     <a href="{% url 'historial' %}">Volver</a>
   </form>

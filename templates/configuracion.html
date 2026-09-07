@@ -2,7 +2,7 @@
 {% block title %}Configuración{% endblock %}
 {% block content %}
 <h2>Configuración del establecimiento</h2>
-<p class="lead">Al iniciar labores se registran las actividades CIIU (puede tener varias) y los motivos de venta prestablecidos.</p>
+<p class="lead">Al iniciar labores se registran las actividades CIIU (puede tener varias) y los motivos de venta prestablecidos. Aquí también se administran los usuarios del negocio.</p>
 
 <div class="panel" style="margin-bottom:16px;">
   <h2 style="font-size:16px;">Correo del asesor contable</h2>
@@ -17,7 +17,46 @@
 </div>
 
 <div class="panel" style="margin-bottom:16px;">
+  <h2 style="font-size:16px;">Usuarios del negocio</h2>
+  <div class="tabla-wrap">
+  <table>
+    <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+      {% for p in usuarios %}
+      <tr>
+        <td>{{ p.user.get_full_name|default:p.user.username }}</td>
+        <td>{{ p.user.username }}</td>
+        <td>{{ p.get_rol_display }}</td>
+        <td>{% if p.user.is_active %}activo{% else %}inactivo{% endif %}</td>
+        <td>
+          <form method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ p.pk }}">
+            {% if p.user.is_active %}
+            <input type="hidden" name="accion" value="desactivar">
+            <button class="btn btn-ghost" type="submit">Desactivar</button>
+            {% else %}
+            <input type="hidden" name="accion" value="activar">
+            <button class="btn btn-primary" type="submit">Activar</button>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" style="margin-top:12px;">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="usuario">
+    {{ form_usuario.as_p }}
+    <button class="btn btn-primary" type="submit">Crear usuario</button>
+  </form>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
   <h2 style="font-size:16px;">Actividades CIIU</h2>
+  <div class="tabla-wrap">
   <table>
     <thead><tr><th>Código</th><th>Descripción</th><th>Tarifa ICA</th></tr></thead>
     <tbody>
@@ -32,6 +71,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <form method="post" style="margin-top:12px;">
     {% csrf_token %}
     <input type="hidden" name="accion" value="ciiu">
@@ -42,6 +82,7 @@
 
 <div class="panel">
   <h2 style="font-size:16px;">Motivos de venta prestablecidos</h2>
+  <div class="tabla-wrap">
   <table>
     <thead><tr><th>CIIU</th><th>Motivo</th><th>Por defecto</th></tr></thead>
     <tbody>
@@ -56,6 +97,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <form method="post" style="margin-top:12px;">
     {% csrf_token %}
     <input type="hidden" name="accion" value="motivo">
