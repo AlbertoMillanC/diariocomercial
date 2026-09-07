@@ -95,6 +95,11 @@ class Venta(models.Model):
     ica_estimado = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     estado = models.CharField(max_length=12, default="vigente")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["establecimiento", "fecha"], name="venta_est_fecha_idx"),
+        ]
+
     def save(self, *args, **kwargs):
         if self.fecha_hora:
             self.fecha = timezone.localtime(self.fecha_hora).date()
@@ -119,6 +124,11 @@ class Compra(models.Model):
     concepto = models.CharField(max_length=160, blank=True)
     estado = models.CharField(max_length=12, default="vigente")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["establecimiento", "fecha"], name="compra_est_fecha_idx"),
+        ]
+
     def __str__(self):
         return f"Compra {self.proveedor} {self.valor}"
 
@@ -141,6 +151,11 @@ class Retencion(models.Model):
     tercero = models.CharField(max_length=120, blank=True)
     estado = models.CharField(max_length=12, default="vigente")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["establecimiento", "fecha"], name="ret_est_fecha_idx"),
+        ]
+
     def __str__(self):
         return f"Retencion {self.tipo} {self.valor}"
 
@@ -155,16 +170,18 @@ class EnvioReporte(models.Model):
     estado_envio = models.CharField(max_length=12, default="enviado")
     total_ingresos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_egresos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_retenciones = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ica = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     def __str__(self):
         return f"Envio {self.fecha_envio} {self.estado_envio}"
 
 
 class Auditoria(models.Model):
-    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
     entidad_afectada = models.CharField(max_length=30)
-    id_registro = models.IntegerField()
-    accion = models.CharField(max_length=12)
+    id_registro = models.IntegerField(default=0)
+    accion = models.CharField(max_length=20)
     valor_anterior = models.TextField(blank=True)
     valor_nuevo = models.TextField(blank=True)
     fecha_hora = models.DateTimeField(auto_now_add=True)
