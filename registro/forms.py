@@ -12,6 +12,18 @@ class LoginForm(AuthenticationForm):
         "inactive": "Este usuario está inactivo. Pídale al propietario que lo active.",
     }
 
+    def clean(self):
+        username = self.cleaned_data.get("username")
+        password = self.cleaned_data.get("password")
+        if username and password:
+            user = User.objects.filter(username=username).first()
+            if user and not user.is_active and user.check_password(password):
+                raise forms.ValidationError(
+                    self.error_messages["inactive"],
+                    code="inactive",
+                )
+        return super().clean()
+
 
 class VentaForm(forms.ModelForm):
     nuevo_motivo = forms.CharField(
