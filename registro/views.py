@@ -484,6 +484,7 @@ def configuracion(request):
             est.correo_reportes = request.POST.get("correo_reportes", "").strip()
             est.save()
             messages.success(request, "Correo del contador actualizado.")
+            return redirect("configuracion")
         elif accion == "ciiu":
             form_ciiu = ActividadCIIUForm(request.POST, prefix="ciiu")
             if form_ciiu.is_valid():
@@ -546,7 +547,6 @@ def configuracion(request):
                 objetivo.user.save()
                 messages.success(request, f"{objetivo.user.username} quedó activo.")
             return redirect("configuracion")
-        return redirect("configuracion")
 
     usuarios = Perfil.objects.filter(establecimiento=est).select_related("user").order_by("rol", "user__username")
     return render(
