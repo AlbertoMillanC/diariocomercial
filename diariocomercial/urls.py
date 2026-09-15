@@ -24,5 +24,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("login/", LoginDiario.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("api/shadow-audit/", include("shadow_tax_audit.urls")),
     path("", include("registro.urls")),
 ]
