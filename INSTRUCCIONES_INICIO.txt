@@ -1,0 +1,86 @@
+﻿====================================================================
+  GUIA PARA INICIAR EL PROYECTO DIARIOCOMERCIAL EN TERMINAL
+====================================================================
+
+Proyecto: DiarioComercial (Django)
+Ruta: C:\Users\BUNANDUN\diariocomercial
+
+* NOTA IMPORTANTE SOBRE EL PUERTO:
+  El puerto 8000 esta siendo usado actualmente por Docker en tu equipo,
+  por lo que el proyecto se ejecuta en el PUERTO 8001.
+
+--------------------------------------------------------------------
+OPCION 1: PASOS EN POWERSHELL (Recomendado)
+--------------------------------------------------------------------
+
+1. Abre PowerShell.
+
+2. Entra a la carpeta del proyecto:
+   cd C:\Users\BUNANDUN\diariocomercial
+
+3. Activa el entorno virtual:
+   .\.venv\Scripts\Activate.ps1
+
+   * Si te sale un error de "politica de ejecucion" (ExecutionPolicy), corre:
+     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+     .\.venv\Scripts\Activate.ps1
+
+4. Inicia el servidor en el puerto 8001:
+   python manage.py runserver 8001
+
+5. Abre en tu navegador:
+   http://127.0.0.1:8001/login/
+
+
+--------------------------------------------------------------------
+OPCION 2: PASOS EN CMD (Simbolo del sistema)
+--------------------------------------------------------------------
+
+1. Abre CMD.
+
+2. Ve a la carpeta del proyecto:
+   cd C:\Users\BUNANDUN\diariocomercial
+
+3. Activa el entorno virtual:
+   .venv\Scripts\activate.bat
+
+4. Inicia el servidor en el puerto 8001:
+   python manage.py runserver 8001
+
+5. Abre en tu navegador:
+   http://127.0.0.1:8001/login/
+
+
+--------------------------------------------------------------------
+OPCION 3: INICIO DIRECTO EN 1 SOLA LINEA
+--------------------------------------------------------------------
+
+Desde PowerShell dentro de C:\Users\BUNANDUN\diariocomercial:
+   .\.venv\Scripts\python.exe manage.py runserver 8001
+
+
+--------------------------------------------------------------------
+CREDENCIALES DE ACCESO (Usuarios Demo ya creados)
+--------------------------------------------------------------------
+
+* Rol Propietaria:
+  Usuario:  maria.gomez
+  Password: tunja2026
+
+* Rol Dependiente:
+  Usuario:  carlos.ruiz
+  Password: tunja2026
+
+
+--------------------------------------------------------------------
+COMANDOS UTILES
+--------------------------------------------------------------------
+
+- Detener el servidor:
+  Ctrl + C en la terminal.
+
+- Pruebas unitarias:
+  python manage.py test registro
+
+- Recargar base de datos demo:
+  python manage.py cargar_demo

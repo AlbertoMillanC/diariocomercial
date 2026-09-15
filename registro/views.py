@@ -61,13 +61,28 @@ def _rango_mes():
 
 
 def _parse_rango(data):
+    hoy = date.today()
+    periodo = (data.get("periodo") or "").strip()
+    if periodo == "hoy":
+        return hoy, hoy, False
+    elif periodo == "este_mes":
+        return hoy.replace(day=1), hoy, False
+    elif periodo == "mes_anterior":
+        from datetime import timedelta
+        primer_dia_este_mes = hoy.replace(day=1)
+        ultimo_dia_mes_ant = primer_dia_este_mes - timedelta(days=1)
+        primer_dia_mes_ant = ultimo_dia_mes_ant.replace(day=1)
+        return primer_dia_mes_ant, ultimo_dia_mes_ant, False
+    elif periodo == "ano":
+        return hoy.replace(month=1, day=1), hoy, False
+
     mes_desde, hoy = _rango_mes()
     desde = parse_date(data.get("desde") or "") or mes_desde
     hasta = parse_date(data.get("hasta") or "") or hoy
     return desde, hasta, hasta < desde
 
 
-def _totales(establecimiento, desde, hasta):
+def _totales(establecimiento, desde, hasta, usuario_id=None):
     ventas = Venta.objects.filter(
         establecimiento=establecimiento, estado="vigente", fecha__range=(desde, hasta)
     )
@@ -77,6 +92,10 @@ def _totales(establecimiento, desde, hasta):
     rets = Retencion.objects.filter(
         establecimiento=establecimiento, estado="vigente", fecha__range=(desde, hasta)
     )
+    if usuario_id:
+        ventas = ventas.filter(usuario_id=usuario_id)
+        compras = compras.filter(usuario_id=usuario_id)
+        rets = rets.filter(usuario_id=usuario_id)
     ingresos = sum((v.valor for v in ventas), Decimal("0"))
     ica = sum((v.ica_estimado for v in ventas), Decimal("0"))
     egresos = sum((c.valor for c in compras), Decimal("0"))
@@ -315,17 +334,22 @@ def historial(request):
     est = perfil.establecimiento
     desde, hasta, rango_malo = _parse_rango(request.GET)
     tipo = request.GET.get("tipo") or "todos"
+    usuario_id = request.GET.get("usuario") or ""
+    usuarios_negocio = User.objects.filter(perfil__establecimiento=est).order_by("first_name", "username")
     filas = []
     if rango_malo:
         messages.error(request, "La fecha hasta no puede ser menor que la fecha desde.")
         ingresos = egresos = retenciones = ica = neto = Decimal("0")
     else:
         if tipo in ("todos", "venta"):
-            for v in (
+            qs_ventas = (
                 Venta.objects.filter(establecimiento=est, fecha__range=(desde, hasta))
                 .select_related("usuario", "actividad")
                 .order_by("-fecha_hora")
-            ):
+            )
+            if usuario_id:
+                qs_ventas = qs_ventas.filter(usuario_id=usuario_id)
+            for v in qs_ventas:
                 ciiu = v.actividad.codigo if v.actividad else ""
                 filas.append(
                     {
@@ -339,11 +363,14 @@ def historial(request):
                     }
                 )
         if tipo in ("todos", "compra"):
-            for c in (
+            qs_compras = (
                 Compra.objects.filter(establecimiento=est, fecha__range=(desde, hasta))
                 .select_related("usuario")
                 .order_by("-fecha")
-            ):
+            )
+            if usuario_id:
+                qs_compras = qs_compras.filter(usuario_id=usuario_id)
+            for c in qs_compras:
                 filas.append(
                     {
                         "obj": c,
@@ -356,11 +383,14 @@ def historial(request):
                     }
                 )
         if tipo in ("todos", "retencion"):
-            for r in (
+            qs_rets = (
                 Retencion.objects.filter(establecimiento=est, fecha__range=(desde, hasta))
                 .select_related("usuario")
                 .order_by("-fecha")
-            ):
+            )
+            if usuario_id:
+                qs_rets = qs_rets.filter(usuario_id=usuario_id)
+            for r in qs_rets:
                 filas.append(
                     {
                         "obj": r,
@@ -373,7 +403,7 @@ def historial(request):
                     }
                 )
         filas.sort(key=lambda x: str(x["cuando"]), reverse=True)
-        ingresos, egresos, retenciones, ica, neto = _totales(est, desde, hasta)
+        ingresos, egresos, retenciones, ica, neto = _totales(est, desde, hasta, usuario_id=usuario_id)
     return render(
         request,
         "historial.html",
@@ -382,6 +412,8 @@ def historial(request):
             "desde": desde,
             "hasta": hasta,
             "tipo": tipo,
+            "usuarios_negocio": usuarios_negocio,
+            "usuario_filtro": usuario_id,
             "ingresos": ingresos,
             "egresos": egresos,
             "retenciones": retenciones,
@@ -425,7 +457,10 @@ def editar_movimiento(request, tipo, pk):
                 _snapshot(guardado),
                 motivo,
             )
-            messages.success(request, "Registro actualizado.")
+            messages.success(
+                request,
+                f"{tipo.capitalize()} #{guardado.pk} actualizada con éxito (motivo: \"{motivo}\"). Cambio registrado en auditoría.",
+            )
             return redirect("historial")
     return render(request, "editar_form.html", {"form": form, "tipo": tipo})
 
@@ -461,7 +496,10 @@ def anular_movimiento(request, tipo, pk):
                         "Anulada junto con la venta",
                     )
             _audit(request.user, tipo, obj, "anular", antes, _snapshot(obj), motivo)
-            messages.success(request, "Registro anulado. No se borra, queda en el historial.")
+            messages.success(
+                request,
+                f"{tipo.capitalize()} #{obj.pk} anulada exitosamente (motivo: \"{motivo}\"). No se borra físicamente, queda registrada en auditoría.",
+            )
             return redirect("historial")
     return render(request, "anular_confirm.html", {"obj": obj, "tipo": tipo})
 

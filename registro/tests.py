@@ -337,3 +337,30 @@ class DiarioComercialTests(TestCase):
         )
         ana.refresh_from_db()
         self.assertFalse(ana.is_active)
+
+    def test_filtros_periodo_rapido_y_usuario_en_historial(self):
+        self._login()
+        Venta.objects.create(
+            establecimiento=self.est,
+            usuario=self.maria,
+            fecha=self.hoy,
+            valor=Decimal("50000"),
+            concepto="Venta Maria",
+        )
+        Venta.objects.create(
+            establecimiento=self.est,
+            usuario=self.carlos,
+            fecha=self.hoy,
+            valor=Decimal("30000"),
+            concepto="Venta Carlos",
+        )
+        # Acceso con periodo rápido
+        resp_mes = self.client.get(reverse("inicio"), {"periodo": "este_mes"})
+        self.assertEqual(resp_mes.status_code, 200)
+
+        # Filtro por usuario específico en historial
+        resp_carlos = self.client.get(reverse("historial"), {"usuario": str(self.carlos.pk)})
+        self.assertEqual(resp_carlos.status_code, 200)
+        self.assertEqual(len(resp_carlos.context["filas"]), 1)
+        self.assertEqual(resp_carlos.context["filas"][0]["obj"].concepto, "Venta Carlos")
+        self.assertEqual(resp_carlos.context["ingresos"], Decimal("30000"))

@@ -15,7 +15,23 @@
       <option value="retencion" {% if tipo == 'retencion' %}selected{% endif %}>Retenciones</option>
     </select>
   </div>
+  <div>
+    <label>Usuario</label>
+    <select name="usuario">
+      <option value="">Todos los usuarios</option>
+      {% for u in usuarios_negocio %}
+      <option value="{{ u.id }}" {% if usuario_filtro == u.id|stringformat:"s" %}selected{% endif %}>
+        {{ u.get_full_name|default:u.username }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
   <button class="btn btn-primary" type="submit">Consultar</button>
+  <div class="periodos-rapidos">
+    <a class="btn btn-ghost btn-sm" href="?periodo=hoy{% if tipo != 'todos' %}&tipo={{ tipo }}{% endif %}{% if usuario_filtro %}&usuario={{ usuario_filtro }}{% endif %}">Hoy</a>
+    <a class="btn btn-ghost btn-sm" href="?periodo=este_mes{% if tipo != 'todos' %}&tipo={{ tipo }}{% endif %}{% if usuario_filtro %}&usuario={{ usuario_filtro }}{% endif %}">Este mes</a>
+    <a class="btn btn-ghost btn-sm" href="?periodo=mes_anterior{% if tipo != 'todos' %}&tipo={{ tipo }}{% endif %}{% if usuario_filtro %}&usuario={{ usuario_filtro }}{% endif %}">Mes anterior</a>
+  </div>
   {% if puede_editar %}
   <a class="btn btn-accent" href="{% url 'enviar_reporte' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Enviar reporte</a>
   {% endif %}

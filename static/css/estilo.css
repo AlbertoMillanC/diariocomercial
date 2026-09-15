@@ -34,6 +34,8 @@ h2 { margin: 0 0 8px; }
 .btn-ghost { background: #fff; border: 1px solid var(--line); color: var(--navy); }
 .btn-accent { background: var(--orange); color: #fff; }
 .btn-danger { background: #a33b32; color: #fff; }
+.btn-sm { padding: 6px 10px; font-size: 12px; font-weight: normal; }
+.periodos-rapidos { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
