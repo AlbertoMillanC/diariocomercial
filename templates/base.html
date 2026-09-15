@@ -28,6 +28,7 @@
     <a href="{% url 'compra_nueva' %}" class="{% if request.resolver_match.url_name == 'compra_nueva' %}activo{% endif %}">Compras</a>
     <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
     <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
+    <a href="{% url 'portal_web' %}" class="{% if request.resolver_match.url_name == 'portal_web' %}activo{% endif %}">🌐 Web/Móvil</a>
     {% if user.perfil.es_propietario %}
     <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
     <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>

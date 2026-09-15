@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Portal Web & Móvil — DiarioComercial{% endblock %}
+{% block content %}
+<style>
+  .portal-header {
+    background: linear-gradient(135deg, #12323a 0%, #1b6b7a 100%);
+    color: #fff;
+    padding: 24px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(18, 50, 58, 0.15);
+  }
+  .portal-header h2 { margin: 0 0 6px 0; font-size: 24px; color: #fff; }
+  .portal-badge {
+    background: #e6f3ea;
+    color: #1b6b7a;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .portal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 800px) {
+    .portal-grid { grid-template-columns: 1fr; }
+  }
+  .portal-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  }
+  .portal-card h3 { margin-top: 0; font-size: 18px; color: var(--navy); }
+  .portal-input-group {
+    margin-bottom: 12px;
+  }
+  .portal-input-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .portal-input-group input, .portal-input-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .cloud-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #1b6b7a;
+    background: #eef7f8;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-top: 14px;
+  }
+  .pulse-dot {
+    width: 10px;
+    height: 10px;
+    background: #28a745;
+    border-radius: 50%;
+    box-shadow: 0 0 0 rgba(40, 167, 69, 0.4);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(40, 167, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+  }
+  .qr-box {
+    background: #fdfbf7;
+    border: 1px dashed var(--teal);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    margin-top: 16px;
+  }
+</style>
+
+<div class="portal-header">
+  <span class="portal-badge">Exploración Front Web & Cloud</span>
+  <h2>Acceso Web DiarioComercial para Comerciantes</h2>
+  <p style="margin:0; opacity:0.9; font-size:14px;">
+    Esta interfaz permite operar DiarioComercial desde cualquier teléfono celular, tablet o computador remoto sin requerir instalación local ni entorno de escritorio.
+  </p>
+</div>
+
+<div class="portal-grid">
+  <!-- Tarjeta 1: Registro Rápido Táctil (Móvil / Web) -->
+  <div class="portal-card">
+    <h3>📱 Registro Rápido de Venta (Web Táctil)</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">
+      Diseñado para dependientes en mostrador que usan el celular o pantalla táctil del negocio.
+    </p>
+
+    <form method="post" action="{% url 'venta_nueva' %}">
+      {% csrf_token %}
+      <input type="hidden" name="fecha" value="{{ hoy|date:'Y-m-d' }}">
+      <input type="hidden" name="tipo_cliente" value="particular">
+
+      <div class="portal-input-group">
+        <label>Monto de la Venta ($ COP)</label>
+        <input type="number" name="valor" step="100" placeholder="Ej. 25000" required autofocus>
+      </div>
+
+      <div class="portal-input-group">
+        <label>Actividad CIIU / Tarifa</label>
+        <select name="actividad" required>
+          {% for act in actividades %}
+            <option value="{{ act.id }}">{{ act.codigo }} — {{ act.descripcion }} ({{ act.tarifa_x_mil }}x1000)</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="portal-input-group">
+        <label>Concepto / Observación rápida</label>
+        <input type="text" name="concepto" placeholder="Ej. Venta mostrador #3" value="Venta web móvil">
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px;">
+        ⚡ Guardar Venta Inmediata
+      </button>
+    </form>
+  </div>
+
+  <!-- Tarjeta 2: Conexión Remota y Estado de Servicio Cloud -->
+  <div class="portal-card">
+    <h3>☁️ Estado de Conexión y Acceso Cloud</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:14px;">
+      El comerciante puede monitorear sus cifras desde casa o autorizar acceso remoto a su contador.
+    </p>
+
+    <div class="cloud-indicator">
+      <div class="pulse-dot"></div>
+      <div><strong>Servicio Web Activo:</strong> Sincronizado en tiempo real con la base de datos central.</div>
+    </div>
+
+    <div class="qr-box">
+      <strong style="color:var(--navy); font-size:14px; display:block; margin-bottom:6px;">
+        📲 Acceso Móvil mediante Red Local / Túnel
+      </strong>
+      <code style="background:#fff; padding:6px 12px; border-radius:6px; font-size:13px; border:1px solid var(--line); display:inline-block;">
+        http://{{ host_ip }}:8001/portal/
+      </code>
+      <p style="font-size:12px; color:var(--muted); margin:8px 0 0;">
+        Al ingresar desde el navegador del celular, la pantalla se ajusta automáticamente al formato táctil.
+      </p>
+    </div>
+
+    <div style="margin-top: 18px; display: flex; gap: 10px;">
+      <a class="btn btn-ghost" style="flex:1; text-align:center;" href="{% url 'inicio' %}">Ver Tablero Clásico</a>
+      <a class="btn btn-accent" style="flex:1; text-align:center;" href="{% url 'historial' %}">Historial Completo</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

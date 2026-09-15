@@ -697,3 +697,21 @@ def enviar_reporte(request):
             "envios": envios,
         },
     )
+
+
+@login_required
+def portal_web(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    actividades = ActividadCIIU.objects.filter(establecimiento=est)
+    return render(
+        request,
+        "portal_web.html",
+        {
+            "hoy": date.today(),
+            "actividades": actividades,
+            "host_ip": request.get_host().split(":")[0],
+        },
+    )

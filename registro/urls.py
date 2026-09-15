@@ -12,4 +12,5 @@ urlpatterns = [
     path("configuracion/", views.configuracion, name="configuracion"),
     path("auditoria/", views.auditoria, name="auditoria"),
     path("enviar/", views.enviar_reporte, name="enviar_reporte"),
+    path("portal/", views.portal_web, name="portal_web"),
 ]
