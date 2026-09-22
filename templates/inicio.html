@@ -8,12 +8,6 @@
   <div><label>Desde</label><input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"></div>
   <div><label>Hasta</label><input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"></div>
   <button class="btn btn-primary" type="submit">Consultar</button>
-  <div class="periodos-rapidos">
-    <a class="btn btn-ghost btn-sm" href="?periodo=hoy">Hoy</a>
-    <a class="btn btn-ghost btn-sm" href="?periodo=este_mes">Este mes</a>
-    <a class="btn btn-ghost btn-sm" href="?periodo=mes_anterior">Mes anterior</a>
-    <a class="btn btn-ghost btn-sm" href="?periodo=ano">Este año</a>
-  </div>
 </form>
 <div class="cards cards-5">
   <div class="card"><span>Ingresos brutos</span><strong>{{ ingresos|pesos }}</strong></div>
