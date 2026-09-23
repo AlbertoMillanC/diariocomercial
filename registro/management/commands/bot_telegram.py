@@ -62,6 +62,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         token = options.get("token") or os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not token and os.path.exists(".env"):
+            try:
+                with open(".env", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("TELEGRAM_BOT_TOKEN="):
+                            token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+            except Exception:
+                pass
 
         if not token:
             self.stdout.write(
