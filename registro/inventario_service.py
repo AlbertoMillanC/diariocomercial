@@ -476,16 +476,71 @@ def generar_resumen_general_categorias(establecimiento) -> str:
     return "\n".join(lineas)
 
 
+def limpiar_termino_consulta(texto: str) -> Optional[str]:
+    """
+    Extrae únicamente el nombre del producto de una pregunta o frase,
+    removiendo saludos, verbos y prefijos cotidianos como:
+      'tienes pan' -> 'pan'
+      'tiene salchichas' -> 'salchichas'
+      'hay queso' -> 'queso'
+      'tienen huevos?' -> 'huevos'
+      'cuanto vale el arroz' -> 'arroz'
+      'a como tiene el tomate' -> 'tomate'
+      'buenas vecino tiene panela' -> 'panela'
+      'tienes' -> None (no es producto)
+      'hay' -> None (no es producto)
+    """
+    t = normalizar_texto(texto)
+    t = re.sub(r"[¿\?\.!,;:_]", " ", t)
+
+    # 1. Quitar saludos y fórmulas de cortesía
+    t = re.sub(
+        r"\b(hola|buenas|buenos dias|buenas tardes|buenas noches|vecino|vecina|amigo|amiga|don|dona|por favor|favor)\b",
+        " ",
+        t,
+    )
+
+    # 2. Quitar verbos y fórmulas de pregunta o disponibilidad
+    patrones_verbos = [
+        r"\b(?:cuanto\s+(?:vale|cuesta)|a\s+como(?:\s+esta|\s+sale)?|precio(?:\s+de|\s+del)?)\b",
+        r"\b(?:me\s+vende|me\s+da|deme|regalame|vengo\s+por|busco|quiero|necesito)\b",
+        r"\b(?:tienes|tiene|tenes|tienen|tenemos|tengo)\b",
+        r"\b(?:hay|habra|habria|queda|quedan|quedo)\b",
+        r"\b(?:vendes|vende|venden|vender)\b",
+        r"\b(?:consigue|consigues|consiguen|trae|traes|trajeron)\b",
+        r"\b(?:disponible|disponibles)\b",
+    ]
+    for patron in patrones_verbos:
+        t = re.sub(patron, " ", t)
+
+    # 3. Quitar artículos, preposiciones y cuantificadores vagos al inicio o aislados
+    t = re.sub(r"\b(?:de|del|el|la|los|las|un|una|unos|unas|algun|alguna|algunos|algunas|para)\b", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+
+    # 4. Lista negra de palabras que jamás son un producto
+    palabras_invalidas = {
+        "tienes", "tiene", "tenes", "tienen", "tenemos", "tengo", "hay", "queda",
+        "quedan", "vendes", "vende", "venden", "cuanto", "vale", "cuesta", "precio",
+        "algo", "que", "para", "por", "favor", "buenas", "hola", "don", "dona", "vecino"
+    }
+
+    if not t or t in palabras_invalidas or len(t) < 2:
+        return None
+
+    return t
+
+
 def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]:
     """
     Detecta si el mensaje es una pregunta en lenguaje natural sobre inventario:
       - 'que carnes tengo', 'que abarrotes hay', 'que lacteos hay', 'que verduras hay'
-      - 'tenemos carne...', 'tenemos tocino...', 'tenemos arroz?', 'tenemos huevos'
-      - 'hay tocino?', 'hay leche?', 'queda queso?'
+      - 'tienes pan', 'tienes salchicha', 'hay queso campesino', 'tenemos tocino'
       - 'cuanto vale el arroz', 'cuanto cuesta la pechuga', 'precio del tocino'
     Retorna la respuesta formateada o None si no corresponde a una consulta de inventario.
     """
     t = normalizar_texto(texto).strip()
+    if texto.strip().startswith("/") or "/" in t:
+        return None
     t_limpio = re.sub(r"[¿\?\.!]", "", t).strip()
 
     # 1. Preguntas de categorías completas: "que carnes tengo", "que abarrotes hay"
@@ -497,31 +552,37 @@ def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]
         cat_pedida = m_cat.group(1)
         return generar_lista_categoria(establecimiento, cat_pedida)
 
-    # 2. Preguntas sobre si hay un producto o cuánto cuesta:
-    # "tenemos tocino", "tenemos carne", "hay leche", "queda arroz", "tienen huevos"
-    # "cuanto vale el tocino", "cuanto cuesta la carne", "precio del arroz"
-    patron_pregunta = r"^(?:tenemos|hay|tienen|queda|disponible|cuanto\s+(?:cuesta|vale)|precio(?:\s+de)?)\s+(?:el\s+|la\s+|los\s+|las\s+|de\s+)?(.+)$"
-    m_prod = re.match(patron_pregunta, t_limpio)
-
-    termino_busqueda = None
-    if m_prod:
-        termino_busqueda = m_prod.group(1).strip()
-    elif t.endswith("?") and not any(k in t for k in ("venta", "compra", "retencion")):
-        termino_busqueda = t_limpio
-    elif not any(char.isdigit() for char in t_limpio):
-        palabras = t_limpio.split()
-        comandos_excluidos = (
-            "venta", "vendi", "compra", "retencion", "anular", "resumen",
-            "consolidado", "ayuda", "historial", "start", "hola", "hoy", "caja",
-            "comprar", "pedido", "pedidos", "faltantes"
+    # 2. Si solo escribió "tienes", "tiene", "hay" sin nombrar producto
+    if t_limpio in ("tienes", "tiene", "tenes", "tienen", "tenemos", "hay", "que tienes", "que tiene", "que hay", "buenas tienes"):
+        return (
+            "💬 *¿Qué producto estás buscando?*\n\n"
+            "Puedes preguntarme por ejemplo:\n"
+            "• _¿Tienes pan?_\n"
+            "• _¿Hay salchicha?_\n"
+            "• _¿Cuánto vale el queso campesino?_\n"
+            "• _¿Tenemos tocino?_\n\n"
+            "O escribe `/inventario` para ver los departamentos disponibles."
         )
-        if 1 <= len(palabras) <= 3 and not any(k in t_limpio for k in comandos_excluidos):
-            termino_busqueda = t_limpio
 
+    # 3. No procesar si es un comando contable o de venta explícita
+    comandos_excluidos = (
+        "venta", "vendi", "compra", "retencion", "anular", "resumen",
+        "consolidado", "ayuda", "historial", "start", "hoy", "caja",
+        "comprar", "pedido", "pedidos", "faltantes"
+    )
+    if any(k in t_limpio for k in comandos_excluidos):
+        return None
+
+    # Si contiene dígitos (números de dinero o peso), dejarlo pasar para registro de venta
+    if any(char.isdigit() for char in t_limpio):
+        return None
+
+    # 4. Extraer el nombre limpio del producto sin 'tienes', 'hay', artículos, etc.
+    termino_busqueda = limpiar_termino_consulta(t_limpio)
     if not termino_busqueda:
         return None
 
-    # Si preguntó genéricamente "tenemos carne" o "hay carne", mostrar cortes
+    # Si preguntó genéricamente "carne" o "abarrotes", mostrar categoría
     if termino_busqueda in ("carne", "carnes"):
         return generar_lista_categoria(establecimiento, "carnes")
     if termino_busqueda in ("abarrote", "abarrotes", "viveres", "grano", "granos"):
@@ -535,7 +596,7 @@ def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]
     if termino_busqueda in ("aseo", "limpieza"):
         return generar_lista_categoria(establecimiento, "aseo")
 
-    # Buscar producto específico
+    # Buscar producto específico en catálogo
     prod = buscar_producto_en_texto(establecimiento, termino_busqueda)
     if prod:
         estado_icono = "✅" if prod.stock_kilos > 0 else "⚠️"
@@ -593,11 +654,9 @@ def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]
         )
 
     # Si no se encontró en el catálogo: agregarlo a productos solicitados por clientes
-    nombre_limpio = re.sub(
-        r"^(de\s+|el\s+|la\s+|los\s+|las\s+|un\s+|una\s+|unos\s+|unas\s+)", "", termino_busqueda
-    ).strip().capitalize()
+    nombre_limpio = termino_busqueda.strip().capitalize()
 
-    if len(nombre_limpio) >= 3:
+    if len(nombre_limpio) >= 2:
         item = registrar_o_actualizar_pedido(
             establecimiento=establecimiento,
             nombre_producto=nombre_limpio,
@@ -664,8 +723,10 @@ def registrar_o_actualizar_pedido(
         pendientes = ItemPedido.objects.filter(
             establecimiento=establecimiento, estado="pendiente"
         )
+        n_norm = normalizar_texto(nombre_limpio)
         for p in pendientes:
-            if normalizar_texto(p.nombre_producto) == normalizar_texto(nombre_limpio):
+            p_norm = normalizar_texto(p.nombre_producto)
+            if p_norm == n_norm or p_norm == n_norm.rstrip("s") or n_norm == p_norm.rstrip("s"):
                 item = p
                 break
 
