@@ -1,4 +1,4 @@
-﻿====================================================================
+====================================================================
   GUIA PARA INICIAR EL PROYECTO DIARIOCOMERCIAL EN TERMINAL
 ====================================================================
 
@@ -76,7 +76,13 @@ CREDENCIALES DE ACCESO (Usuarios Demo ya creados)
 COMANDOS UTILES
 --------------------------------------------------------------------
 
-- Detener el servidor:
+- Iniciar el Bot de Telegram:
+  .\.venv\Scripts\python.exe -u manage.py bot_telegram
+
+- Iniciar el Servidor Web (Puerto 8001):
+  .\.venv\Scripts\python.exe manage.py runserver 8001
+
+- Detener cualquier proceso:
   Ctrl + C en la terminal.
 
 - Pruebas unitarias:
@@ -84,3 +90,75 @@ COMANDOS UTILES
 
 - Recargar base de datos demo:
   python manage.py cargar_demo
+
+
+====================================================================
+  GUIA COMPLETA DE COMANDOS DEL BOT DE TELEGRAM (@DiarioComercial_bot)
+====================================================================
+
+1. CONSULTAS DE INVENTARIO POR DEPARTAMENTOS:
+   /inventario  -> Resumen general de stock global en kilos y valor total COP
+   /carnes      -> Lista de cortes de carniceria (Kilo, Libra y Gramo)
+   /abarrotes   -> Viveres, arroz, granos, aceites, harinas y pastas
+   /lacteos     -> Leches, quesos, mantequillas y huevos campesinos
+   /fruver      -> Frutas, verduras, papas y platanos
+   /bebidas     -> Gaseosas, aguas embotelladas y jugos
+   /aseo        -> Detergentes, jabones de ropa/bano y papel higienico
+
+2. LISTA DE COMPRAS Y PEDIDOS A PROVEEDORES:
+   /comprar     -> Muestra la lista formal de compras dividida en:
+                   * 🔴 Agotados en tienda (urgente reposicion)
+                   * 🟡 Stock bajo (alerta preventiva <= 3 Kg)
+                   * 🔵 Solicitados por clientes (productos que no existen)
+                   * ⚪ Agregados manualmente
+   /pedidos     -> Mismo reporte de /comprar
+   /faltantes   -> Mismo reporte de /comprar
+
+   * Preguntas en lenguaje cotidiano para compras:
+     - "¿Que debo comprar?"
+     - "¿Que se acabo?"
+     - "¿Que falta comprar?"
+     - "Lista de compras"
+
+   * Registro automatico de productos no existentes:
+     - Escribe: "salchicha", "salchichas", "tienes pan", "hay arepas"
+     - El bot detecta que no estan en inventario, infiere su categoria
+       y lo anade a compras futuras con contador de veces solicitado.
+
+3. PREGUNTAS EN LENGUAJE NATURAL (STOCK Y PRECIOS):
+   - "¿Tenemos tocino?"       -> Existencias en Kilos, Libras, Gramos y precio
+   - "Tienes pan"             -> Detecta "Pan" y si no hay lo anade a compras
+   - "Hay queso campesino?"   -> Existencias y precio por Kilo, Libra y Gramo
+   - "¿Que carnes tengo?"     -> Lista completa de carniceria
+   - "¿Que abarrotes hay?"    -> Lista completa de viveres
+   - "¿Cuanto vale la pechuga?" -> Precios vigentes
+
+4. VENTAS RAPIDAS (Calcula gramos exactos y descuenta stock):
+   - 40 mil carne molida      -> Calcula gramos segun precio/gramo y descuenta
+   - 40000 carne molida       -> Mismo efecto en formato numerico
+   - 20 mil tocino            -> Venta rapida en dinero
+   - 15 mil costilla          -> Venta rapida en dinero
+   - 10 mil arroz             -> Descuenta gramos de arroz
+   - 1 libra de carne molida  -> Descuenta 500 gramos exactos
+   - 2 kilos de papa          -> Descuenta 2.000 gramos exactos
+   - Venta 50000 mostrador    -> Venta general particular sin producto
+   - Venta empresa 300000 Boyaca SAS -> Genera retencion ICA
+
+5. REPORTES CONTABLES Y CIERRES:
+   - /hoy         -> Cierre de caja en vivo (Ingresos, Egresos, ICA)
+   - /resumen     -> Balance acumulado del mes
+   - /ultimas     -> Ultimos 5 movimientos con ID de comprobante
+   - /ica         -> Estimacion del impuesto ICA Tunja
+   - /consolidado -> ENVIA EL ARCHIVO EXCEL OFICIAL PARA EL CONTADOR
+                     (Firmado: CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB)
+
+6. ANULACIONES CON AUDITORIA Y RESTAURACION DE INVENTARIO:
+   - /anular <ID> <motivo>
+     Ejemplo: /anular 15 Error de digitacion en caja
+     (Anula el comprobante, restaura los gramos al inventario y registra auditoria)
+
+7. PANEL WEB DJANGO (Navegador):
+   - Inventario:    http://127.0.0.1:8001/inventario/
+   - Lista Compras: http://127.0.0.1:8001/pedidos/
+   - Ventas:        http://127.0.0.1:8001/ventas/nueva/
+   - Compras:       http://127.0.0.1:8001/compras/nueva/

@@ -1,0 +1,131 @@
+================================================================================
+          LISTA COMPLETA DE COMANDOS Y MENSAJES - BOT TELEGRAM DIARIOCOMERCIAL
+                             Bot: @DiarioComercial_bot
+================================================================================
+
+--------------------------------------------------------------------------------
+1. COMANDOS DE INVENTARIO Y DEPARTAMENTOS
+--------------------------------------------------------------------------------
+  /inventario   -> Muestra el resumen global de existencias (Kg totales) y valor COP.
+  /carnes       -> Muestra todos los cortes de carnicería con precios (Kg, lb, g) y stock.
+  /abarrotes    -> Víveres, arroz, frijol, lenteja, garbanzo, aceite, azúcar, harinas.
+  /lacteos      -> Leche entera, quesos campesino/doble crema, huevos campesinos.
+  /fruver       -> Frutas, verduras, papas pastusa/criolla, plátanos, tomates, cebollas.
+  /bebidas      -> Gaseosas personal/familiar, agua mineral embotellada, jugos, cerveza.
+  /aseo         -> Detergentes en polvo/líquido, jabones, blanqueador, papel higiénico.
+
+  * También funcionan sin la barra diagonal:
+    inventario, carnes, abarrotes, lacteos, fruver, bebidas, aseo.
+
+
+--------------------------------------------------------------------------------
+2. LISTA DE COMPRAS Y PEDIDOS A PROVEEDORES
+--------------------------------------------------------------------------------
+  /comprar      -> Reporte completo de productos a comprar organizado en 4 grupos:
+                   1) 🔴 Inventario Agotado (urgente reposición, stock en 0 Kg)
+                   2) 🟡 Stock Bajo (alerta preventiva <= 3 Kg)
+                   3) 🔵 Solicitados por Clientes (productos que no existen en tienda)
+                   4) ⚪ Agregados Manualmente desde el panel web
+  /pedidos      -> Mismo reporte de compras pendientes.
+  /faltantes    -> Mismo reporte de compras pendientes.
+
+  * Preguntas en lenguaje cotidiano para consultar compras:
+    • ¿Qué debo comprar?
+    • ¿Qué se acabó?
+    • ¿Qué falta comprar?
+    • Lista de compras
+    • ¿Qué falta?
+
+  * Agregar productos que no existen a compras futuras:
+    • Si un cliente te pregunta por un producto que la tienda no vende, escríbelo:
+      - salchicha
+      - salchichas
+      - tienes pan
+      - hay arepas
+      - tienes kumis
+    • El bot detecta que no existe en el catálogo, limpia los verbos ("tienes", "hay"),
+      infiere la categoría adecuada y lo agrega a la lista de compras con contador
+      de cuántas veces lo han pedido los clientes.
+
+
+--------------------------------------------------------------------------------
+3. CONSULTAS EN LENGUAJE NATURAL (STOCK Y PRECIOS)
+--------------------------------------------------------------------------------
+  Pregunta como si hablaras con una persona normal:
+  • ¿Tenemos tocino?         -> Te da kilos, libras, gramos y precios de Kilo, Libra y Gramo.
+  • ¿Hay queso campesino?    -> Te indica si está disponible o agotado y sus precios.
+  • ¿Cuánto vale la pechuga? -> Precios vigentes.
+  • ¿Queda carne molida?     -> Existencias exactas en gramos y kilos.
+  • ¿Qué carnes tengo?       -> Despliega todos los cortes de carnicería.
+  • ¿Qué abarrotes hay?      -> Despliega todo el catálogo de granos y víveres.
+  • ¿Qué lácteos hay?        -> Despliega leches, quesos y huevos.
+
+
+--------------------------------------------------------------------------------
+4. VENTAS RÁPIDAS (DESCUENTO EXACTO EN GRAMOS SEGÚN EL PRECIO)
+--------------------------------------------------------------------------------
+  A. Venta por Dinero (Calcula gramos exactos y descuenta del stock):
+     • 40 mil carne molida    -> Calcula los gramos según el precio/gramo y descuenta.
+     • 40000 carne molida     -> Mismo efecto con cifra numérica.
+     • 20 mil tocino          -> Descuenta gramos de tocino y guarda comprobante.
+     • 15 mil costilla        -> Descuenta gramos de costilla de cerdo.
+     • 10 mil arroz           -> Descuenta gramos de arroz blanco.
+     • 5 mil papa             -> Descuenta gramos de papa pastusa.
+
+  B. Venta por Peso explícito:
+     • 1 libra de carne molida -> Descuenta 500 gramos exactos.
+     • media libra de tocino   -> Descuenta 250 gramos exactos.
+     • 2 kilos de costilla     -> Descuenta 2.000 gramos exactos.
+     • 500g pechuga            -> Descuenta 500 gramos exactos.
+
+  C. Ventas Generales de Mostrador:
+     • Venta 50000 mostrador   -> Venta particular de $50.000 COP con ICA estimado.
+
+  D. Ventas a Empresas con Retención ReteICA:
+     • Venta empresa 300000 Boyaca SAS -> Genera comprobante con deducción de ICA.
+
+
+--------------------------------------------------------------------------------
+5. GASTOS Y COMPRAS A PROVEEDORES
+--------------------------------------------------------------------------------
+  • Compra 80000 Distribuidora Boyaca -> Registra egreso en el libro diario.
+  • Compra 150000 Frigorifico Central -> Registra egreso con fecha y comprobante.
+
+
+--------------------------------------------------------------------------------
+6. REPORTES CONTABLES Y ARCHIVOS PARA EL CONTADOR
+--------------------------------------------------------------------------------
+  /hoy          -> Cierre de caja en vivo del día de hoy:
+                   Total ventas, total compras/gastos, balance neto e ICA del día.
+  /resumen      -> Balance consolidado acumulado del mes en curso.
+  /ultimas      -> Últimos 5 movimientos registrados con su ID para control.
+  /ica          -> Detalle del impuesto de Industria y Comercio (ICA Tunja) acumulado.
+  /consolidado  -> GENERA Y ENVÍA EL ARCHIVO EXCEL OFICIAL (.XLSX) PARA EL CONTADOR:
+                   Incluye Libro Diario, Resumen Ejecutivo, Retenciones de ICA,
+                   Cálculo de ICA Tunja y está firmado formalmente por:
+                   CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB
+
+
+--------------------------------------------------------------------------------
+7. ANULACIONES CON AUDITORÍA Y REVERSIÓN DE STOCK
+--------------------------------------------------------------------------------
+  /anular <ID> <motivo>
+  Ejemplo:
+  /anular 18 Error al digitar cantidad en caja
+
+  Efecto:
+  - Marca la venta o compra como anulada.
+  - Devuelve exactamente los gramos/kilos descontados al inventario de la tienda.
+  - Guarda registro de auditoría con fecha, hora, usuario y motivo.
+
+
+--------------------------------------------------------------------------------
+8. ACCESO AL PANEL WEB EN EL NAVEGADOR
+--------------------------------------------------------------------------------
+  • Inicio y Libro Diario:  http://127.0.0.1:8001/
+  • Inventario y Stock:     http://127.0.0.1:8001/inventario/
+  • Lista de Compras:       http://127.0.0.1:8001/pedidos/
+  • Registro de Ventas:     http://127.0.0.1:8001/ventas/nueva/
+  • Registro de Compras:    http://127.0.0.1:8001/compras/nueva/
+  • Auditoría y Trazabilidad: http://127.0.0.1:8001/auditoria/
+================================================================================
