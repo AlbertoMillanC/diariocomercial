@@ -33,6 +33,7 @@ from .models import (
     Venta,
 )
 from .reportes import respuesta_csv, respuesta_pdf, texto_consolidado
+from .inventario_service import procesar_salida_inventario, revertir_salida_inventario
 
 
 class LoginDiario(LoginView):
@@ -259,6 +260,11 @@ def venta_nueva(request):
             messages.error(request, "El valor tiene que ser mayor a cero.")
         else:
             venta.save()
+            # Descontar inventario si el concepto o motivo coincide con un producto
+            texto_concepto = f"{venta.concepto or ''} {venta.motivo.nombre if venta.motivo else ''}".strip()
+            prod, kilos, libras, _, info_stock = procesar_salida_inventario(
+                est, texto_concepto, venta.valor
+            )
             if venta.tipo_cliente == "empresa":
                 ret_val = form.cleaned_data.get("retencion_valor") or Decimal("0")
                 if ret_val > 0:
@@ -272,7 +278,10 @@ def venta_nueva(request):
                         tercero=form.cleaned_data.get("tercero") or "",
                         estado="vigente",
                     )
-            messages.success(request, "Venta guardada.")
+            msg_exito = "Venta guardada."
+            if prod and kilos > 0:
+                msg_exito += f" Existencias actualizadas: -{kilos} Kg (-{libras} lb) de '{prod.nombre}'. Stock: {prod.stock_kilos} Kg."
+            messages.success(request, msg_exito)
             return redirect("inicio")
     return render(
         request,
@@ -483,6 +492,7 @@ def anular_movimiento(request, tipo, pk):
             antes = _snapshot(obj)
             obj.estado = "anulado"
             obj.save()
+            info_inv = ""
             if tipo == "venta":
                 for ret in Retencion.objects.filter(venta=obj, estado="vigente"):
                     ret_antes = _snapshot(ret)
@@ -497,11 +507,12 @@ def anular_movimiento(request, tipo, pk):
                         _snapshot(ret),
                         "Anulada junto con la venta",
                     )
+                info_inv = revertir_salida_inventario(perfil.establecimiento, obj)
             _audit(request.user, tipo, obj, "anular", antes, _snapshot(obj), motivo)
-            messages.success(
-                request,
-                f"{tipo.capitalize()} #{obj.pk} anulada exitosamente (motivo: \"{motivo}\"). No se borra físicamente, queda registrada en auditoría.",
-            )
+            msg_anulacion = f"{tipo.capitalize()} #{obj.pk} anulada exitosamente (motivo: \"{motivo}\")."
+            if info_inv:
+                msg_anulacion += f" {info_inv.replace('*', '')}"
+            messages.success(request, msg_anulacion)
             return redirect("historial")
     return render(request, "anular_confirm.html", {"obj": obj, "tipo": tipo})
 

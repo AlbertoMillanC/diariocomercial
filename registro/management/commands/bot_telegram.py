@@ -32,6 +32,12 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta
+from registro.inventario_service import (
+    buscar_producto_en_texto,
+    parsear_peso,
+    procesar_salida_inventario,
+    revertir_salida_inventario,
+)
 
 
 class TelegramClient:
@@ -214,20 +220,31 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.anular_venta(venta_id, motivo, autor))
             return
 
-        # 8. Venta Empresa con Retención ReteICA: "Venta empresa 500000 Papeleria Central"
-        match_venta_empresa = re.match(r"^venta\s+empresa\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
+        # 8. Venta Empresa con Retención ReteICA: "Venta empresa 500000 Papeleria Central" o "Venta empresa 2 kilos lomo Asadero"
+        match_venta_empresa = re.match(r"^venta\s+empresa\s+(.*)$", texto_limpio, re.IGNORECASE)
         if match_venta_empresa:
-            valor_raw = match_venta_empresa.group(1).replace(".", "").replace(",", "")
-            concepto = match_venta_empresa.group(2).strip() or "Venta corporativa a empresa"
-            client.send_message(chat_id, self.guardar_venta_empresa(Decimal(valor_raw), concepto, autor))
+            cuerpo = match_venta_empresa.group(1).strip()
+            _, valor, concepto = self.extraer_datos_venta(cuerpo)
+            client.send_message(chat_id, self.guardar_venta_empresa(valor or Decimal("0"), concepto, autor))
             return
 
-        # 9. Venta Particular normal: "Venta 45000 viveres mostrador"
-        match_venta = re.match(r"^venta\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
-        if match_venta:
-            valor_raw = match_venta.group(1).replace(".", "").replace(",", "")
-            concepto = match_venta.group(2).strip() or "Venta mostrador"
-            client.send_message(chat_id, self.guardar_venta(Decimal(valor_raw), concepto, autor))
+        # 9. Venta Particular / Carnicería / Mostrador:
+        # Soporta:
+        # - "Venta 1 libra carne molida"
+        # - "Vendi una libra de carne"
+        # - "Venta 12000 1 libra carne molida"
+        # - "Venta 12000 carne molida"
+        # - "Venta carne molida 1 libra"
+        # - "Venta 45000 viveres mostrador"
+        # - Pesaje directo: "1 libra carne molida", "2 kilos costilla", "500g sobrebarriga"
+        es_venta_directa = bool(re.match(r"^(venta|vendi)\b", texto_limpio, re.IGNORECASE))
+        peso_detectado = parsear_peso(texto_limpio)
+        prod_detectado = buscar_producto_en_texto(Establecimiento.objects.first(), texto_limpio)
+
+        if es_venta_directa or (peso_detectado and prod_detectado):
+            cuerpo = re.sub(r"^(venta|vendi)\s+", "", texto_limpio, flags=re.IGNORECASE).strip()
+            _, valor, concepto = self.extraer_datos_venta(cuerpo)
+            client.send_message(chat_id, self.guardar_venta(valor or Decimal("0"), concepto, autor))
             return
 
         # 10. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
@@ -251,6 +268,8 @@ class Command(BaseCommand):
             chat_id,
             "❓ Comando no reconocido.\n\n"
             "Escribe `/ayuda` para ver todos los comandos o prueba:\n"
+            "• `Venta 1 libra carne molida`\n"
+            "• `Venta 12000 carne molida`\n"
             "• `Venta 50000 viveres`\n"
             "• `Venta empresa 200000 Inversiones SAS`\n"
             "• `Compra 45000 proveedor`\n"
@@ -261,28 +280,70 @@ class Command(BaseCommand):
         return (
             f"👋 *¡Hola {autor}! Asistente DiarioComercial*\n"
             "_Comandos disponibles para registrar y consultar en tiempo real:_\n\n"
-            "📝 *REGISTRO DE OPERACIONES:*\n"
-            "• `Venta 45000 viveres` ➡️ Venta normal\n"
-            "• `Venta empresa 300000 Boyaca SAS` ➡️ Venta con ReteICA automático\n"
-            "• `Compra 85000 Distribuidora` ➡️ Gasto o compra\n"
+            "📝 *REGISTRO DE OPERACIONES Y CARNICERÍA:*\n"
+            "• `Venta 1 libra carne molida` ➡️ Descuenta stock (1 lb) y liquida el precio oficial\n"
+            "• `Venta 12000 carne molida` ➡️ Descuenta por valor monetario en báscula\n"
+            "• `Venta 12000 1 libra carne molida` ➡️ Precio y peso explícito\n"
+            "• `Venta 45000 viveres mostrador` ➡️ Venta general de mostrador\n"
+            "• `Venta empresa 300000 Boyaca SAS` ➡️ Venta corporativa con ReteICA\n"
+            "• `Compra 85000 Distribuidora` ➡️ Registro de compra o gasto\n"
             "• `Retencion 15000 Alcaldia` ➡️ Retención practicada\n\n"
             "📊 *CONSULTAS Y REPORTES:*\n"
             "• `/carnes` ➡️ *Lista de cortes, existencias y precios por Kilo, Libra y Gramo*\n"
-            "• `/inventario` ➡️ Resumen general de stock y valor total\n"
-            "• `/hoy` ➡️ Cierre de caja del día\n"
+            "• `/inventario` ➡️ Resumen general de existencias y valor del inventario\n"
+            "• `/hoy` ➡️ Cierre de caja del día en vivo\n"
             "• `/resumen` ➡️ Balance acumulado del mes\n"
-            "• `/ultimas` ➡️ Últimos 5 movimientos con ID\n"
+            "• `/ultimas` ➡️ Últimos movimientos con ID para trazabilidad\n"
             "• `/ica` ➡️ Estimación del impuesto ICA Tunja\n"
             "• `/consolidado` ➡️ *Te envía el archivo Excel oficial para el contador*\n\n"
             "🚫 *ANULACIONES:*\n"
-            "• `/anular <ID> <motivo>` ➡️ Anula una venta con registro de auditoría"
+            "• `/anular <ID> <motivo>` ➡️ Anula una venta, restaura existencias y guarda auditoría"
         )
+
+    def extraer_datos_venta(self, cuerpo):
+        """
+        Interpreta conceptos de venta en lenguaje natural colombiano:
+        - "45000 viveres mostrador" -> valor=45000, concepto="viveres mostrador"
+        - "1 libra carne molida" -> valor=None, concepto="1 libra carne molida"
+        - "12000 1 libra carne molida" -> valor=12000, concepto="1 libra carne molida"
+        - "carne molida 1 libra" -> valor=None, concepto="carne molida 1 libra"
+        - "12000 carne molida" -> valor=12000, concepto="carne molida"
+        """
+        kilos = parsear_peso(cuerpo)
+        t_sin_peso = cuerpo
+        if kilos is not None:
+            t_sin_peso = re.sub(
+                r"(una|un|dos|tres|cuatro|cinco|media|1/2|cuarto|1/4|3/4|\d+(?:[\.,]\d+)?)\s*(libras?|lb|kilos?|kg|gramos?|g)\b",
+                "",
+                t_sin_peso,
+                flags=re.IGNORECASE,
+            ).strip()
+
+        m_money = re.search(r"\$?\s*(\d{1,3}(?:\.\d{3})+|\d+)\b", t_sin_peso)
+        valor = None
+        concepto = cuerpo
+        if m_money:
+            raw = m_money.group(1).replace(".", "").replace(",", "")
+            val_int = int(raw)
+            if val_int >= 50 or kilos is None:
+                valor = Decimal(raw)
+                concepto = re.sub(r"\$?\s*" + re.escape(m_money.group(1)) + r"\s*", "", cuerpo).strip()
+                if not concepto:
+                    concepto = "Venta mostrador"
+
+        return kilos, valor, concepto
 
     def guardar_venta(self, valor, concepto, autor):
         est = Establecimiento.objects.first()
         usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
         tarifa_mil = actividad.tarifa_x_mil if actividad else Decimal("6.0")
+
+        # Descontar stock y autocalcular valor si se vendió por peso sin dinero explícito
+        prod, kilos, libras, val_calc, info_stock = procesar_salida_inventario(est, concepto, valor)
+        if (not valor or valor <= Decimal("1")) and val_calc > 0:
+            valor = val_calc
+
         ica = (valor * tarifa_mil) / Decimal("1000")
 
         venta = Venta.objects.create(
@@ -303,11 +364,11 @@ class Command(BaseCommand):
             entidad_afectada="venta",
             id_registro=venta.pk,
             accion="crear_telegram",
-            valor_nuevo=f"valor={valor}|concepto={concepto}|ica={ica}",
+            valor_nuevo=f"valor={valor}|concepto={concepto}|ica={ica}|prod={prod.nombre if prod else 'none'}|kilos={kilos}",
             motivo=f"Venta registrada desde Telegram por {autor}",
         )
 
-        return (
+        msg = (
             "✅ *¡Venta registrada con éxito!*\n\n"
             f"🧾 *Comprobante:* #{venta.pk}\n"
             f"💵 *Valor:* ${valor:,.0f} COP\n"
@@ -315,15 +376,21 @@ class Command(BaseCommand):
             f"📊 *ICA estimado:* ${ica:,.2f} COP ({tarifa_mil} x mil)\n"
             f"📅 *Fecha:* {date.today().strftime('%d/%m/%Y')}"
         )
+        if info_stock:
+            msg += f"\n{info_stock}"
+        return msg
 
     def guardar_venta_empresa(self, valor, concepto, autor):
         est = Establecimiento.objects.first()
         usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
         tarifa_mil = actividad.tarifa_x_mil if actividad else Decimal("6.0")
-        ica = (valor * tarifa_mil) / Decimal("1000")
 
-        # ReteICA practicado por la empresa (tarifa completa del municipio de Tunja)
+        prod, kilos, libras, val_calc, info_stock = procesar_salida_inventario(est, concepto, valor)
+        if (not valor or valor <= Decimal("1")) and val_calc > 0:
+            valor = val_calc
+
+        ica = (valor * tarifa_mil) / Decimal("1000")
         reteica = ica
 
         venta = Venta.objects.create(
@@ -355,11 +422,11 @@ class Command(BaseCommand):
             entidad_afectada="venta",
             id_registro=venta.pk,
             accion="crear_telegram_empresa",
-            valor_nuevo=f"valor={valor}|reteica={reteica}",
+            valor_nuevo=f"valor={valor}|reteica={reteica}|prod={prod.nombre if prod else 'none'}|kilos={kilos}",
             motivo=f"Venta a empresa con retención registrada por {autor}",
         )
 
-        return (
+        msg = (
             "🏢 *¡Venta Corporativa a Empresa Registrada!*\n\n"
             f"🧾 *Comprobante:* #{venta.pk}\n"
             f"💵 *Valor Bruto:* ${valor:,.0f} COP\n"
@@ -367,6 +434,9 @@ class Command(BaseCommand):
             f"💰 *Neto a recaudar:* ${(valor - reteica):,.0f} COP\n"
             f"📊 *ICA generado:* ${ica:,.2f} COP"
         )
+        if info_stock:
+            msg += f"\n{info_stock}"
+        return msg
 
     def guardar_compra(self, valor, proveedor, autor):
         est = Establecimiento.objects.first()
@@ -446,21 +516,27 @@ class Command(BaseCommand):
         # Si tenía retención asociada, se anula también
         Retencion.objects.filter(venta=venta, estado="vigente").update(estado="anulado")
 
+        # Revertir existencias de inventario si aplica
+        info_reversion = revertir_salida_inventario(est, venta)
+
         Auditoria.objects.create(
             usuario=usuario,
             entidad_afectada="venta",
             id_registro=venta.pk,
             accion="anular_telegram",
-            valor_nuevo="estado=anulado",
+            valor_nuevo=f"estado=anulado|{info_reversion}",
             motivo=f"Anulada desde Telegram por {autor}: {motivo}",
         )
 
-        return (
+        msg = (
             f"🚫 *¡Venta #{venta_id} Anulada Exitosamente!*\n\n"
             f"💵 *Valor anulado:* ${venta.valor:,.0f} COP\n"
             f"📋 *Motivo:* {motivo}\n"
             f"🛡️ *Auditoría:* Registro histórico preservado en base de datos."
         )
+        if info_reversion:
+            msg += f"\n{info_reversion}"
+        return msg
 
     def generar_resumen_hoy(self):
         est = Establecimiento.objects.first()

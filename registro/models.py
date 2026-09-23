@@ -214,12 +214,12 @@ class Producto(models.Model):
 
     @property
     def precio_libra(self):
-        return (self.precio_kilo / Decimal("2")).quantize(Decimal("1"))
+        return (Decimal(str(self.precio_kilo)) / Decimal("2")).quantize(Decimal("1"))
 
     @property
     def precio_gramo(self):
-        return (self.precio_kilo / Decimal("1000")).quantize(Decimal("0.01"))
+        return (Decimal(str(self.precio_kilo)) / Decimal("1000")).quantize(Decimal("0.01"))
 
     @property
     def stock_libras(self):
-        return (self.stock_kilos * Decimal("2")).quantize(Decimal("0.1"))
+        return (Decimal(str(self.stock_kilos)) * Decimal("2")).quantize(Decimal("0.1"))
