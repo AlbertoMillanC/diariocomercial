@@ -34,6 +34,9 @@ from openpyxl.utils import get_column_letter
 from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta
 from registro.inventario_service import (
     buscar_producto_en_texto,
+    consultar_producto_o_categoria,
+    generar_lista_categoria,
+    generar_resumen_general_categorias,
     parsear_dinero,
     parsear_peso,
     procesar_salida_inventario,
@@ -183,14 +186,39 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.generar_resumen_hoy())
             return
 
-        # 3. Comando /carnes -> Lista de cortes, existencias y precios por kilo, libra y gramo
-        if cmd in ("/carnes", "carnes", "/carne", "carne"):
-            client.send_message(chat_id, self.generar_inventario_carnes())
+        # 3. Comandos de inventario por grupos / departamentos
+        if cmd in ("/inventario", "inventario", "/stock", "stock"):
+            client.send_message(chat_id, generar_resumen_general_categorias(Establecimiento.objects.first()))
             return
 
-        # 4. Comando /inventario -> Inventario general
-        if cmd in ("/inventario", "inventario", "/stock", "stock"):
-            client.send_message(chat_id, self.generar_inventario_general())
+        if cmd in ("/carnes", "carnes", "/carne", "carne"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "carnes"))
+            return
+
+        if cmd in ("/abarrotes", "abarrotes", "/viveres", "viveres", "/granos", "granos"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "abarrotes"))
+            return
+
+        if cmd in ("/lacteos", "lacteos", "/huevos", "huevos"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "lacteos"))
+            return
+
+        if cmd in ("/fruver", "fruver", "/verduras", "verduras", "/frutas", "frutas"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "fruver"))
+            return
+
+        if cmd in ("/bebidas", "bebidas", "/bebida", "bebida"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "bebidas"))
+            return
+
+        if cmd in ("/aseo", "aseo", "/limpieza", "limpieza"):
+            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "aseo"))
+            return
+
+        # 4. Consultas en lenguaje natural de inventario ("que carnes tengo", "tenemos tocino", "cuanto vale el arroz")
+        resp_consulta = consultar_producto_o_categoria(Establecimiento.objects.first(), texto_limpio)
+        if resp_consulta:
+            client.send_message(chat_id, resp_consulta)
             return
 
         # 5. Comando /ultimas -> Últimos 5 movimientos
@@ -198,22 +226,22 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.generar_ultimas())
             return
 
-        # 4. Comando /ica -> Información de impuesto ICA
+        # 6. Comando /ica -> Información de impuesto ICA
         if cmd in ("/ica", "ica", "/impuesto", "impuesto"):
             client.send_message(chat_id, self.generar_informacion_ica())
             return
 
-        # 5. Comando /resumen -> Acumulado del mes
+        # 7. Comando /resumen -> Acumulado del mes
         if cmd in ("/resumen", "resumen", "/saldo", "saldo"):
             client.send_message(chat_id, self.generar_resumen_mes())
             return
 
-        # 6. Comando /ayuda o /start
+        # 8. Comando /ayuda o /start
         if cmd in ("/start", "/ayuda", "ayuda", "hola"):
             client.send_message(chat_id, self.mensaje_ayuda(autor))
             return
 
-        # 7. Comando /anular <id> <motivo>
+        # 9. Comando /anular <id> <motivo>
         match_anular = re.match(r"^/anular\s+(\d+)\s*(.*)$", texto_limpio, re.IGNORECASE)
         if match_anular:
             venta_id = int(match_anular.group(1))
@@ -221,7 +249,7 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.anular_venta(venta_id, motivo, autor))
             return
 
-        # 8. Venta Empresa con Retención ReteICA: "Venta empresa 500000 Papeleria Central" o "Venta empresa 2 kilos lomo Asadero"
+        # 10. Venta Empresa con Retención ReteICA: "Venta empresa 500000 Papeleria Central" o "Venta empresa 2 kilos lomo Asadero"
         match_venta_empresa = re.match(r"^venta\s+empresa\s+(.*)$", texto_limpio, re.IGNORECASE)
         if match_venta_empresa:
             cuerpo = match_venta_empresa.group(1).strip()
@@ -229,11 +257,11 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.guardar_venta_empresa(valor or Decimal("0"), concepto, autor))
             return
 
-        # 9. Venta Particular / Carnicería / Mostrador:
+        # 11. Venta Particular / Carnicería / Mostrador / Supermercado:
         # Detecta si:
         # a) Empieza por "venta" o "vendi" (ej: "Venta 40 mil carne molida", "Venta 40000", "Venta 45000 viveres")
-        # b) O contiene un corte de carne Y dinero: "40000 carne molida", "40 mil carne molida", "20k pechuga", "15 mil costilla"
-        # c) O contiene un corte de carne Y peso: "1 libra carne molida", "500g costilla", "2 kilos pechuga"
+        # b) O contiene un producto Y dinero: "40000 carne molida", "40 mil arroz", "20k pechuga", "15 mil costilla"
+        # c) O contiene un producto Y peso: "1 libra carne molida", "2 kilos papa", "500g costilla"
         es_venta_directa = bool(re.match(r"^(venta|vendi)\b", texto_limpio, re.IGNORECASE))
         prod_detectado = buscar_producto_en_texto(Establecimiento.objects.first(), texto_limpio)
         dinero_detectado, _ = parsear_dinero(texto_limpio)
@@ -245,7 +273,7 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.guardar_venta(valor or dinero_detectado or Decimal("0"), concepto, autor))
             return
 
-        # 10. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
+        # 12. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
         match_compra = re.match(r"^compra\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
         if match_compra:
             valor_raw = match_compra.group(1).replace(".", "").replace(",", "")
@@ -253,7 +281,7 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.guardar_compra(Decimal(valor_raw), proveedor, autor))
             return
 
-        # 11. Retención suelta: "Retencion 18000 Alcaldia de Tunja"
+        # 13. Retención suelta: "Retencion 18000 Alcaldia de Tunja"
         match_ret = re.match(r"^retencion\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
         if match_ret:
             valor_raw = match_ret.group(1).replace(".", "").replace(",", "")
@@ -265,33 +293,41 @@ class Command(BaseCommand):
         client.send_message(
             chat_id,
             "❓ Comando no reconocido.\n\n"
-            "Escribe `/ayuda` para ver todos los comandos o prueba:\n"
-            "• `40 mil carne molida` o `40000 carne molida`\n"
-            "• `Venta 1 libra carne molida`\n"
-            "• `Venta 50000 viveres`\n"
-            "• `Venta empresa 200000 Inversiones SAS`\n"
-            "• `Compra 45000 proveedor`\n"
-            "• `/consolidado` (para recibir el Excel)"
+            "💬 *Puedes preguntarme en lenguaje natural:*\n"
+            "• _¿tenemos carne?_\n"
+            "• _¿tenemos tocino?_\n"
+            "• _¿que abarrotes hay?_\n"
+            "• _¿cuanto vale el arroz?_\n\n"
+            "O escribe `/inventario` o `/ayuda` para ver todos los comandos."
         )
 
     def mensaje_ayuda(self, autor):
         return (
             f"👋 *¡Hola {autor}! Asistente DiarioComercial*\n"
-            "_Comandos disponibles para registrar y consultar en tiempo real:_\n\n"
-            "📝 *REGISTRO DE OPERACIONES Y CARNICERÍA:*\n"
-            "• `40 mil carne molida` o `40000 carne molida` ➡️ Calcula exacto los gramos y descuenta stock\n"
-            "• `Venta 1 libra carne molida` ➡️ Descuenta stock (1 lb) y liquida el precio oficial\n"
-            "• `Venta 12000 carne molida` ➡️ Descuenta por valor monetario en báscula\n"
-            "• `Venta 45000 viveres mostrador` ➡️ Venta general de mostrador\n"
-            "• `Venta empresa 300000 Boyaca SAS` ➡️ Venta corporativa con ReteICA\n"
-            "• `Compra 85000 Distribuidora` ➡️ Registro de compra o gasto\n"
-            "• `Retencion 15000 Alcaldia` ➡️ Retención practicada\n\n"
-            "📊 *CONSULTAS Y REPORTES:*\n"
-            "• `/carnes` ➡️ *Lista de cortes, existencias y precios por Kilo, Libra y Gramo*\n"
-            "• `/inventario` ➡️ Resumen general de existencias y valor del inventario\n"
-            "• `/hoy` ➡️ Cierre de caja del día en vivo\n"
-            "• `/resumen` ➡️ Balance acumulado del mes\n"
-            "• `/ultimas` ➡️ Últimos movimientos con ID para trazabilidad\n"
+            "_Comandos y consultas en lenguaje natural en tiempo real:_\n\n"
+            "🏪 *CONSULTAS DE INVENTARIO Y SUPERMERCADO:*\n"
+            "• `/inventario` ➡️ Resumen general por departamentos (kilos y valor)\n"
+            "• `/carnes` ➡️ Carnes y embutidos (kilo, libra y gramo)\n"
+            "• `/abarrotes` ➡️ Víveres, arroz, granos, aceites y harinas\n"
+            "• `/lacteos` ➡️ Lácteos, quesos y huevos campesinos\n"
+            "• `/fruver` ➡️ Frutas, verduras, papas y plátanos\n"
+            "• `/bebidas` ➡️ Bebidas, gaseosas y jugos\n"
+            "• `/aseo` ➡️ Productos de aseo y limpieza del hogar\n\n"
+            "💬 *PREGUNTAS EN LENGUAJE NATURAL:*\n"
+            "• `¿tenemos carne?` o `que carnes tengo` ➡️ Muestra cortes disponibles\n"
+            "• `¿tenemos tocino?` o `tenemos arroz` ➡️ Existencias y precios exactos\n"
+            "• `¿que abarrotes hay?` o `que lacteos hay` ➡️ Catálogo del grupo\n"
+            "• `¿cuanto vale la pechuga?` ➡️ Precios por kilo, libra y gramo\n\n"
+            "📝 *VENTAS RÁPIDAS (Calcula gramos y descuenta stock):*\n"
+            "• `40 mil carne molida` o `40000 carne molida`\n"
+            "• `20 mil tocino` o `15 mil costilla`\n"
+            "• `10 mil arroz` o `1 libra de frijol`\n"
+            "• `Venta 50000 viveres mostrador`\n"
+            "• `Venta empresa 300000 Boyaca SAS`\n\n"
+            "📊 *REPORTES CONTABLES:*\n"
+            "• `/hoy` ➡️ Cierre de caja en vivo\n"
+            "• `/resumen` ➡️ Balance del mes\n"
+            "• `/ultimas` ➡️ Últimos movimientos con ID\n"
             "• `/ica` ➡️ Estimación del impuesto ICA Tunja\n"
             "• `/consolidado` ➡️ *Te envía el archivo Excel oficial para el contador*\n\n"
             "🚫 *ANULACIONES:*\n"

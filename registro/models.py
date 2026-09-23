@@ -193,10 +193,12 @@ class Auditoria(models.Model):
 
 class Producto(models.Model):
     CATEGORIAS = (
-        ("carnes", "Carnes y Derivados"),
-        ("viveres", "Víveres y Abarrotes"),
-        ("lacteos", "Lácteos"),
+        ("carnes", "Carnes y Embutidos"),
+        ("abarrotes", "Víveres y Abarrotes"),
+        ("lacteos", "Lácteos y Huevos"),
+        ("fruver", "Frutas y Verduras"),
         ("bebidas", "Bebidas"),
+        ("aseo", "Aseo y Limpieza"),
         ("otros", "Otros"),
     )
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="productos")

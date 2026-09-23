@@ -17,10 +17,13 @@
     <label>Filtrar por Categoría</label>
     <select name="categoria" onchange="this.form.submit()">
       <option value="todas" {% if categoria_actual == 'todas' %}selected{% endif %}>Todas las categorías</option>
-      <option value="carnes" {% if categoria_actual == 'carnes' %}selected{% endif %}>Carnes y Derivados</option>
-      <option value="viveres" {% if categoria_actual == 'viveres' %}selected{% endif %}>Víveres y Abarrotes</option>
-      <option value="lacteos" {% if categoria_actual == 'lacteos' %}selected{% endif %}>Lácteos</option>
+      <option value="carnes" {% if categoria_actual == 'carnes' %}selected{% endif %}>Carnes y Embutidos</option>
+      <option value="abarrotes" {% if categoria_actual == 'abarrotes' %}selected{% endif %}>Víveres y Abarrotes</option>
+      <option value="lacteos" {% if categoria_actual == 'lacteos' %}selected{% endif %}>Lácteos y Huevos</option>
+      <option value="fruver" {% if categoria_actual == 'fruver' %}selected{% endif %}>Frutas y Verduras</option>
       <option value="bebidas" {% if categoria_actual == 'bebidas' %}selected{% endif %}>Bebidas</option>
+      <option value="aseo" {% if categoria_actual == 'aseo' %}selected{% endif %}>Aseo y Limpieza</option>
+      <option value="otros" {% if categoria_actual == 'otros' %}selected{% endif %}>Otros</option>
     </select>
   </div>
   <button class="btn btn-primary" type="submit">Filtrar</button>
