@@ -46,6 +46,11 @@
       {% endfor %}
     {% endif %}
     {% block content %}{% endblock %}
+    {% if user.is_authenticated %}
+    <footer style="text-align: center; padding: 24px 10px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); margin-top: 36px;">
+      <strong>CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB</strong> — DiarioComercial Tunja &copy; 2026
+    </footer>
+    {% endif %}
   </main>
 </body>
 </html>

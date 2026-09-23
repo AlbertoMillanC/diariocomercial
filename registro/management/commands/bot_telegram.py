@@ -167,7 +167,7 @@ class Command(BaseCommand):
         if cmd in ("/consolidado", "consolidado", "/excel", "excel"):
             client.send_message(chat_id, "⏳ _Generando archivo Excel del consolidado para el contador..._")
             archivo_bytes, nombre_archivo = self.generar_excel_consolidado()
-            caption = f"📊 *Consolidado Oficial de DiarioComercial*\nGenerado para el contador — Periodo: {date.today().strftime('%B %Y')}"
+            caption = f"📊 *Consolidado Oficial de DiarioComercial*\n✍️ CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB\nPeriodo: {date.today().strftime('%B %Y')}"
             client.send_document(chat_id, archivo_bytes, nombre_archivo, caption)
             return
 
@@ -597,6 +597,11 @@ class Command(BaseCommand):
             for col_idx in range(1, 4):
                 ws1.cell(row=row_idx, column=col_idx).border = thin_border
 
+        # Pie de página en Hoja 1
+        pie_row_ws1 = len(datos_resumen) + 8
+        c_pie1 = ws1.cell(row=pie_row_ws1, column=1, value="CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB")
+        c_pie1.font = Font(name="Calibri", size=10, bold=True, color="5C6B70")
+
         # ---------------- HOJA 2: DETALLE DE MOVIMIENTOS ----------------
         ws2 = wb.create_sheet(title="Detalle Movimientos")
         ws2.views.sheetView[0].showGridLines = True
@@ -629,6 +634,15 @@ class Command(BaseCommand):
             ws2.cell(row=row_idx, column=7, value=m[6])
             for col_idx in range(1, 8):
                 ws2.cell(row=row_idx, column=col_idx).border = thin_border
+
+        # Pie de página en Hoja 2
+        pie_row_ws2 = len(movimientos) + 3
+        c_pie2 = ws2.cell(row=pie_row_ws2, column=1, value="CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB")
+        c_pie2.font = Font(name="Calibri", size=10, bold=True, color="5C6B70")
+
+        # Pie de página de impresión
+        ws1.oddFooter.center.text = "CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB"
+        ws2.oddFooter.center.text = "CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB"
 
         # Autoajuste de columnas en ambas hojas
         for ws in (ws1, ws2):

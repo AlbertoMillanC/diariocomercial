@@ -119,6 +119,8 @@ def respuesta_csv(est, desde, hasta, ingresos, egresos, retenciones, ica, neto, 
     writer.writerow(["Fecha", "Tipo", "Detalle", "Valor", "Estado", "Usuario"])
     for m in _movimientos(est, desde, hasta):
         writer.writerow([m["fecha"], m["tipo"], m["detalle"], m["valor"], m["estado"], m["usuario"]])
+    writer.writerow([])
+    writer.writerow(["CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB"])
     resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
     resp["Content-Disposition"] = f'attachment; filename="consolidado_{desde}_{hasta}.csv"'
     return resp
@@ -132,7 +134,10 @@ def respuesta_pdf(est, desde, hasta, ingresos, egresos, retenciones, ica, neto, 
 
     def linea(texto, size=11, salto=16):
         nonlocal y
-        if y < 50:
+        if y < 65:
+            # Pie de pagina en pagina previa
+            pdf.setFont("Helvetica-Oblique", 8)
+            pdf.drawString(40, 25, "CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB — DiarioComercial")
             pdf.showPage()
             y = alto - 50
         pdf.setFont("Helvetica", size)
@@ -166,6 +171,9 @@ def respuesta_pdf(est, desde, hasta, ingresos, egresos, retenciones, ica, neto, 
             9,
             13,
         )
+    # Pie de pagina final
+    pdf.setFont("Helvetica-Oblique", 8)
+    pdf.drawString(40, 25, "CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB — DiarioComercial")
     pdf.save()
     buffer.seek(0)
     resp = HttpResponse(buffer.read(), content_type="application/pdf")
