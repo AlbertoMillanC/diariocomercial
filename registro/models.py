@@ -202,7 +202,7 @@ class Producto(models.Model):
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="productos")
     categoria = models.CharField(max_length=20, choices=CATEGORIAS, default="carnes")
     nombre = models.CharField(max_length=120)
-    stock_kilos = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Existencias en Kilogramos")
+    stock_kilos = models.DecimalField(max_digits=12, decimal_places=3, default=0, help_text="Existencias en Kilogramos con precisión de gramos")
     precio_kilo = models.DecimalField(max_digits=12, decimal_places=2, help_text="Precio por Kilo")
     estado = models.CharField(max_length=12, default="activo")
 
@@ -223,3 +223,7 @@ class Producto(models.Model):
     @property
     def stock_libras(self):
         return (Decimal(str(self.stock_kilos)) * Decimal("2")).quantize(Decimal("0.1"))
+
+    @property
+    def stock_gramos(self):
+        return int((Decimal(str(self.stock_kilos)) * Decimal("1000")).quantize(Decimal("1")))

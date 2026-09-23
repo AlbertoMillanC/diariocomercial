@@ -34,6 +34,7 @@ from openpyxl.utils import get_column_letter
 from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta
 from registro.inventario_service import (
     buscar_producto_en_texto,
+    parsear_dinero,
     parsear_peso,
     procesar_salida_inventario,
     revertir_salida_inventario,
@@ -229,22 +230,19 @@ class Command(BaseCommand):
             return
 
         # 9. Venta Particular / Carnicería / Mostrador:
-        # Soporta:
-        # - "Venta 1 libra carne molida"
-        # - "Vendi una libra de carne"
-        # - "Venta 12000 1 libra carne molida"
-        # - "Venta 12000 carne molida"
-        # - "Venta carne molida 1 libra"
-        # - "Venta 45000 viveres mostrador"
-        # - Pesaje directo: "1 libra carne molida", "2 kilos costilla", "500g sobrebarriga"
+        # Detecta si:
+        # a) Empieza por "venta" o "vendi" (ej: "Venta 40 mil carne molida", "Venta 40000", "Venta 45000 viveres")
+        # b) O contiene un corte de carne Y dinero: "40000 carne molida", "40 mil carne molida", "20k pechuga", "15 mil costilla"
+        # c) O contiene un corte de carne Y peso: "1 libra carne molida", "500g costilla", "2 kilos pechuga"
         es_venta_directa = bool(re.match(r"^(venta|vendi)\b", texto_limpio, re.IGNORECASE))
-        peso_detectado = parsear_peso(texto_limpio)
         prod_detectado = buscar_producto_en_texto(Establecimiento.objects.first(), texto_limpio)
+        dinero_detectado, _ = parsear_dinero(texto_limpio)
+        peso_detectado = parsear_peso(texto_limpio)
 
-        if es_venta_directa or (peso_detectado and prod_detectado):
+        if es_venta_directa or (prod_detectado and (dinero_detectado or peso_detectado)):
             cuerpo = re.sub(r"^(venta|vendi)\s+", "", texto_limpio, flags=re.IGNORECASE).strip()
             _, valor, concepto = self.extraer_datos_venta(cuerpo)
-            client.send_message(chat_id, self.guardar_venta(valor or Decimal("0"), concepto, autor))
+            client.send_message(chat_id, self.guardar_venta(valor or dinero_detectado or Decimal("0"), concepto, autor))
             return
 
         # 10. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
@@ -268,8 +266,8 @@ class Command(BaseCommand):
             chat_id,
             "❓ Comando no reconocido.\n\n"
             "Escribe `/ayuda` para ver todos los comandos o prueba:\n"
+            "• `40 mil carne molida` o `40000 carne molida`\n"
             "• `Venta 1 libra carne molida`\n"
-            "• `Venta 12000 carne molida`\n"
             "• `Venta 50000 viveres`\n"
             "• `Venta empresa 200000 Inversiones SAS`\n"
             "• `Compra 45000 proveedor`\n"
@@ -281,9 +279,9 @@ class Command(BaseCommand):
             f"👋 *¡Hola {autor}! Asistente DiarioComercial*\n"
             "_Comandos disponibles para registrar y consultar en tiempo real:_\n\n"
             "📝 *REGISTRO DE OPERACIONES Y CARNICERÍA:*\n"
+            "• `40 mil carne molida` o `40000 carne molida` ➡️ Calcula exacto los gramos y descuenta stock\n"
             "• `Venta 1 libra carne molida` ➡️ Descuenta stock (1 lb) y liquida el precio oficial\n"
             "• `Venta 12000 carne molida` ➡️ Descuenta por valor monetario en báscula\n"
-            "• `Venta 12000 1 libra carne molida` ➡️ Precio y peso explícito\n"
             "• `Venta 45000 viveres mostrador` ➡️ Venta general de mostrador\n"
             "• `Venta empresa 300000 Boyaca SAS` ➡️ Venta corporativa con ReteICA\n"
             "• `Compra 85000 Distribuidora` ➡️ Registro de compra o gasto\n"
@@ -303,11 +301,11 @@ class Command(BaseCommand):
     def extraer_datos_venta(self, cuerpo):
         """
         Interpreta conceptos de venta en lenguaje natural colombiano:
-        - "45000 viveres mostrador" -> valor=45000, concepto="viveres mostrador"
+        - "40 mil carne molida" -> valor=40000, concepto="carne molida"
+        - "40000 carne molida" -> valor=40000, concepto="carne molida"
         - "1 libra carne molida" -> valor=None, concepto="1 libra carne molida"
         - "12000 1 libra carne molida" -> valor=12000, concepto="1 libra carne molida"
-        - "carne molida 1 libra" -> valor=None, concepto="carne molida 1 libra"
-        - "12000 carne molida" -> valor=12000, concepto="carne molida"
+        - "45000 viveres mostrador" -> valor=45000, concepto="viveres mostrador"
         """
         kilos = parsear_peso(cuerpo)
         t_sin_peso = cuerpo
@@ -319,17 +317,10 @@ class Command(BaseCommand):
                 flags=re.IGNORECASE,
             ).strip()
 
-        m_money = re.search(r"\$?\s*(\d{1,3}(?:\.\d{3})+|\d+)\b", t_sin_peso)
-        valor = None
-        concepto = cuerpo
-        if m_money:
-            raw = m_money.group(1).replace(".", "").replace(",", "")
-            val_int = int(raw)
-            if val_int >= 50 or kilos is None:
-                valor = Decimal(raw)
-                concepto = re.sub(r"\$?\s*" + re.escape(m_money.group(1)) + r"\s*", "", cuerpo).strip()
-                if not concepto:
-                    concepto = "Venta mostrador"
+        valor, texto_sin_dinero = parsear_dinero(t_sin_peso)
+        concepto = texto_sin_dinero if valor else cuerpo
+        if not concepto or concepto.lower() in ("de", "para"):
+            concepto = "Venta mostrador"
 
         return kilos, valor, concepto
 

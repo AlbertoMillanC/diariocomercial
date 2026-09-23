@@ -16,6 +16,41 @@ def normalizar_texto(texto: str) -> str:
     return t
 
 
+def parsear_dinero(texto: str) -> Tuple[Optional[Decimal], str]:
+    """
+    Detecta y extrae montos en pesos colombianos como:
+      - '40 mil' o '40mil' -> 40000
+      - '40k' -> 40000
+      - '40 lucas' -> 40000
+      - '40.000' o '40000' o '$40000' -> 40000
+    Retorna: (valor_decimal, texto_limpio_sin_cifra)
+    """
+    t = normalizar_texto(texto)
+
+    # 1. Patrón con 'mil', 'k', 'lucas': ej "40 mil", "40mil", "40k", "40 lucas", "12.5 mil"
+    m_mil = re.search(r"(?:\$|\b)(\d+(?:[\.,]\d+)?)\s*(?:mil|k|lucas)\b", t)
+    if m_mil:
+        num_str = m_mil.group(1).replace(",", ".")
+        try:
+            val = (Decimal(num_str) * Decimal("1000")).quantize(Decimal("1"))
+            texto_restante = t.replace(m_mil.group(0), " ").strip()
+            texto_restante = re.sub(r"^(de\s+|para\s+)", "", texto_restante).strip()
+            return val, texto_restante
+        except Exception:
+            pass
+
+    # 2. Cifra de dinero con puntos o formato numérico >= 3 dígitos: ej "$40.000", "40000"
+    m_cifra = re.search(r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{3,})\b", t)
+    if m_cifra:
+        raw = m_cifra.group(1).replace(".", "").replace(",", "")
+        val = Decimal(raw)
+        texto_restante = t.replace(m_cifra.group(0), " ").strip()
+        texto_restante = re.sub(r"^(de\s+|para\s+)", "", texto_restante).strip()
+        return val, texto_restante
+
+    return None, t
+
+
 def parsear_peso(texto: str) -> Optional[Decimal]:
     """
     Extrae el peso en KILOS de una frase en español.
@@ -36,7 +71,7 @@ def parsear_peso(texto: str) -> Optional[Decimal]:
     """
     t = normalizar_texto(texto)
 
-    # Fracciones comunes de libra
+    # Fracciones comunes de libra / kilo
     if "media libra" in t or "1/2 libra" in t or "1/2 lb" in t or "medio kilo" in t or "1/2 kilo" in t or "1/2 kg" in t:
         if "kilo" in t or "kg" in t:
             return Decimal("0.5")
@@ -75,9 +110,9 @@ def parsear_peso(texto: str) -> Optional[Decimal]:
             cant = Decimal(num_str)
             unidad = m.group(2)
             if "k" in unidad:
-                return cant.quantize(Decimal("0.01"))
+                return cant.quantize(Decimal("0.001"))
             elif "l" in unidad:
-                return (cant * Decimal("0.5")).quantize(Decimal("0.01"))
+                return (cant * Decimal("0.5")).quantize(Decimal("0.001"))
             elif "g" in unidad:
                 return (cant / Decimal("1000")).quantize(Decimal("0.001"))
         except Exception:
@@ -100,8 +135,7 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
         if normalizar_texto(p.nombre) in t:
             return p
 
-    # 2. Búsqueda por palabras clave significativas
-    # Mapeo de sinónimos y palabras comunes de carnicería en Boyacá
+    # 2. Búsqueda por palabras clave significativas de carnicería
     sinonimos = {
         "molida": "molida",
         "lomo": "lomo fino",
@@ -122,7 +156,7 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
                 if objetivo in normalizar_texto(p.nombre):
                     return p
 
-    # 3. Si solo dijo "carne" o "res", sugerir o tomar el corte más popular (molida o lomo)
+    # 3. Si solo dijo "carne" o "res", tomar el corte más frecuente
     if re.search(r"\bcarne\b", t):
         for p in productos:
             if "molida" in normalizar_texto(p.nombre) or "lomo" in normalizar_texto(p.nombre):
@@ -137,8 +171,9 @@ def procesar_salida_inventario(
     establecimiento, texto_venta: str, valor_ingresado: Optional[Decimal] = None
 ) -> Tuple[Optional[Producto], Decimal, Decimal, Decimal, str]:
     """
-    Interpreta el concepto y/o valor de una venta, descuenta el stock del producto
-    y calcula el valor total si no fue provisto.
+    Interpreta el concepto y/o valor de una venta, calcula los gramos exactos
+    según el precio por gramo/kilo, descuenta el stock del producto
+    y calcula el valor monetario si no fue provisto.
 
     Retorna:
       (producto, kilos_descontados, libras_descontadas, valor_final, info_formateada)
@@ -147,30 +182,41 @@ def procesar_salida_inventario(
     if not prod:
         return None, Decimal("0"), Decimal("0"), valor_ingresado or Decimal("0"), ""
 
+    # Extraer monto de dinero si no vino en valor_ingresado
+    val_extraido, _ = parsear_dinero(texto_venta)
+    valor_final = valor_ingresado if (valor_ingresado and valor_ingresado > 1) else val_extraido
+
     kilos = parsear_peso(texto_venta)
-    valor_final = valor_ingresado if (valor_ingresado and valor_ingresado > 1) else None
 
-    # Si no hay peso explícito pero sí hay dinero, calcular peso en kilos
-    if kilos is None and valor_final and prod.precio_kilo > 0:
-        kilos = (valor_final / prod.precio_kilo).quantize(Decimal("0.01"))
-
-    # Si hay peso explícito pero no había dinero (o era 1), calcular el dinero según precio del producto
-    if kilos and not valor_final:
-        valor_final = (kilos * prod.precio_kilo).quantize(Decimal("1"))
+    # 1. Caso Venta por Dinero (ej: $40.000 o "40 mil carne molida"):
+    # Se calcula la cantidad exacta en gramos con el precio por gramo del corte
+    if kilos is None and valor_final and prod.precio_gramo > 0:
+        gramos = int((Decimal(valor_final) / prod.precio_gramo).quantize(Decimal("1")))
+        kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
+    elif kilos is not None:
+        # 2. Caso Venta por Peso explícito (ej: 1 libra, 2 kilos, 500g):
+        gramos = int((kilos * Decimal("1000")).quantize(Decimal("1")))
+        if not valor_final and prod.precio_gramo > 0:
+            valor_final = (Decimal(gramos) * prod.precio_gramo).quantize(Decimal("1"))
+    else:
+        gramos = 0
 
     if not kilos or kilos <= 0:
         return prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), ""
 
-    # Descontar del inventario
+    # Descontar del inventario con precisión de gramos (3 decimales de Kilo)
     prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
     prod.save()
 
-    libras = (kilos * Decimal("2")).quantize(Decimal("0.1"))
+    libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
+    gramos_str = f"{gramos:,.0f}".replace(",", ".")
+    kilos_str = f"{kilos:.3f}".rstrip("0").rstrip(".")
+
     info_formateada = (
-        f"\n📦 *Inventario Actualizado:*\n"
+        f"\n📦 *Inventario Actualizado (Cálculo Exacto):*\n"
         f"   • Producto: *{prod.nombre}*\n"
-        f"   • Salida: -{kilos} Kg (-{libras} lb)\n"
-        f"   • Stock restante: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb)"
+        f"   • Salida vendida: *{gramos_str} gramos* ({kilos_str} Kg / {libras} lb)\n"
+        f"   • Stock restante: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)"
     )
 
     return prod, kilos, libras, valor_final or Decimal("0"), info_formateada
@@ -178,7 +224,6 @@ def procesar_salida_inventario(
 
 def revertir_salida_inventario(establecimiento, venta) -> str:
     """Restaura el inventario cuando una venta es anulada."""
-    # Buscar si quedó rastro en la auditoría
     audit = Auditoria.objects.filter(
         entidad_afectada="venta", id_registro=venta.pk, accion__startswith="crear"
     ).first()
@@ -197,14 +242,22 @@ def revertir_salida_inventario(establecimiento, venta) -> str:
         prod = buscar_producto_en_texto(establecimiento, venta.concepto)
 
     if prod:
-        kilos = parsear_peso(venta.concepto)
-        if not kilos and prod.precio_kilo > 0 and venta.valor > 0:
-            kilos = (venta.valor / prod.precio_kilo).quantize(Decimal("0.01"))
+        if audit and "kilos=" in audit.valor_nuevo:
+            m_k = re.search(r"kilos=([\d\.]+)", audit.valor_nuevo)
+            if m_k:
+                kilos = Decimal(m_k.group(1))
+
+        if not kilos:
+            kilos = parsear_peso(venta.concepto)
+            if not kilos and prod.precio_gramo > 0 and venta.valor > 0:
+                gramos = int((Decimal(venta.valor) / prod.precio_gramo).quantize(Decimal("1")))
+                kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
 
         if kilos and kilos > 0:
             prod.stock_kilos += kilos
             prod.save()
-            libras = (kilos * Decimal("2")).quantize(Decimal("0.1"))
-            return f"\n🔄 *Inventario Revertido:* Se repusieron +{kilos} Kg (+{libras} lb) a *{prod.nombre}* (Stock: {prod.stock_kilos} Kg)."
+            gramos = int(kilos * 1000)
+            libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
+            return f"\n🔄 *Inventario Revertido:* Se repusieron +{gramos:,} g (+{kilos} Kg / +{libras} lb) a *{prod.nombre}* (Stock: {prod.stock_kilos} Kg)."
 
     return ""
