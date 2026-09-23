@@ -253,8 +253,8 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.generar_resumen_mes())
             return
 
-        # 8. Comando /ayuda o /start
-        if cmd in ("/start", "/ayuda", "ayuda", "hola"):
+        # 8. Comando /ayuda, /start, /comandos, /guia
+        if cmd in ("/start", "/ayuda", "ayuda", "hola", "/comandos", "comandos", "/guia", "guia", "/instrucciones", "instrucciones"):
             client.send_message(chat_id, self.mensaje_ayuda(autor))
             return
 
