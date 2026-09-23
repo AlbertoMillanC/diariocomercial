@@ -41,6 +41,7 @@ from registro.inventario_service import (
     normalizar_texto,
     parsear_dinero,
     parsear_peso,
+    procesar_entrada_inventario,
     procesar_salida_inventario,
     revertir_salida_inventario,
 )
@@ -270,14 +271,14 @@ class Command(BaseCommand):
         match_venta_empresa = re.match(r"^venta\s+empresa\s+(.*)$", texto_limpio, re.IGNORECASE)
         if match_venta_empresa:
             cuerpo = match_venta_empresa.group(1).strip()
-            _, valor, concepto = self.extraer_datos_venta(cuerpo)
-            client.send_message(chat_id, self.guardar_venta_empresa(valor or Decimal("0"), concepto, autor))
+            _, valor, concepto, medio_pago = self.extraer_datos_venta(cuerpo)
+            client.send_message(chat_id, self.guardar_venta_empresa(valor or Decimal("0"), concepto, autor, medio_pago=medio_pago))
             return
 
         # 11. Venta Particular / Carnicería / Mostrador / Supermercado:
         # Detecta si:
-        # a) Empieza por "venta" o "vendi" (ej: "Venta 40 mil carne molida", "Venta 40000", "Venta 45000 viveres")
-        # b) O contiene un producto Y dinero: "40000 carne molida", "40 mil arroz", "20k pechuga", "15 mil costilla"
+        # a) Empieza por "venta" o "vendi" (ej: "Venta 40 mil carne molida nequi", "Venta 40000", "Venta 45000 viveres")
+        # b) O contiene un producto Y dinero: "40000 carne molida", "40 mil arroz", "20k pechuga", "15 mil costilla nequi"
         # c) O contiene un producto Y peso: "1 libra carne molida", "2 kilos papa", "500g costilla"
         es_venta_directa = bool(re.match(r"^(venta|vendi)\b", texto_limpio, re.IGNORECASE))
         prod_detectado = buscar_producto_en_texto(Establecimiento.objects.first(), texto_limpio)
@@ -286,11 +287,21 @@ class Command(BaseCommand):
 
         if es_venta_directa or (prod_detectado and (dinero_detectado or peso_detectado)):
             cuerpo = re.sub(r"^(venta|vendi)\s+", "", texto_limpio, flags=re.IGNORECASE).strip()
-            _, valor, concepto = self.extraer_datos_venta(cuerpo)
-            client.send_message(chat_id, self.guardar_venta(valor or dinero_detectado or Decimal("0"), concepto, autor))
+            _, valor, concepto, medio_pago = self.extraer_datos_venta(cuerpo)
+            client.send_message(chat_id, self.guardar_venta(valor or dinero_detectado or Decimal("0"), concepto, autor, medio_pago=medio_pago))
             return
 
-        # 12. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
+        # 12. Entrada de mercancía directa o reabastecimiento:
+        # "Llegaron 20 kilos de tocino", "Llego 15 kilos pechuga", "Entrada 50 kilos papa", "Surtir 20 kilos arroz"
+        match_entrada = re.match(r"^(?:llegaron|llego|entrada|surtir|recibir)\s+(.*)$", texto_limpio, re.IGNORECASE)
+        if match_entrada:
+            cuerpo_entrada = match_entrada.group(1).strip()
+            prod_ent, kilos_ent, info_entrada = procesar_entrada_inventario(Establecimiento.objects.first(), cuerpo_entrada)
+            if info_entrada:
+                client.send_message(chat_id, info_entrada)
+                return
+
+        # 13. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
         match_compra = re.match(r"^compra\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
         if match_compra:
             valor_raw = match_compra.group(1).replace(".", "").replace(",", "")
@@ -357,14 +368,34 @@ class Command(BaseCommand):
     def extraer_datos_venta(self, cuerpo):
         """
         Interpreta conceptos de venta en lenguaje natural colombiano:
-        - "40 mil carne molida" -> valor=40000, concepto="carne molida"
-        - "40000 carne molida" -> valor=40000, concepto="carne molida"
+        - "40 mil carne molida nequi" -> valor=40000, concepto="carne molida", medio="nequi"
+        - "40000 carne molida" -> valor=40000, concepto="carne molida", medio="efectivo"
+        - "20 mil tocino daviplata" -> valor=20000, concepto="tocino", medio="daviplata"
         - "1 libra carne molida" -> valor=None, concepto="1 libra carne molida"
-        - "12000 1 libra carne molida" -> valor=12000, concepto="1 libra carne molida"
-        - "45000 viveres mostrador" -> valor=45000, concepto="viveres mostrador"
+        - "45000 viveres mostrador transferencia" -> valor=45000, concepto="viveres mostrador"
         """
-        kilos = parsear_peso(cuerpo)
-        t_sin_peso = cuerpo
+        # 1. Detectar medio de pago (Nequi, Daviplata, Transferencia, Efectivo)
+        cuerpo_lower = cuerpo.lower()
+        medio_pago = "efectivo"
+        if re.search(r"\bnequi\b", cuerpo_lower):
+            medio_pago = "nequi"
+        elif re.search(r"\b(?:daviplata|davi)\b", cuerpo_lower):
+            medio_pago = "daviplata"
+        elif re.search(r"\b(?:transferencia|bancolombia|transfiya)\b", cuerpo_lower):
+            medio_pago = "transferencia"
+        elif re.search(r"\befectivo\b", cuerpo_lower):
+            medio_pago = "efectivo"
+
+        # Remover palabra de medio de pago para no ensuciar el concepto
+        t_sin_medio = re.sub(
+            r"\b(nequi|daviplata|davi|transferencia|bancolombia|transfiya|efectivo)\b",
+            "",
+            cuerpo,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        kilos = parsear_peso(t_sin_medio)
+        t_sin_peso = t_sin_medio
         if kilos is not None:
             t_sin_peso = re.sub(
                 r"(una|un|dos|tres|cuatro|cinco|media|1/2|cuarto|1/4|3/4|\d+(?:[\.,]\d+)?)\s*(libras?|lb|kilos?|kg|gramos?|g)\b",
@@ -374,13 +405,13 @@ class Command(BaseCommand):
             ).strip()
 
         valor, texto_sin_dinero = parsear_dinero(t_sin_peso)
-        concepto = texto_sin_dinero if valor else cuerpo
-        if not concepto or concepto.lower() in ("de", "para"):
+        concepto = texto_sin_dinero if valor else t_sin_medio
+        if not concepto or concepto.lower() in ("de", "para", "en", "por"):
             concepto = "Venta mostrador"
 
-        return kilos, valor, concepto
+        return kilos, valor, concepto, medio_pago
 
-    def guardar_venta(self, valor, concepto, autor):
+    def guardar_venta(self, valor, concepto, autor, medio_pago="efectivo"):
         est = Establecimiento.objects.first()
         usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
@@ -402,6 +433,7 @@ class Command(BaseCommand):
             valor=valor,
             concepto=f"{concepto} (Telegram: {autor})",
             tipo_cliente="particular",
+            medio_pago=medio_pago,
             ica_estimado=ica,
             estado="vigente",
         )
@@ -411,15 +443,23 @@ class Command(BaseCommand):
             entidad_afectada="venta",
             id_registro=venta.pk,
             accion="crear_telegram",
-            valor_nuevo=f"valor={valor}|concepto={concepto}|ica={ica}|prod={prod.nombre if prod else 'none'}|kilos={kilos}",
+            valor_nuevo=f"valor={valor}|concepto={concepto}|medio={medio_pago}|ica={ica}|prod={prod.nombre if prod else 'none'}|kilos={kilos}",
             motivo=f"Venta registrada desde Telegram por {autor}",
         )
+
+        icono_medio = {
+            "efectivo": "💵 Efectivo",
+            "nequi": "📱 Nequi",
+            "daviplata": "📲 Daviplata",
+            "transferencia": "🏦 Transferencia",
+        }.get(medio_pago, "💵 Efectivo")
 
         msg = (
             "✅ *¡Venta registrada con éxito!*\n\n"
             f"🧾 *Comprobante:* #{venta.pk}\n"
             f"💵 *Valor:* ${valor:,.0f} COP\n"
             f"🏷️ *Concepto:* {concepto}\n"
+            f"💳 *Medio de pago:* {icono_medio}\n"
             f"📊 *ICA estimado:* ${ica:,.2f} COP ({tarifa_mil} x mil)\n"
             f"📅 *Fecha:* {date.today().strftime('%d/%m/%Y')}"
         )
@@ -427,7 +467,7 @@ class Command(BaseCommand):
             msg += f"\n{info_stock}"
         return msg
 
-    def guardar_venta_empresa(self, valor, concepto, autor):
+    def guardar_venta_empresa(self, valor, concepto, autor, medio_pago="transferencia"):
         est = Establecimiento.objects.first()
         usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
@@ -449,6 +489,7 @@ class Command(BaseCommand):
             valor=valor,
             concepto=f"{concepto} [Venta Empresa] (Telegram: {autor})",
             tipo_cliente="empresa",
+            medio_pago=medio_pago,
             ica_estimado=ica,
             estado="vigente",
         )
@@ -489,6 +530,9 @@ class Command(BaseCommand):
         est = Establecimiento.objects.first()
         usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
 
+        # Reabastecer stock si la compra incluye producto y peso (ej: 20 kilos tocino Frigorifico)
+        prod_ent, kilos_ent, info_entrada = procesar_entrada_inventario(est, proveedor)
+
         compra = Compra.objects.create(
             establecimiento=est,
             usuario=usuario,
@@ -503,17 +547,20 @@ class Command(BaseCommand):
             entidad_afectada="compra",
             id_registro=compra.pk,
             accion="crear_telegram",
-            valor_nuevo=f"valor={valor}|proveedor={proveedor}",
+            valor_nuevo=f"valor={valor}|proveedor={proveedor}|prod={prod_ent.nombre if prod_ent else 'none'}|kilos={kilos_ent}",
             motivo=f"Compra registrada desde Telegram por {autor}",
         )
 
-        return (
+        msg = (
             "🛒 *¡Compra/Gasto registrado!*\n\n"
             f"🧾 *Comprobante:* #{compra.pk}\n"
             f"💵 *Valor:* ${valor:,.0f} COP\n"
             f"🏢 *Proveedor:* {proveedor}\n"
             f"📅 *Fecha:* {date.today().strftime('%d/%m/%Y')}"
         )
+        if info_entrada:
+            msg += f"\n\n{info_entrada}"
+        return msg
 
     def guardar_retencion(self, valor, tercero, autor):
         est = Establecimiento.objects.first()
@@ -597,12 +644,26 @@ class Command(BaseCommand):
         cant = ventas.count()
         promedio = (total_ventas / cant) if cant > 0 else Decimal("0")
 
+        total_efectivo = sum((v.valor for v in ventas if v.medio_pago == "efectivo"), Decimal("0"))
+        total_nequi = sum((v.valor for v in ventas if v.medio_pago == "nequi"), Decimal("0"))
+        total_daviplata = sum((v.valor for v in ventas if v.medio_pago == "daviplata"), Decimal("0"))
+        total_transf = sum((v.valor for v in ventas if v.medio_pago == "transferencia"), Decimal("0"))
+
+        desglose = (
+            "💳 *ARQUEO POR MEDIO DE PAGO:*\n"
+            f"   • 💵 Efectivo en cajón: *${total_efectivo:,.0f} COP*\n"
+            f"   • 📱 Nequi: *${total_nequi:,.0f} COP*\n"
+            f"   • 📲 Daviplata: *${total_daviplata:,.0f} COP*\n"
+            f"   • 🏦 Transferencia: *${total_transf:,.0f} COP*\n\n"
+        )
+
         return (
             f"☀️ *Cierre de Caja de Hoy ({hoy.strftime('%d/%m/%Y')})*\n"
             f"📍 _{est.nombre}_\n\n"
             f"🧾 *Operaciones:* {cant} ventas registradas\n"
             f"💵 *Total Ventas:* ${total_ventas:,.0f} COP\n"
-            f"🎯 *Ticket Promedio:* ${promedio:,.0f} COP\n"
+            f"🎯 *Ticket Promedio:* ${promedio:,.0f} COP\n\n"
+            f"{desglose}"
             f"🛒 *Gastos del día:* ${total_compras:,.0f} COP\n"
             f"📊 *ICA Estimado Hoy:* ${ica_hoy:,.2f} COP\n"
             f"💰 *Caja Neta Hoy:* ${(total_ventas - total_compras):,.0f} COP"

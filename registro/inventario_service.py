@@ -380,6 +380,75 @@ def revertir_salida_inventario(establecimiento, venta) -> str:
     return ""
 
 
+def procesar_entrada_inventario(
+    establecimiento, texto: str
+) -> Tuple[Optional[Producto], Decimal, str]:
+    """
+    Interpreta el ingreso o reabastecimiento de mercancía desde Telegram.
+    Ejemplos:
+      - 'Llegaron 20 kilos de tocino'
+      - 'Llego 15 kilos pechuga'
+      - 'Entrada 30 kilos papa pastusa'
+      - 'Surtir 10 kilos arroz'
+      - 'Compra 240000 20 kilos tocino Distribuidora'
+    Suma el stock al producto, marca el pedido pendiente como comprado si aplica
+    y genera la confirmación en Telegram.
+    """
+    t = normalizar_texto(texto)
+    kilos = parsear_peso(t)
+    prod = buscar_producto_en_texto(establecimiento, t)
+
+    if not prod:
+        termino_limpio = limpiar_termino_consulta(t)
+        if termino_limpio:
+            prod = buscar_producto_en_texto(establecimiento, termino_limpio)
+
+    if not prod or not kilos or kilos <= 0:
+        return None, Decimal("0"), ""
+
+    stock_anterior = prod.stock_kilos
+    prod.stock_kilos += kilos
+    prod.save()
+
+    # Si estaba en lista de compras pendientes, marcar como comprado/abastecido
+    pedidos_resueltos = ItemPedido.objects.filter(
+        establecimiento=establecimiento,
+        producto=prod,
+        estado="pendiente",
+    )
+    if not pedidos_resueltos.exists():
+        pedidos_resueltos = ItemPedido.objects.filter(
+            establecimiento=establecimiento,
+            nombre_producto__iexact=prod.nombre,
+            estado="pendiente",
+        )
+
+    cant_resueltos = pedidos_resueltos.count()
+    if cant_resueltos > 0:
+        pedidos_resueltos.update(estado="comprado")
+
+    gramos = int(kilos * 1000)
+    libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
+    gramos_str = f"{gramos:,.0f}".replace(",", ".")
+    kilos_str = f"{kilos:.3f}".rstrip("0").rstrip(".")
+
+    info_pedido = ""
+    if cant_resueltos > 0:
+        info_pedido = "\n   ✅ *Lista de compras actualizada:* Producto marcado como *ABASTECIDO* en `/pedidos`."
+
+    info = (
+        "📦 *¡Entrada de Mercancía Registrada con Éxito!*\n"
+        f"📍 _{establecimiento.nombre}_\n\n"
+        f"   • Producto: *{prod.nombre}*\n"
+        f"   • Cantidad ingresada: *+{gramos_str} g* (+{kilos_str} Kg / +{libras} lb)\n"
+        f"   • Stock anterior: {stock_anterior:,.2f} Kg\n"
+        f"   • *Nuevo stock disponible:* *{prod.stock_kilos:,.2f} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)"
+        f"{info_pedido}"
+    )
+
+    return prod, kilos, info
+
+
 def generar_lista_categoria(establecimiento, categoria: str) -> str:
     """Genera el mensaje con productos, existencias y precios de una categoría."""
     cat_aliases = {

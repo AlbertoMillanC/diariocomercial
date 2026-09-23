@@ -59,7 +59,7 @@ class VentaForm(forms.ModelForm):
 
     class Meta:
         model = Venta
-        fields = ["fecha_hora", "actividad", "motivo", "valor", "tipo_cliente", "observacion"]
+        fields = ["fecha_hora", "actividad", "motivo", "valor", "tipo_cliente", "medio_pago", "observacion"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(
                 attrs={"type": "datetime-local"},
@@ -91,11 +91,17 @@ class VentaForm(forms.ModelForm):
         self.fields["motivo"].required = False
         self.fields["actividad"].label = "Actividad CIIU"
         self.fields["tipo_cliente"].label = "¿A quién le vende?"
+        self.fields["medio_pago"].label = "Medio de pago"
+        self.fields["medio_pago"].required = False
+        self.fields["medio_pago"].initial = "efectivo"
         self.fields["fecha_hora"].label = "Fecha y hora"
         self.fields["fecha_hora"].help_text = "Sale automática. Si necesita cambiarla, pulse el calendario."
         self.fields["observacion"].label = "Observación (opcional)"
         self.fields["observacion"].required = False
         self.fields["observacion"].widget.attrs["placeholder"] = "Ej. fiado, domicilio"
+
+    def clean_medio_pago(self):
+        return self.cleaned_data.get("medio_pago") or "efectivo"
 
     def clean_fecha_hora(self):
         dt = self.cleaned_data["fecha_hora"]

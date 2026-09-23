@@ -80,6 +80,12 @@ class Venta(models.Model):
         ("particular", "Particular"),
         ("empresa", "Empresa"),
     )
+    MEDIOS_PAGO = (
+        ("efectivo", "Efectivo"),
+        ("nequi", "Nequi"),
+        ("daviplata", "Daviplata"),
+        ("transferencia", "Transferencia"),
+    )
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
     usuario = models.ForeignKey(User, on_delete=models.PROTECT)
     actividad = models.ForeignKey(
@@ -92,6 +98,7 @@ class Venta(models.Model):
     concepto = models.CharField(max_length=160, blank=True)
     observacion = models.CharField(max_length=160, blank=True)
     tipo_cliente = models.CharField(max_length=12, choices=CLIENTES, default="particular")
+    medio_pago = models.CharField(max_length=20, choices=MEDIOS_PAGO, default="efectivo")
     ica_estimado = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     estado = models.CharField(max_length=12, default="vigente")
 

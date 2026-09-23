@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+import urllib.parse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -809,6 +810,21 @@ def pedidos_lista(request):
     total_agotados = ItemPedido.objects.filter(establecimiento=est, estado="pendiente", origen="agotado").count()
     total_solicitados = ItemPedido.objects.filter(establecimiento=est, estado="pendiente", origen="solicitado").count()
 
+    # Construir enlace de WhatsApp para enviar pedido formal al proveedor
+    items_pendientes = ItemPedido.objects.filter(establecimiento=est, estado="pendiente").order_by("categoria", "nombre_producto")
+    if items_pendientes.exists():
+        lineas = [f"📋 *PEDIDO DE COMPRA - {est.nombre.upper()}*"]
+        lineas.append("Hola, solicito despacho de los siguientes productos:\n")
+        for item in items_pendientes:
+            cant = f" - {item.cantidad_sugerida:g} {item.unidad}" if item.cantidad_sugerida > 0 else ""
+            obs = f" ({item.observacion})" if item.observacion else ""
+            lineas.append(f"▫️ *{item.nombre_producto}*{cant}{obs}")
+        lineas.append("\n_Generado automáticamente desde Diario Comercial._")
+        msg_wa = "\n".join(lineas)
+        whatsapp_pedido_url = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
+    else:
+        whatsapp_pedido_url = ""
+
     return render(
         request,
         "pedidos.html",
@@ -820,6 +836,7 @@ def pedidos_lista(request):
             "total_pendientes": total_pendientes,
             "total_agotados": total_agotados,
             "total_solicitados": total_solicitados,
+            "whatsapp_pedido_url": whatsapp_pedido_url,
             "puede_editar": perfil.es_propietario(),
         },
     )
