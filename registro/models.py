@@ -189,3 +189,37 @@ class Auditoria(models.Model):
 
     def __str__(self):
         return f"{self.accion} {self.entidad_afectada} #{self.id_registro}"
+
+
+class Producto(models.Model):
+    CATEGORIAS = (
+        ("carnes", "Carnes y Derivados"),
+        ("viveres", "Víveres y Abarrotes"),
+        ("lacteos", "Lácteos"),
+        ("bebidas", "Bebidas"),
+        ("otros", "Otros"),
+    )
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="productos")
+    categoria = models.CharField(max_length=20, choices=CATEGORIAS, default="carnes")
+    nombre = models.CharField(max_length=120)
+    stock_kilos = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Existencias en Kilogramos")
+    precio_kilo = models.DecimalField(max_digits=12, decimal_places=2, help_text="Precio por Kilo")
+    estado = models.CharField(max_length=12, default="activo")
+
+    class Meta:
+        ordering = ["categoria", "nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} - ${self.precio_kilo}/kg"
+
+    @property
+    def precio_libra(self):
+        return (self.precio_kilo / Decimal("2")).quantize(Decimal("1"))
+
+    @property
+    def precio_gramo(self):
+        return (self.precio_kilo / Decimal("1000")).quantize(Decimal("0.01"))
+
+    @property
+    def stock_libras(self):
+        return (self.stock_kilos * Decimal("2")).quantize(Decimal("0.1"))

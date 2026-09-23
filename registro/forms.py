@@ -3,7 +3,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import ActividadCIIU, Compra, MotivoVenta, Perfil, Retencion, Venta
+from .models import ActividadCIIU, Compra, MotivoVenta, Perfil, Producto, Retencion, Venta
 
 
 class LoginForm(AuthenticationForm):
@@ -168,4 +168,22 @@ class MotivoVentaForm(forms.ModelForm):
             "actividad": "Actividad CIIU",
             "nombre": "Motivo de venta",
             "es_predeterminado": "Usar este motivo por defecto",
+        }
+
+
+class ProductoForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ["categoria", "nombre", "stock_kilos", "precio_kilo", "estado"]
+        labels = {
+            "categoria": "Categoría",
+            "nombre": "Nombre del Producto / Corte",
+            "stock_kilos": "Existencias en Kilos (Kg)",
+            "precio_kilo": "Precio por Kilo ($ COP)",
+            "estado": "Estado",
+        }
+        widgets = {
+            "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res"}),
+            "stock_kilos": forms.NumberInput(attrs={"step": "0.1", "min": "0"}),
+            "precio_kilo": forms.NumberInput(attrs={"step": "100", "min": "0"}),
         }

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Inventario y Existencias{% endblock %}
+{% block content %}
+<h2>Inventario y Existencias</h2>
+<p class="lead">Control de existencias físicas y precios por Kilo, Libra y Gramo.</p>
+
+<div class="cards">
+  <div class="card"><span>Total en Existencias</span><strong>{{ total_kilos|floatformat:1 }} Kg</strong></div>
+  <div class="card"><span>Total en Libras</span><strong>{{ total_kilos|floatformat:1 }} x 2 lb</strong></div>
+  <div class="card"><span>Valor del Inventario</span><strong>{{ valor_inventario|pesos }}</strong></div>
+  <div class="card"><span>Productos Registrados</span><strong>{{ productos|length }}</strong></div>
+</div>
+
+<form class="filters" method="get" style="margin-top: 16px;">
+  <div>
+    <label>Filtrar por Categoría</label>
+    <select name="categoria" onchange="this.form.submit()">
+      <option value="todas" {% if categoria_actual == 'todas' %}selected{% endif %}>Todas las categorías</option>
+      <option value="carnes" {% if categoria_actual == 'carnes' %}selected{% endif %}>Carnes y Derivados</option>
+      <option value="viveres" {% if categoria_actual == 'viveres' %}selected{% endif %}>Víveres y Abarrotes</option>
+      <option value="lacteos" {% if categoria_actual == 'lacteos' %}selected{% endif %}>Lácteos</option>
+      <option value="bebidas" {% if categoria_actual == 'bebidas' %}selected{% endif %}>Bebidas</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">Filtrar</button>
+</form>
+
+<div class="panel" style="margin-bottom: 24px;">
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th>Producto / Corte</th>
+          <th>Stock (Kilos)</th>
+          <th>Stock (Libras)</th>
+          <th>Precio / Kilo</th>
+          <th>Precio / Libra</th>
+          <th>Precio / Gramo</th>
+          {% if puede_editar %}<th>Ajuste Rápido</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in productos %}
+        <tr>
+          <td><span class="tag">{{ p.get_categoria_display }}</span></td>
+          <td><strong>{{ p.nombre }}</strong></td>
+          <td>{{ p.stock_kilos }} Kg</td>
+          <td>{{ p.stock_libras }} lb</td>
+          <td><strong>${{ p.precio_kilo|floatformat:0 }}</strong></td>
+          <td>${{ p.precio_libra|floatformat:0 }}</td>
+          <td>${{ p.precio_gramo }}</td>
+          {% if puede_editar %}
+          <td>
+            <form method="post" action="{% url 'inventario_ajustar' p.pk %}" style="display:flex; gap:6px; align-items:center;">
+              {% csrf_token %}
+              <input type="number" step="0.1" name="stock_kilos" value="{{ p.stock_kilos }}" title="Stock en Kilos" style="width:70px; padding:4px; margin:0;" required>
+              <input type="number" step="100" name="precio_kilo" value="{{ p.precio_kilo|floatformat:0 }}" title="Precio por Kilo" style="width:85px; padding:4px; margin:0;" required>
+              <button class="btn btn-ghost" type="submit" style="padding:4px 8px; font-size:12px;" title="Guardar cambios">💾</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">No hay productos registrados en esta categoría.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if puede_editar %}
+<div class="panel" style="max-width: 600px;">
+  <h3>➕ Agregar Nuevo Producto o Corte</h3>
+  <form method="post">
+    {% csrf_token %}
+    <div>
+      <label>{{ form.categoria.label }}</label>
+      {{ form.categoria }}
+    </div>
+    <div>
+      <label>{{ form.nombre.label }}</label>
+      {{ form.nombre }}
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label>{{ form.stock_kilos.label }}</label>
+        {{ form.stock_kilos }}
+      </div>
+      <div>
+        <label>{{ form.precio_kilo.label }}</label>
+        {{ form.precio_kilo }}
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit" style="margin-top:10px;">Registrar Producto</button>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

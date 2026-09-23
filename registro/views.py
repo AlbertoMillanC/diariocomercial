@@ -16,6 +16,7 @@ from .forms import (
     CompraForm,
     LoginForm,
     MotivoVentaForm,
+    ProductoForm,
     RetencionForm,
     UsuarioNegocioForm,
     VentaForm,
@@ -27,6 +28,7 @@ from .models import (
     EnvioReporte,
     MotivoVenta,
     Perfil,
+    Producto,
     Retencion,
     Venta,
 )
@@ -697,3 +699,62 @@ def enviar_reporte(request):
             "envios": envios,
         },
     )
+
+
+@login_required
+def inventario_lista(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    categoria = request.GET.get("categoria") or "todas"
+    qs = Producto.objects.filter(establecimiento=est)
+    if categoria != "todas":
+        qs = qs.filter(categoria=categoria)
+
+    form = ProductoForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        prod = form.save(commit=False)
+        prod.establecimiento = est
+        prod.save()
+        messages.success(request, f"Producto '{prod.nombre}' agregado al inventario.")
+        return redirect("inventario")
+
+    total_kilos = sum((p.stock_kilos for p in qs), Decimal("0"))
+    valor_inventario = sum((p.stock_kilos * p.precio_kilo for p in qs), Decimal("0"))
+
+    return render(
+        request,
+        "inventario.html",
+        {
+            "productos": qs,
+            "form": form,
+            "categoria_actual": categoria,
+            "total_kilos": total_kilos,
+            "valor_inventario": valor_inventario,
+            "puede_editar": perfil.es_propietario(),
+        },
+    )
+
+
+@login_required
+def inventario_ajustar(request, pk):
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario puede modificar inventario.")
+        return redirect("inventario")
+    prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
+    if request.method == "POST":
+        nuevo_stock = request.POST.get("stock_kilos")
+        nuevo_precio = request.POST.get("precio_kilo")
+        try:
+            if nuevo_stock:
+                prod.stock_kilos = Decimal(nuevo_stock)
+            if nuevo_precio:
+                prod.precio_kilo = Decimal(nuevo_precio)
+            prod.save()
+            messages.success(request, f"Existencias y precio de '{prod.nombre}' actualizados.")
+        except Exception as e:
+            messages.error(request, f"Error al actualizar: {e}")
+    return redirect("inventario")

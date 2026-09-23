@@ -31,7 +31,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Retencion, Venta
+from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta
 
 
 class TelegramClient:
@@ -176,7 +176,17 @@ class Command(BaseCommand):
             client.send_message(chat_id, self.generar_resumen_hoy())
             return
 
-        # 3. Comando /ultimas -> Últimos 5 movimientos
+        # 3. Comando /carnes -> Lista de cortes, existencias y precios por kilo, libra y gramo
+        if cmd in ("/carnes", "carnes", "/carne", "carne"):
+            client.send_message(chat_id, self.generar_inventario_carnes())
+            return
+
+        # 4. Comando /inventario -> Inventario general
+        if cmd in ("/inventario", "inventario", "/stock", "stock"):
+            client.send_message(chat_id, self.generar_inventario_general())
+            return
+
+        # 5. Comando /ultimas -> Últimos 5 movimientos
         if cmd in ("/ultimas", "ultimas", "/historial", "historial"):
             client.send_message(chat_id, self.generar_ultimas())
             return
@@ -257,6 +267,8 @@ class Command(BaseCommand):
             "• `Compra 85000 Distribuidora` ➡️ Gasto o compra\n"
             "• `Retencion 15000 Alcaldia` ➡️ Retención practicada\n\n"
             "📊 *CONSULTAS Y REPORTES:*\n"
+            "• `/carnes` ➡️ *Lista de cortes, existencias y precios por Kilo, Libra y Gramo*\n"
+            "• `/inventario` ➡️ Resumen general de stock y valor total\n"
             "• `/hoy` ➡️ Cierre de caja del día\n"
             "• `/resumen` ➡️ Balance acumulado del mes\n"
             "• `/ultimas` ➡️ Últimos 5 movimientos con ID\n"
@@ -533,6 +545,44 @@ class Command(BaseCommand):
         ica_total = sum((v.ica_estimado for v in ventas_mes), Decimal("0"))
         lineas.append(f"\n📊 *Total ICA acumulado este mes:* ${ica_total:,.2f} COP")
         lineas.append("_Este valor es la base informativa para preparar la declaración municipal._")
+        return "\n".join(lineas)
+
+    def generar_inventario_carnes(self):
+        est = Establecimiento.objects.first()
+        productos = Producto.objects.filter(establecimiento=est, categoria="carnes", estado="activo").order_by("nombre")
+        if not productos:
+            return "🥩 No hay cortes de carne registrados en el inventario."
+
+        lineas = [
+            "🥩 *LISTA DE PRECIOS Y EXISTENCIAS — CARNES*",
+            f"📍 _{est.nombre}_\n",
+        ]
+        for p in productos:
+            lineas.append(
+                f"• *{p.nombre}*\n"
+                f"  📦 Stock: *{p.stock_kilos} Kg* ({p.stock_libras} lb)\n"
+                f"  💰 *Kilo:* ${p.precio_kilo:,.0f} | *Libra:* ${p.precio_libra:,.0f} | *Gramo:* ${p.precio_gramo}"
+            )
+        lineas.append("\n⚖️ _Precios vigentes para pesaje en báscula de mostrador._")
+        return "\n".join(lineas)
+
+    def generar_inventario_general(self):
+        est = Establecimiento.objects.first()
+        productos = Producto.objects.filter(establecimiento=est, estado="activo").order_by("categoria", "nombre")
+        if not productos:
+            return "📦 No hay productos registrados en el inventario."
+
+        total_kilos = sum((p.stock_kilos for p in productos), Decimal("0"))
+        valor_total = sum((p.stock_kilos * p.precio_kilo for p in productos), Decimal("0"))
+
+        lineas = [
+            "📦 *RESUMEN GENERAL DE INVENTARIO*",
+            f"📍 _{est.nombre}_\n",
+            f"📊 Total Existencias: *{total_kilos:,.1f} Kg*",
+            f"💵 Valor Estimado en Bodega: *${valor_total:,.0f} COP*",
+            f"🏷️ Variedades activas: *{productos.count()} productos*\n",
+            "💡 _Para ver cortes de carne específicos con precios por Kilo, Libra y Gramo, escribe:_ `/carnes`",
+        ]
         return "\n".join(lineas)
 
     def generar_excel_consolidado(self):
