@@ -14,6 +14,7 @@ from django.utils.dateparse import parse_date
 from .forms import (
     ActividadCIIUForm,
     CompraForm,
+    ItemPedidoForm,
     LoginForm,
     MotivoVentaForm,
     ProductoForm,
@@ -26,6 +27,7 @@ from .models import (
     Auditoria,
     Compra,
     EnvioReporte,
+    ItemPedido,
     MotivoVenta,
     Perfil,
     Producto,
@@ -33,7 +35,11 @@ from .models import (
     Venta,
 )
 from .reportes import respuesta_csv, respuesta_pdf, texto_consolidado
-from .inventario_service import procesar_salida_inventario, revertir_salida_inventario
+from .inventario_service import (
+    procesar_salida_inventario,
+    revertir_salida_inventario,
+    sincronizar_productos_agotados,
+)
 
 
 class LoginDiario(LoginView):
@@ -769,3 +775,74 @@ def inventario_ajustar(request, pk):
         except Exception as e:
             messages.error(request, f"Error al actualizar: {e}")
     return redirect("inventario")
+
+
+@login_required
+def pedidos_lista(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    # Auto sincronizar productos en cero a pedidos
+    sincronizar_productos_agotados(est)
+
+    estado_filtro = request.GET.get("estado") or "pendiente"
+    origen_filtro = request.GET.get("origen") or "todos"
+
+    qs = ItemPedido.objects.filter(establecimiento=est)
+    if estado_filtro != "todos":
+        qs = qs.filter(estado=estado_filtro)
+    if origen_filtro != "todos":
+        qs = qs.filter(origen=origen_filtro)
+
+    form = ItemPedidoForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        item = form.save(commit=False)
+        item.establecimiento = est
+        item.origen = "manual"
+        item.save()
+        messages.success(request, f"Producto '{item.nombre_producto}' agregado al pedido de compras.")
+        return redirect("pedidos")
+
+    total_pendientes = ItemPedido.objects.filter(establecimiento=est, estado="pendiente").count()
+    total_agotados = ItemPedido.objects.filter(establecimiento=est, estado="pendiente", origen="agotado").count()
+    total_solicitados = ItemPedido.objects.filter(establecimiento=est, estado="pendiente", origen="solicitado").count()
+
+    return render(
+        request,
+        "pedidos.html",
+        {
+            "items": qs,
+            "form": form,
+            "estado_filtro": estado_filtro,
+            "origen_filtro": origen_filtro,
+            "total_pendientes": total_pendientes,
+            "total_agotados": total_agotados,
+            "total_solicitados": total_solicitados,
+            "puede_editar": perfil.es_propietario(),
+        },
+    )
+
+
+@login_required
+def pedido_cambiar_estado(request, pk, accion):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    item = get_object_or_404(ItemPedido, pk=pk, establecimiento=perfil.establecimiento)
+
+    if accion == "comprar":
+        item.estado = "comprado"
+        item.save()
+        messages.success(request, f"'{item.nombre_producto}' marcado como COMPRADO.")
+    elif accion == "descartar":
+        item.estado = "descartado"
+        item.save()
+        messages.info(request, f"'{item.nombre_producto}' descartado del pedido.")
+    elif accion == "pendiente":
+        item.estado = "pendiente"
+        item.save()
+        messages.info(request, f"'{item.nombre_producto}' reactivado como PENDIENTE.")
+
+    return redirect("pedidos")

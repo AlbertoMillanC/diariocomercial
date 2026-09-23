@@ -1,7 +1,7 @@
 import re
 from decimal import Decimal
 from typing import Optional, Tuple
-from .models import Producto, Auditoria
+from .models import Producto, Auditoria, ItemPedido
 
 
 def normalizar_texto(texto: str) -> str:
@@ -306,6 +306,36 @@ def procesar_salida_inventario(
         f"   • Stock restante: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)"
     )
 
+    # Alerta inmediata de compras si el stock queda agotado o bajo
+    if prod.stock_kilos <= Decimal("0"):
+        registrar_o_actualizar_pedido(
+            establecimiento=establecimiento,
+            nombre_producto=prod.nombre,
+            producto=prod,
+            origen="agotado",
+            cantidad_sugerida=Decimal("10.0") if prod.categoria in ("carnes", "abarrotes") else Decimal("5.0"),
+            unidad="Kg",
+            observacion="Agotado tras venta reciente",
+        )
+        info_formateada += (
+            f"\n\n🚨 *ALERTA COMPRAR:* ¡Stock de *{prod.nombre}* AGOTADO (0 Kg restantes)!\n"
+            f"   Se incluyó automáticamente en la lista de compras pendientes (`/comprar`)."
+        )
+    elif prod.stock_kilos <= Decimal("3.0"):
+        registrar_o_actualizar_pedido(
+            establecimiento=establecimiento,
+            nombre_producto=prod.nombre,
+            producto=prod,
+            origen="stock_bajo",
+            cantidad_sugerida=Decimal("5.0"),
+            unidad="Kg",
+            observacion=f"Stock bajo tras venta: {prod.stock_kilos} Kg",
+        )
+        info_formateada += (
+            f"\n\n⚠️ *ALERTA COMPRAR:* Stock de *{prod.nombre}* bajo ({prod.stock_kilos} Kg restantes).\n"
+            f"   Sugerido para pedido de reposición en `/comprar`."
+        )
+
     return prod, kilos, libras, valor_final or Decimal("0"), info_formateada
 
 
@@ -478,6 +508,15 @@ def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]
         termino_busqueda = m_prod.group(1).strip()
     elif t.endswith("?") and not any(k in t for k in ("venta", "compra", "retencion")):
         termino_busqueda = t_limpio
+    elif not any(char.isdigit() for char in t_limpio):
+        palabras = t_limpio.split()
+        comandos_excluidos = (
+            "venta", "vendi", "compra", "retencion", "anular", "resumen",
+            "consolidado", "ayuda", "historial", "start", "hola", "hoy", "caja",
+            "comprar", "pedido", "pedidos", "faltantes"
+        )
+        if 1 <= len(palabras) <= 3 and not any(k in t_limpio for k in comandos_excluidos):
+            termino_busqueda = t_limpio
 
     if not termino_busqueda:
         return None
@@ -515,18 +554,233 @@ def consultar_producto_o_categoria(establecimiento, texto: str) -> Optional[str]
             "otros": "📦",
         }.get(prod.categoria, "📦")
 
+        alerta_adicional = ""
+        if prod.stock_kilos <= Decimal("0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento,
+                nombre_producto=prod.nombre,
+                producto=prod,
+                origen="agotado",
+                cantidad_sugerida=Decimal("10.0") if prod.categoria in ("carnes", "abarrotes") else Decimal("5.0"),
+                unidad="Kg",
+                observacion="Consultado por cliente y agotado",
+            )
+            alerta_adicional = (
+                f"\n\n🚨 *ALERTA COMPRAR:* No hay existencias de *{prod.nombre}* (0 Kg).\n"
+                f"📝 Se incluyó automáticamente en la lista de compras pendientes (`/comprar`)."
+            )
+        elif prod.stock_kilos <= Decimal("3.0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento,
+                nombre_producto=prod.nombre,
+                producto=prod,
+                origen="stock_bajo",
+                cantidad_sugerida=Decimal("5.0"),
+                unidad="Kg",
+                observacion=f"Stock bajo consultado: {prod.stock_kilos} Kg",
+            )
+            alerta_adicional = (
+                f"\n\n⚠️ *ALERTA:* Queda poco stock ({prod.stock_kilos} Kg restantes).\n"
+                f"📝 Sugerido para reposición en `/comprar`."
+            )
+
         return (
             f"{icono_cat} *Consulta de Producto: {prod.nombre}*\n"
             f"📍 _{establecimiento.nombre}_\n\n"
             f"📦 *Existencias actuales:* *{prod.stock_kilos:,.2f} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)\n"
             f"💰 *Precios vigentes:*\n   {info_precio}\n\n"
-            f"{estado_icono} *Estado:* _{estado_msg}_"
+            f"{estado_icono} *Estado:* _{estado_msg}_{alerta_adicional}"
         )
 
-    # Si no se encontró en el catálogo
+    # Si no se encontró en el catálogo: agregarlo a productos solicitados por clientes
+    nombre_limpio = re.sub(
+        r"^(de\s+|el\s+|la\s+|los\s+|las\s+|un\s+|una\s+|unos\s+|unas\s+)", "", termino_busqueda
+    ).strip().capitalize()
+
+    if len(nombre_limpio) >= 3:
+        item = registrar_o_actualizar_pedido(
+            establecimiento=establecimiento,
+            nombre_producto=nombre_limpio,
+            producto=None,
+            origen="solicitado",
+            cantidad_sugerida=Decimal("5.0"),
+            unidad="Kg",
+            observacion="Preguntado por cliente / no existe en catálogo",
+        )
+        veces_txt = f"{item.veces_solicitado} vez" if item.veces_solicitado == 1 else f"{item.veces_solicitado} veces"
+        return (
+            f"❌ No tenemos *'{nombre_limpio}'* en el catálogo actual del supermercado.\n\n"
+            f"📝 *ALERTA:* Agregado a la lista de compras futuras / pedido formal.\n"
+            f"📊 Solicitado por clientes: *{veces_txt}*.\n\n"
+            f"💡 Escribe `/comprar` para ver todos los productos pendientes por pedir."
+        )
+
     return (
         f"🔍 No encontré *'{termino_busqueda}'* en el catálogo del supermercado.\n\n"
         "Puedes escribir `/inventario` para ver los departamentos disponibles o probar:\n"
         "• `/carnes`\n• `/abarrotes`\n• `/lacteos`\n• `/fruver`\n• `/bebidas`\n• `/aseo`"
     )
+
+
+def inferir_categoria(texto: str) -> str:
+    """Infiere la categoría adecuada para un producto nuevo no registrado."""
+    t = normalizar_texto(texto)
+    if any(w in t for w in ("salchicha", "salchichon", "jamon", "mortadela", "carne", "pollo", "cerdo", "res", "tocino", "costilla", "morcilla", "embutido", "chorizo")):
+        return "carnes"
+    if any(w in t for w in ("arroz", "frijol", "lenteja", "garbanzo", "harina", "aceite", "azucar", "sal", "cafe", "panela", "pasta", "espagueti", "galleta", "avena", "arepa", "atun", "sardina")):
+        return "abarrotes"
+    if any(w in t for w in ("leche", "queso", "yogurt", "yogur", "cuajada", "mantequilla", "crema", "huevo", "huevos", "kumis", "suero")):
+        return "lacteos"
+    if any(w in t for w in ("papa", "cebolla", "tomate", "platano", "limon", "aguacate", "zanahoria", "fruta", "verdura", "manzana", "pera", "banano", "naranja", "cilantro", "guayaba", "fresa", "mango", "pina")):
+        return "fruver"
+    if any(w in t for w in ("agua", "gaseosa", "jugo", "cerveza", "refresco", "soda", "cola", "pony", "malta", "vino", "aguardiente")):
+        return "bebidas"
+    if any(w in t for w in ("jabon", "detergente", "cloro", "blanqueador", "papel", "higienico", "crema dental", "shampoo", "limpido", "suavizante", "cepillo", "toalla", "escoba", "trapero")):
+        return "aseo"
+    return "otros"
+
+
+def registrar_o_actualizar_pedido(
+    establecimiento,
+    nombre_producto: str,
+    producto: Optional[Producto] = None,
+    origen: str = "agotado",
+    cantidad_sugerida: Decimal = Decimal("5.0"),
+    unidad: str = "Kg",
+    observacion: str = "",
+) -> ItemPedido:
+    """
+    Registra o actualiza un ítem en la lista de compras/pedidos pendientes.
+    Si ya existe un pedido pendiente con el mismo producto o nombre, incrementa
+    el número de veces solicitado y actualiza su observación.
+    """
+    nombre_limpio = nombre_producto.strip()
+    item = None
+    if producto:
+        item = ItemPedido.objects.filter(
+            establecimiento=establecimiento, producto=producto, estado="pendiente"
+        ).first()
+    if not item:
+        pendientes = ItemPedido.objects.filter(
+            establecimiento=establecimiento, estado="pendiente"
+        )
+        for p in pendientes:
+            if normalizar_texto(p.nombre_producto) == normalizar_texto(nombre_limpio):
+                item = p
+                break
+
+    if item:
+        item.veces_solicitado += 1
+        if observacion and observacion not in item.observacion:
+            item.observacion = f"{item.observacion} | {observacion}".strip(" |")
+        if origen == "agotado":
+            item.origen = "agotado"
+        item.save()
+        return item
+
+    categoria = producto.categoria if producto else inferir_categoria(nombre_limpio)
+    item = ItemPedido.objects.create(
+        establecimiento=establecimiento,
+        producto=producto,
+        nombre_producto=nombre_limpio.capitalize(),
+        categoria=categoria,
+        cantidad_sugerida=cantidad_sugerida,
+        unidad=unidad,
+        origen=origen,
+        veces_solicitado=1,
+        observacion=observacion,
+        estado="pendiente",
+    )
+    return item
+
+
+def sincronizar_productos_agotados(establecimiento):
+    """Sincroniza automáticamente productos con stock <= 0 a la lista de compras."""
+    if not establecimiento:
+        return
+    agotados = Producto.objects.filter(
+        establecimiento=establecimiento, stock_kilos__lte=0, estado="activo"
+    )
+    for p in agotados:
+        registrar_o_actualizar_pedido(
+            establecimiento=establecimiento,
+            nombre_producto=p.nombre,
+            producto=p,
+            origen="agotado",
+            cantidad_sugerida=Decimal("10.0") if p.categoria in ("carnes", "abarrotes") else Decimal("5.0"),
+            unidad="Kg",
+            observacion="Stock en 0 Kg",
+        )
+
+
+def generar_lista_compras(establecimiento) -> str:
+    """
+    Genera el reporte de compras pendientes y pedido formal para Telegram.
+    Divide entre:
+      - Inventario Agotado / Por Reponer (0 Kg)
+      - Stock Bajo (Alerta preventiva)
+      - Solicitados por Clientes (Nuevos productos que no existen)
+      - Manuales
+    """
+    if not establecimiento:
+        return "⚠️ No hay un establecimiento configurado."
+
+    sincronizar_productos_agotados(establecimiento)
+
+    items = ItemPedido.objects.filter(
+        establecimiento=establecimiento, estado="pendiente"
+    ).order_by("-fecha_actualizacion")
+
+    if not items.exists():
+        return (
+            "✅ *¡Todo al día con el inventario!*\n\n"
+            "No hay productos agotados ni pedidos pendientes por comprar en este momento.\n\n"
+            "💡 _Si un cliente pregunta por algo nuevo (ej: salchichas), escríbelo aquí y se agregará automáticamente a compras futuras._"
+        )
+
+    agotados = [i for i in items if i.origen == "agotado"]
+    stock_bajo = [i for i in items if i.origen == "stock_bajo"]
+    solicitados = [i for i in items if i.origen == "solicitado"]
+    manuales = [i for i in items if i.origen == "manual"]
+
+    lineas = [
+        "🛒 *LISTA DE COMPRAS Y PEDIDO FORMAL*",
+        f"📍 _{establecimiento.nombre}_ | Pendientes: {items.count()}\n",
+    ]
+
+    if agotados:
+        lineas.append("🔴 *INVENTARIO AGOTADO (URGENTE):*")
+        for i in agotados:
+            stock_info = f" (Stock: {i.producto.stock_kilos} Kg)" if i.producto else ""
+            lineas.append(f"• *{i.nombre_producto}*{stock_info} — Reponer aprox. {i.cantidad_sugerida:,.0f} {i.unidad}")
+        lineas.append("")
+
+    if stock_bajo:
+        lineas.append("🟡 *STOCK BAJO (ALERTA PREVENTIVA):*")
+        for i in stock_bajo:
+            stock_info = f" ({i.producto.stock_kilos} Kg restantes)" if i.producto else ""
+            lineas.append(f"• *{i.nombre_producto}*{stock_info} — Sugerido pedir: {i.cantidad_sugerida:,.0f} {i.unidad}")
+        lineas.append("")
+
+    if solicitados:
+        lineas.append("🔵 *PRODUCTOS SOLICITADOS POR CLIENTES (No en tienda):*")
+        for i in solicitados:
+            veces_txt = f"{i.veces_solicitado} vez" if i.veces_solicitado == 1 else f"{i.veces_solicitado} veces"
+            lineas.append(f"• *{i.nombre_producto}* (Cat: {i.get_categoria_display()}) — Preguntado {veces_txt}")
+        lineas.append("")
+
+    if manuales:
+        lineas.append("⚪ *AGREGADOS MANUALMENTE:*")
+        for i in manuales:
+            obs = f" ({i.observacion})" if i.observacion else ""
+            lineas.append(f"• *{i.nombre_producto}* — {i.cantidad_sugerida:,.0f} {i.unidad}{obs}")
+        lineas.append("")
+
+    lineas.append(
+        "🌐 *Gestión en Django Web:*\n"
+        "👉 Administra o marca como comprados en: `http://127.0.0.1:8001/pedidos/`\n\n"
+        "💡 _Para registrar compras que salgan del libro de caja escribe:_ `Compra <monto> <proveedor>`"
+    )
+
+    return "\n".join(lineas)
 

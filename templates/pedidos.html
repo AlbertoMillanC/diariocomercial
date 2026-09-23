@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Lista de Compras y Pedidos{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+  <div>
+    <h2>🛒 Lista de Compras y Pedido Formal</h2>
+    <p class="lead">Productos agotados, con stock bajo y artículos solicitados por clientes para reposición.</p>
+  </div>
+  <div>
+    <button onclick="window.print()" class="btn btn-ghost" title="Imprimir lista para llevar al mercado o proveedor">🖨️ Imprimir Pedido</button>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <span>Pendientes por Pedir</span>
+    <strong style="color: #b91c1c;">{{ total_pendientes }} productos</strong>
+  </div>
+  <div class="card">
+    <span>Agotados en Tienda</span>
+    <strong style="color: #c2410c;">{{ total_agotados }}</strong>
+  </div>
+  <div class="card">
+    <span>Solicitados por Clientes</span>
+    <strong style="color: #2563eb;">{{ total_solicitados }}</strong>
+  </div>
+  <div class="card">
+    <span>Sincronización Bot</span>
+    <strong style="color: #16a34a;">Telegram Activo ⚡</strong>
+  </div>
+</div>
+
+<form class="filters" method="get" style="margin-top: 18px;">
+  <div>
+    <label>Estado</label>
+    <select name="estado" onchange="this.form.submit()">
+      <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendientes por comprar</option>
+      <option value="comprado" {% if estado_filtro == 'comprado' %}selected{% endif %}>Comprados / Resueltos</option>
+      <option value="descartado" {% if estado_filtro == 'descartado' %}selected{% endif %}>Descartados</option>
+      <option value="todos" {% if estado_filtro == 'todos' %}selected{% endif %}>Todos los estados</option>
+    </select>
+  </div>
+  <div>
+    <label>Origen del Pedido</label>
+    <select name="origen" onchange="this.form.submit()">
+      <option value="todos" {% if origen_filtro == 'todos' %}selected{% endif %}>Todos los orígenes</option>
+      <option value="agotado" {% if origen_filtro == 'agotado' %}selected{% endif %}>Inventario Agotado</option>
+      <option value="stock_bajo" {% if origen_filtro == 'stock_bajo' %}selected{% endif %}>Stock Bajo</option>
+      <option value="solicitado" {% if origen_filtro == 'solicitado' %}selected{% endif %}>Solicitado por Clientes</option>
+      <option value="manual" {% if origen_filtro == 'manual' %}selected{% endif %}>Agregado Manualmente</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" type="submit">Filtrar</button>
+</form>
+
+<div class="panel" style="margin-bottom: 24px;">
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Producto / Solicitud</th>
+          <th>Departamento</th>
+          <th>Origen</th>
+          <th>Veces Preguntado</th>
+          <th>Cantidad Sugerida</th>
+          <th>Nota / Observación</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>
+            <strong>{{ it.nombre_producto }}</strong>
+            {% if it.producto %}
+              <div style="font-size:12px; color:var(--muted);">
+                Stock actual: <strong>{{ it.producto.stock_kilos }} Kg</strong> ({{ it.producto.stock_libras }} lb)
+              </div>
+            {% endif %}
+          </td>
+          <td><span class="tag">{{ it.get_categoria_display }}</span></td>
+          <td>
+            {% if it.origen == 'agotado' %}
+              <span class="badge" style="background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:12px;">🔴 Agotado</span>
+            {% elif it.origen == 'stock_bajo' %}
+              <span class="badge" style="background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:12px;">🟡 Stock Bajo</span>
+            {% elif it.origen == 'solicitado' %}
+              <span class="badge" style="background:#dbeafe; color:#1e40af; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:12px;">🔵 Solicitado</span>
+            {% else %}
+              <span class="badge" style="background:#f3f4f6; color:#374151; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:12px;">⚪ Manual</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            {% if it.veces_solicitado > 1 %}
+              <strong style="color:#2563eb; font-size:14px;">{{ it.veces_solicitado }} veces</strong>
+            {% else %}
+              {{ it.veces_solicitado }}
+            {% endif %}
+          </td>
+          <td><strong>{{ it.cantidad_sugerida|floatformat:1 }} {{ it.unidad }}</strong></td>
+          <td><small>{{ it.observacion|default:"—" }}</small></td>
+          <td>
+            {% if it.estado == 'pendiente' %}
+              <span style="color:#dc2626; font-weight:bold;">⏳ Pendiente</span>
+            {% elif it.estado == 'comprado' %}
+              <span style="color:#16a34a; font-weight:bold;">✅ Comprado</span>
+            {% else %}
+              <span style="color:#6b7280;">Descartado</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              {% if it.estado == 'pendiente' %}
+                <a href="{% url 'pedido_cambiar_estado' it.pk 'comprar' %}" class="btn btn-ghost" style="color:#16a34a; padding:4px 8px; font-size:12px;" title="Marcar como comprado">✅ Comprar</a>
+                <a href="{% url 'pedido_cambiar_estado' it.pk 'descartar' %}" class="btn btn-ghost" style="color:#dc2626; padding:4px 8px; font-size:12px;" title="Descartar del pedido">🗑️</a>
+              {% else %}
+                <a href="{% url 'pedido_cambiar_estado' it.pk 'pendiente' %}" class="btn btn-ghost" style="color:#2563eb; padding:4px 8px; font-size:12px;" title="Reactivar en lista de compras">🔄 Reactivar</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:24px; color:var(--muted);">
+            🎉 No hay productos en esta lista. ¡Todo el inventario está abastecido o el filtro no arrojó resultados!
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel" style="max-width: 650px;">
+  <h3>➕ Agregar Producto Manualmente a la Lista de Compras</h3>
+  <form method="post">
+    {% csrf_token %}
+    <div>
+      <label>{{ form.nombre_producto.label }}</label>
+      {{ form.nombre_producto }}
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label>{{ form.categoria.label }}</label>
+        {{ form.categoria }}
+      </div>
+      <div>
+        <label>{{ form.cantidad_sugerida.label }}</label>
+        <div style="display:flex; gap:6px;">
+          {{ form.cantidad_sugerida }}
+          {{ form.unidad }}
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <label>{{ form.observacion.label }}</label>
+      {{ form.observacion }}
+    </div>
+    <button class="btn btn-primary" type="submit" style="margin-top:12px;">Agregar a Pedidos</button>
+  </form>
+</div>
+
+{% endblock %}

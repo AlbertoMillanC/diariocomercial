@@ -36,7 +36,9 @@ from registro.inventario_service import (
     buscar_producto_en_texto,
     consultar_producto_o_categoria,
     generar_lista_categoria,
+    generar_lista_compras,
     generar_resumen_general_categorias,
+    normalizar_texto,
     parsear_dinero,
     parsear_peso,
     procesar_salida_inventario,
@@ -215,7 +217,22 @@ class Command(BaseCommand):
             client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "aseo"))
             return
 
-        # 4. Consultas en lenguaje natural de inventario ("que carnes tengo", "tenemos tocino", "cuanto vale el arroz")
+        # 4. Comandos de Compras / Pedido Formal y preguntas de faltantes
+        # /comprar, /pedido, /pedidos, /faltantes o "¿qué debo comprar?", "¿qué se acabó?", "¿qué falta?"
+        t_compras = normalizar_texto(texto_limpio).replace("¿", "").replace("?", "").strip()
+        es_consulta_compras = (
+            cmd in ("/comprar", "comprar", "/pedido", "pedido", "/pedidos", "pedidos", "/faltantes", "faltantes")
+            or t_compras in (
+                "que debo comprar", "que hay que comprar", "que se acabo", "que falta",
+                "que falta comprar", "lista de compras", "lista compras", "que compras faltan", "que comprar"
+            )
+            or bool(re.match(r"^(?:que\s+(?:debo|hay\s+que|falta|toca)\s+comprar|que\s+se\s+acabo|lista\s+(?:de\s+)?compras?|pedidos?)$", t_compras))
+        )
+        if es_consulta_compras:
+            client.send_message(chat_id, generar_lista_compras(Establecimiento.objects.first()))
+            return
+
+        # 5. Consultas en lenguaje natural de inventario ("que carnes tengo", "tenemos tocino", "cuanto vale el arroz", o escribir "salchicha")
         resp_consulta = consultar_producto_o_categoria(Establecimiento.objects.first(), texto_limpio)
         if resp_consulta:
             client.send_message(chat_id, resp_consulta)
@@ -317,7 +334,10 @@ class Command(BaseCommand):
             "• `¿tenemos carne?` o `que carnes tengo` ➡️ Muestra cortes disponibles\n"
             "• `¿tenemos tocino?` o `tenemos arroz` ➡️ Existencias y precios exactos\n"
             "• `¿que abarrotes hay?` o `que lacteos hay` ➡️ Catálogo del grupo\n"
-            "• `¿cuanto vale la pechuga?` ➡️ Precios por kilo, libra y gramo\n\n"
+            "🛒 *LISTA DE COMPRAS Y PEDIDOS A PROVEEDORES:*\n"
+            "• `/comprar` o `/pedidos` ➡️ Ver lista formal de compras y faltantes\n"
+            "• `¿qué debo comprar?` o `¿qué se acabó?` ➡️ Reporte de compras urgentes\n"
+            "• Si escribes ej: `salchicha` o `¿hay salchichas?`, se agrega automáticamente a compras futuras\n\n"
             "📝 *VENTAS RÁPIDAS (Calcula gramos y descuenta stock):*\n"
             "• `40 mil carne molida` o `40000 carne molida`\n"
             "• `20 mil tocino` o `15 mil costilla`\n"

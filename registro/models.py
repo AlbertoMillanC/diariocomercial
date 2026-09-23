@@ -229,3 +229,46 @@ class Producto(models.Model):
     @property
     def stock_gramos(self):
         return int((Decimal(str(self.stock_kilos)) * Decimal("1000")).quantize(Decimal("1")))
+
+
+class ItemPedido(models.Model):
+    """Productos faltantes, con stock bajo o solicitados por clientes para la lista de compras/pedidos."""
+
+    ORIGEN_CHOICES = (
+        ("agotado", "Inventario Agotado / Por Reponer"),
+        ("stock_bajo", "Stock Bajo"),
+        ("solicitado", "Solicitado por Cliente (No existe en catálogo)"),
+        ("manual", "Agregado Manualmente"),
+    )
+    ESTADO_CHOICES = (
+        ("pendiente", "Pendiente por comprar"),
+        ("comprado", "Comprado"),
+        ("descartado", "Descartado"),
+    )
+
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="pedidos_compra"
+    )
+    producto = models.ForeignKey(
+        Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos"
+    )
+    nombre_producto = models.CharField(max_length=120)
+    categoria = models.CharField(max_length=20, choices=Producto.CATEGORIAS, default="otros")
+    cantidad_sugerida = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("1"), help_text="Cantidad sugerida a comprar"
+    )
+    unidad = models.CharField(max_length=20, default="Kg", help_text="Kg, lb, unidades, cubeta, etc.")
+    origen = models.CharField(max_length=20, choices=ORIGEN_CHOICES, default="agotado")
+    veces_solicitado = models.PositiveIntegerField(
+        default=1, help_text="Número de veces que fue solicitado o consultado"
+    )
+    observacion = models.CharField(max_length=200, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="pendiente")
+
+    class Meta:
+        ordering = ["-fecha_actualizacion"]
+
+    def __str__(self):
+        return f"{self.nombre_producto} ({self.get_origen_display()}) - {self.estado}"

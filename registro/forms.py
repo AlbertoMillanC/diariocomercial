@@ -3,7 +3,16 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import ActividadCIIU, Compra, MotivoVenta, Perfil, Producto, Retencion, Venta
+from .models import (
+    ActividadCIIU,
+    Compra,
+    ItemPedido,
+    MotivoVenta,
+    Perfil,
+    Producto,
+    Retencion,
+    Venta,
+)
 
 
 class LoginForm(AuthenticationForm):
@@ -186,4 +195,23 @@ class ProductoForm(forms.ModelForm):
             "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res"}),
             "stock_kilos": forms.NumberInput(attrs={"step": "0.1", "min": "0"}),
             "precio_kilo": forms.NumberInput(attrs={"step": "100", "min": "0"}),
+        }
+
+
+class ItemPedidoForm(forms.ModelForm):
+    class Meta:
+        model = ItemPedido
+        fields = ["nombre_producto", "categoria", "cantidad_sugerida", "unidad", "observacion"]
+        labels = {
+            "nombre_producto": "Producto a pedir",
+            "categoria": "Departamento / Categoría",
+            "cantidad_sugerida": "Cantidad sugerida",
+            "unidad": "Unidad (Kg, lb, un, cubeta)",
+            "observacion": "Nota / Proveedor sugerido (opcional)",
+        }
+        widgets = {
+            "nombre_producto": forms.TextInput(attrs={"placeholder": "Ej. Salchichas manguera, Queso costeño"}),
+            "cantidad_sugerida": forms.NumberInput(attrs={"step": "0.5", "min": "0.5"}),
+            "unidad": forms.TextInput(attrs={"placeholder": "Kg, lb, bolsas, paquetes"}),
+            "observacion": forms.TextInput(attrs={"placeholder": "Ej. Pedir a Distribuidora Los Andes"}),
         }

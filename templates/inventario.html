@@ -2,8 +2,15 @@
 {% load dinero %}
 {% block title %}Inventario y Existencias{% endblock %}
 {% block content %}
-<h2>Inventario y Existencias</h2>
-<p class="lead">Control de existencias físicas y precios por Kilo, Libra y Gramo.</p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+  <div>
+    <h2 style="margin:0;">Inventario y Existencias</h2>
+    <p class="lead" style="margin:4px 0 0 0;">Control de existencias físicas y precios por Kilo, Libra y Gramo.</p>
+  </div>
+  <div>
+    <a href="{% url 'pedidos' %}" class="btn btn-primary" style="background:#b91c1c; border-color:#b91c1c; color:#fff; text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:bold;">🛒 Lista de Compras / Faltantes</a>
+  </div>
+</div>
 
 <div class="cards">
   <div class="card"><span>Total en Existencias</span><strong>{{ total_kilos|floatformat:1 }} Kg</strong></div>
