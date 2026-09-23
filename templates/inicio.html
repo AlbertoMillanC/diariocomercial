@@ -39,6 +39,7 @@
 <div class="actions">
   <a class="btn btn-primary" href="{% url 'venta_nueva' %}">Nueva venta</a>
   <a class="btn btn-ghost" href="{% url 'compra_nueva' %}">Nueva compra</a>
+  <a class="btn btn-ghost" href="{% url 'instrucciones' %}" style="border-color:var(--teal); color:var(--teal);">📖 Guía Bot Telegram</a>
   {% if user.perfil.es_propietario %}
   <a class="btn btn-accent" href="{% url 'enviar_reporte' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Enviar consolidado al contador</a>
   {% endif %}

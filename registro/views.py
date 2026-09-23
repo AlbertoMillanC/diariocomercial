@@ -846,3 +846,8 @@ def pedido_cambiar_estado(request, pk, accion):
         messages.info(request, f"'{item.nombre_producto}' reactivado como PENDIENTE.")
 
     return redirect("pedidos")
+
+
+@login_required
+def instrucciones(request):
+    return render(request, "instrucciones.html")

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Guía de Comandos y Bot Telegram{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+  <div>
+    <h2>📖 Guía de Comandos y Asistente Telegram</h2>
+    <p class="lead">Instrucciones y mensajes cotidianos para operar el bot <strong>@DiarioComercial_bot</strong>, inventario, ventas y compras.</p>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <a class="btn btn-primary" href="https://t.me/DiarioComercial_bot" target="_blank" style="background:#1b6b7a;">🤖 Abrir Bot Telegram</a>
+    <button onclick="window.print()" class="btn btn-ghost">🖨️ Imprimir Guía</button>
+  </div>
+</div>
+
+<div class="cards cards-5">
+  <div class="card">
+    <span>Bot de Telegram</span>
+    <strong style="font-size:18px; color:var(--teal);">@DiarioComercial_bot</strong>
+  </div>
+  <div class="card">
+    <span>Departamentos</span>
+    <strong>6 Grupos</strong>
+  </div>
+  <div class="card">
+    <span>Precisión de Venta</span>
+    <strong>Al Gramo (1g)</strong>
+  </div>
+  <div class="card">
+    <span>Cálculo ICA Tunja</span>
+    <strong>6 x mil</strong>
+  </div>
+  <div class="card">
+    <span>Reporte Oficial</span>
+    <strong style="color:var(--orange);">Excel Contador</strong>
+  </div>
+</div>
+
+<!-- PANEL 1: INVENTARIO POR GRUPOS -->
+<div class="panel" style="margin-bottom: 20px;">
+  <h2 style="font-size:17px; margin-bottom:12px;">🏪 1. Consultas de Inventario por Departamentos</h2>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:180px;">Comando</th>
+          <th>Descripción</th>
+          <th>Productos Incluidos</th>
+          <th>Acceso Rápido</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/inventario</span></td>
+          <td>Resumen general de existencias globales (total kilos) y valor comercial total.</td>
+          <td>Todos los departamentos de la tienda</td>
+          <td><span class="tag">Global</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/carnes</span></td>
+          <td>Existencias en kilos y libras, con precios por Kilo, Libra y Gramo.</td>
+          <td>Tocino, Carne molida, Lomo, Costilla de res/cerdo, Pechuga, Sobrebarriga, etc.</td>
+          <td><span class="tag">🥩 Carnicería</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/abarrotes</span> o <span class="mono">/viveres</span></td>
+          <td>Víveres, granos y productos secos con existencia y precios.</td>
+          <td>Arroz, frijol, lenteja, garbanzo, aceite, panela, azúcar, café, harinas, pastas.</td>
+          <td><span class="tag">🌾 Víveres</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/lacteos</span></td>
+          <td>Lácteos, quesos y huevos campesinos con existencias.</td>
+          <td>Leche entera, queso campesino, queso doble crema, huevos AA (cubeta), mantequilla.</td>
+          <td><span class="tag">🧀 Lácteos</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/fruver</span> o <span class="mono">/verduras</span></td>
+          <td>Frutas y verduras frescas al peso.</td>
+          <td>Papa pastusa, papa criolla, cebolla, tomate, plátano, zanahoria, aguacate, banano.</td>
+          <td><span class="tag">🥬 Fruver</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/bebidas</span></td>
+          <td>Bebidas y refrescos fríos o empaquetados.</td>
+          <td>Gaseosas personales y familiares, agua embotellada, jugos, cerveza en lata.</td>
+          <td><span class="tag">🥤 Bebidas</span></td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/aseo</span></td>
+          <td>Artículos de aseo y limpieza del hogar.</td>
+          <td>Jabón en barra, detergente en polvo, lavaplatos, blanqueador, papel higiénico.</td>
+          <td><span class="tag">🧼 Aseo</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PANEL 2: LISTA DE COMPRAS Y PEDIDOS -->
+<div class="panel" style="margin-bottom: 20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+    <h2 style="font-size:17px; margin:0;">🛒 2. Lista de Compras y Pedido Formal a Proveedores</h2>
+    <a href="{% url 'pedidos' %}" class="btn btn-primary btn-sm" style="background:#b91c1c;">Ir a Lista de Compras Web</a>
+  </div>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:230px;">Comando o Frase Cotidiana</th>
+          <th>Clasificación del Pedido</th>
+          <th>¿Qué hace el bot automáticamente?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:#b91c1c;">/comprar</span>, <span class="mono">/pedidos</span>, <span class="mono">/faltantes</span></td>
+          <td>Reporte General de Compras</td>
+          <td>Muestra todos los faltantes agrupados en 4 niveles de urgencia (Agotados, Stock bajo, Solicitados por clientes y Manuales).</td>
+        </tr>
+        <tr>
+          <td><span class="mono">¿Qué debo comprar?</span><br><span class="mono">¿Qué se acabó?</span><br><span class="mono">Lista de compras</span></td>
+          <td>Consultas en Lenguaje Natural</td>
+          <td>Interpreta la pregunta y responde al instante con los productos que necesitan compra o reposición.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">tienes pan</span><br><span class="mono">tienes salchichas</span><br><span class="mono">hay arepas?</span></td>
+          <td>Detección de Nuevos Productos Solicitados</td>
+          <td>
+            Limpia los verbos (<em>tienes</em>, <em>hay</em>), detecta que no existen en el catálogo actual, infiere su departamento y los agrega a la lista de compras con contador de cuántas veces lo han pedido los clientes.
+          </td>
+        </tr>
+        <tr>
+          <td><span class="mono">¿Tenemos tocino?</span><br><em>(cuando está en 0 Kg)</em></td>
+          <td>Alerta de Producto Agotado</td>
+          <td>Responde que está agotado temporalmente y lo agrega automáticamente a compras urgentes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PANEL 3: CONSULTAS DE STOCK Y PRECIOS -->
+<div class="panel" style="margin-bottom: 20px;">
+  <h2 style="font-size:17px; margin-bottom:12px;">💬 3. Preguntas en Lenguaje Natural (Stock y Precios)</h2>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:230px;">Pregunta en Telegram</th>
+          <th>Datos que responde el Bot</th>
+          <th>Ejemplo de Respuesta</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono">¿Tenemos tocino?</span></td>
+          <td>Stock en Kilos, Libras y Gramos + Precios por Kilo, Libra y Gramo + Estado.</td>
+          <td><em>"🥩 Existencias: 18.00 Kg (36.0 lb / 18,000 g) | Kilo: $20,000 | Libra: $10,000 | Gramo: $20.00 COP"</em></td>
+        </tr>
+        <tr>
+          <td><span class="mono">¿Hay queso campesino?</span></td>
+          <td>Disponibilidad física, precio por libra y por kilo.</td>
+          <td><em>"🧀 Estado: Disponible en tienda | Kilo: $18,000 | Libra: $9,000"</em></td>
+        </tr>
+        <tr>
+          <td><span class="mono">¿Cuánto vale la pechuga?</span></td>
+          <td>Precios unitarios vigentes por kilo, libra y gramo.</td>
+          <td><em>"💰 Kilo: $16,000 COP | Libra: $8,000 COP | Gramo: $16.00 COP"</em></td>
+        </tr>
+        <tr>
+          <td><span class="mono">¿Qué carnes tengo?</span></td>
+          <td>Despliegue completo del departamento con totales en kilos y precios.</td>
+          <td><em>"🥩 Variedades: 10 cortes | Total: 195.0 Kg..."</em></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PANEL 4: VENTAS RÁPIDAS AL GRAMO -->
+<div class="panel" style="margin-bottom: 20px;">
+  <h2 style="font-size:17px; margin-bottom:12px;">⚖️ 4. Ventas Rápidas (Cálculo Exacto de Gramos y Descuento de Stock)</h2>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:240px;">Cómo escribir la venta</th>
+          <th>Tipo de Venta</th>
+          <th>Cálculo Matemático y Descuento en Inventario</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">40 mil carne molida</span><br>o <span class="mono">40000 carne molida</span></td>
+          <td>Venta por Dinero</td>
+          <td>Calcula: <strong>$40,000 ÷ $24/gramo = 1,667 gramos</strong> (1.667 Kg / 3.33 lb). Descuenta del stock y registra el ingreso contable con ICA.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">20 mil tocino</span></td>
+          <td>Venta por Dinero</td>
+          <td>Calcula: <strong>$20,000 ÷ $20/gramo = 1,000 gramos</strong> (1.000 Kg / 2.0 lb). Descuenta del stock.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">1 libra de carne molida</span></td>
+          <td>Venta por Peso</td>
+          <td>Calcula: <strong>500 gramos exactos</strong> (0.500 Kg). Autocalcula el precio ($12,000 COP) y descuenta del stock.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">media libra de tocino</span></td>
+          <td>Venta por Peso Fraccionario</td>
+          <td>Calcula: <strong>250 gramos</strong> (0.250 Kg). Valor: $5,000 COP. Descuenta del stock.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">2 kilos de costilla</span></td>
+          <td>Venta por Kilos</td>
+          <td>Calcula: <strong>2.000 Kg</strong> (4.0 lb). Valor: $36,000 COP. Descuenta del stock.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold;">Venta 50000 mostrador</span></td>
+          <td>Venta General Particular</td>
+          <td>Registra ingreso en caja por $50,000 COP con tarifa ICA estimada.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold;">Venta empresa 300000 Boyaca SAS</span></td>
+          <td>Venta Corporativa</td>
+          <td>Genera comprobante con deducción de Retención ICA Tunja automática.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PANEL 5: CIERRES CONTABLES Y REPORTES -->
+<div class="panel" style="margin-bottom: 20px;">
+  <h2 style="font-size:17px; margin-bottom:12px;">📊 5. Cierres Contables, Excel y Compras</h2>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:180px;">Comando</th>
+          <th>Descripción</th>
+          <th>Resultado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--orange);">/consolidado</span> o <span class="mono">/excel</span></td>
+          <td>Consolidado Oficial para el Contador</td>
+          <td><strong>Genera y envía al chat de Telegram el archivo Excel (.xlsx)</strong> con Libro Diario, Retenciones, Resumen Ejecutivo y firma formal: <em>CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB</em>.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/hoy</span> o <span class="mono">/caja</span></td>
+          <td>Cierre de Caja del Día</td>
+          <td>Total ventas del día, compras, balance neto y estimación de ICA del día.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/resumen</span></td>
+          <td>Balance Mensual</td>
+          <td>Acumulado del mes con base neta e impuestos.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/ultimas</span></td>
+          <td>Historial Inmediato</td>
+          <td>Últimos 5 movimientos con número de comprobante para control o anulación.</td>
+        </tr>
+        <tr>
+          <td><span class="mono" style="font-weight:bold; color:var(--teal);">/ica</span></td>
+          <td>Impuesto ICA Tunja</td>
+          <td>Cálculo del impuesto según la tarifa CIIU (6 x mil) sobre ingresos brutos.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">Compra 80000 Distribuidora</span></td>
+          <td>Gasto / Compra</td>
+          <td>Registra egreso en caja con fecha y proveedor.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">/anular &lt;ID&gt; &lt;motivo&gt;</span></td>
+          <td>Anulación con Reversión</td>
+          <td>Anula la venta, <strong>devuelve los gramos vendidos al inventario</strong> y guarda auditoría.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PANEL 6: CÓMO INICIAR EL PROYECTO EN TERMINAL -->
+<div class="panel">
+  <h2 style="font-size:17px; margin-bottom:12px;">💻 6. Comandos para Terminal (PowerShell / CMD)</h2>
+  <div style="background:#1c2426; color:#e8f3f5; padding:16px; border-radius:8px; font-family:Consolas, monospace; font-size:13px; line-height:1.6;">
+    <span style="color:#7dd3fc;"># 1. Iniciar el Servidor Web Django en el puerto 8001:</span><br>
+    .\.venv\Scripts\python.exe manage.py runserver 8001<br><br>
+    <span style="color:#7dd3fc;"># 2. Iniciar el Bot de Telegram en segundo plano:</span><br>
+    .\.venv\Scripts\python.exe -u manage.py bot_telegram<br><br>
+    <span style="color:#7dd3fc;"># 3. Credenciales de acceso Web (http://127.0.0.1:8001/):</span><br>
+    Propietaria:  maria.gomez  /  tunja2026<br>
+    Dependiente:  carlos.ruiz  /  tunja2026
+  </div>
+</div>
+
+{% endblock %}
