@@ -137,18 +137,26 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
 
     # 2. Búsqueda por palabras clave significativas de carnicería
     sinonimos = {
-        "molida": "molida",
-        "lomo": "lomo fino",
-        "lomito": "lomo fino",
-        "pechuga": "pechuga",
-        "pollo": "pechuga",
-        "costilla": "costilla",
-        "costillitas": "costilla",
+        "molida": "carne molida",
+        "lomo": "lomo de res",
+        "lomito": "lomo de res",
+        "pechuga": "pechuga de pollo",
+        "pierna pernil": "pierna pernil",
+        "pernil": "pierna pernil",
+        "muslo": "pierna pernil",
+        "costilla de res": "costilla de res",
+        "costilla de cerdo": "costilla de cerdo",
+        "costilla": "costilla de cerdo",
+        "costillitas": "costilla de cerdo",
         "sobrebarriga": "sobrebarriga",
         "falda": "sobrebarriga",
         "tocino": "tocino",
+        "panceta": "tocino",
         "chicharron": "tocino",
-        "chuleta": "chuleta",
+        "chuleta": "chuleta de cerdo",
+        "bistec": "carne para asar",
+        "asar": "carne para asar",
+        "chorizo": "chorizo",
     }
     for token, objetivo in sinonimos.items():
         if re.search(rf"\b{token}\b", t):
@@ -156,10 +164,10 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
                 if objetivo in normalizar_texto(p.nombre):
                     return p
 
-    # 3. Si solo dijo "carne" o "res", tomar el corte más frecuente
+    # 3. Si solo dijo "carne" o "res", tomar Carne molida o Carne para asar
     if re.search(r"\bcarne\b", t):
         for p in productos:
-            if "molida" in normalizar_texto(p.nombre) or "lomo" in normalizar_texto(p.nombre):
+            if "carne molida" in normalizar_texto(p.nombre) or "carne para asar" in normalizar_texto(p.nombre):
                 return p
         if productos:
             return productos[0]
