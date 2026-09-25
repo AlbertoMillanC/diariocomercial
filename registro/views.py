@@ -11,6 +11,7 @@ from django.core.mail import send_mail
 from django.db.models import Q, Count, Sum
 from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -57,6 +58,11 @@ from .inventario_service import (
 class LoginDiario(LoginView):
     authentication_form = LoginForm
     redirect_authenticated_user = True
+
+    def get_success_url(self):
+        if self.request.user.is_superuser:
+            return reverse_lazy("superadmin_dashboard")
+        return reverse_lazy("inicio")
 
     def form_invalid(self, form):
         username = (self.request.POST.get("username") or "").strip()
@@ -220,6 +226,8 @@ def inicio(request):
         return render(request, "landing.html", {
             "version": "2.0",
         })
+    if request.user.is_superuser:
+        return redirect("superadmin_dashboard")
     perfil = _perfil(request.user)
     desde, hasta, rango_malo = _parse_rango(request.GET)
     ingresos = egresos = retenciones = ica = neto = Decimal("0")
@@ -1201,8 +1209,10 @@ def superadmin_dashboard(request):
     comercios_plan_cero = Establecimiento.objects.filter(plan_suscripcion="lanzamiento_cero").count()
     comercios_mora = Establecimiento.objects.filter(plan_suscripcion="mora").count()
 
-    volumen_hoy = Venta.objects.filter(fecha=hoy, estado="vigente").aggregate(Sum("valor"))["valor__sum"] or Decimal("0")
-    total_ica_estimado = Venta.objects.filter(estado="vigente").aggregate(Sum("ica_estimado"))["ica_estimado__sum"] or Decimal("0")
+    comercios_de_pago = Establecimiento.objects.filter(plan_suscripcion="activo").count()
+    mrr_saas = Decimal(comercios_de_pago) * Decimal("19900")
+    canales_activos = VinculoCanal.objects.filter(activo=True).count()
+    usuarios_totales = User.objects.count()
 
     comercios_qs = Establecimiento.objects.select_related("municipio").all().order_by("-id")
     lista_comercios = []
@@ -1232,8 +1242,9 @@ def superadmin_dashboard(request):
             "comercios_activos": comercios_activos,
             "comercios_plan_cero": comercios_plan_cero,
             "comercios_mora": comercios_mora,
-            "volumen_hoy": volumen_hoy,
-            "total_ica_estimado": total_ica_estimado,
+            "mrr_saas": mrr_saas,
+            "canales_activos": canales_activos,
+            "usuarios_totales": usuarios_totales,
             "comercios": lista_comercios,
             "contadores": contadores,
             "hoy": hoy,

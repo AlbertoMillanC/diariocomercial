@@ -14,31 +14,42 @@
       <div class="logo">DC</div>
       <div>
         <h1>DiarioComercial</h1>
-        <small>{% if user.perfil %}{{ user.perfil.establecimiento.nombre }}{% endif %}</small>
+        <small>{% if user.is_superuser %}<span style="color:#4ade80; font-weight:bold;">OPERADOR CENTRAL DEL SISTEMA SAAS</span>{% elif user.perfil %}{{ user.perfil.establecimiento.nombre }}{% endif %}</small>
       </div>
     </div>
     <div class="userbox">
       <b>{{ user.get_full_name|default:user.username }}</b>
-      {% if user.perfil %}{{ user.perfil.get_rol_display }}{% endif %}
+      {% if user.is_superuser %}
+        <span class="tag" style="background:#0f172a; color:#4ade80; font-size:11px;">Super-Administrador</span>
+      {% elif user.perfil %}
+        {{ user.perfil.get_rol_display }}
+      {% endif %}
     </div>
   </header>
   <nav class="nav">
-    <a href="{% url 'inicio' %}" class="{% if request.resolver_match.url_name == 'inicio' %}activo{% endif %}">Inicio</a>
-    <a href="{% url 'venta_nueva' %}" class="{% if request.resolver_match.url_name == 'venta_nueva' %}activo{% endif %}">Ventas</a>
-    <a href="{% url 'compra_nueva' %}" class="{% if request.resolver_match.url_name == 'compra_nueva' %}activo{% endif %}">Compras</a>
-    <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
-    <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
-    <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
-    <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
-    <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>
-    {% if user.perfil.es_propietario %}
-    <a href="{% url 'declaracion_ica' %}" class="{% if request.resolver_match.url_name == 'declaracion_ica' %}activo{% endif %}" style="background:rgba(0,168,89,0.2); border:1px solid #10b981; color:#a7f3d0;">🏛️ ICA Tunja</a>
-    <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
-    <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
-    <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>
-    {% endif %}
     {% if user.is_superuser %}
-    <a href="{% url 'superadmin_dashboard' %}" class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}activo{% endif %}" style="background:#0f172a; border:1px solid #4ade80; color:#4ade80;">👑 SuperAdmin</a>
+      <!-- NAVEGACIÓN EXCLUSIVA PARA EL ADMINISTRADOR DEL SISTEMA SAAS -->
+      <a href="{% url 'superadmin_dashboard' %}" class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}activo{% endif %}" style="background:#0f172a; border:1px solid #4ade80; color:#4ade80; font-weight:bold;">👑 Panel del Sistema</a>
+      <a href="{% url 'superadmin_dashboard' %}#directorio">🏢 Directorio de Negocios</a>
+      <a href="{% url 'superadmin_dashboard' %}#contadores">🤝 Red de Contadores</a>
+      <a href="/admin/" target="_blank" style="color:#38bdf8;">⚙️ Base de Datos Django</a>
+      <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">📋 Registro de Auditoría</a>
+    {% else %}
+      <!-- NAVEGACIÓN EXCLUSIVA DEL COMERCIO (TIENDA / CARNICERÍA / MINIMARKET) -->
+      <a href="{% url 'inicio' %}" class="{% if request.resolver_match.url_name == 'inicio' %}activo{% endif %}">Inicio</a>
+      <a href="{% url 'venta_nueva' %}" class="{% if request.resolver_match.url_name == 'venta_nueva' %}activo{% endif %}">Ventas</a>
+      <a href="{% url 'compra_nueva' %}" class="{% if request.resolver_match.url_name == 'compra_nueva' %}activo{% endif %}">Compras</a>
+      <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
+      <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
+      <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
+      <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
+      <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>
+      {% if user.perfil.es_propietario %}
+      <a href="{% url 'declaracion_ica' %}" class="{% if request.resolver_match.url_name == 'declaracion_ica' %}activo{% endif %}" style="background:rgba(0,168,89,0.2); border:1px solid #10b981; color:#a7f3d0;">🏛️ ICA Tunja</a>
+      <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
+      <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
+      <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>
+      {% endif %}
     {% endif %}
     <form class="logout" method="post" action="{% url 'logout' %}">
       {% csrf_token %}

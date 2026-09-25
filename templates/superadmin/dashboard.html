@@ -1,22 +1,58 @@
 {% extends "base.html" %}
-{% block title %}Super-Administrador SaaS — DiarioComercial{% endblock %}
+{% block title %}Panel de Control del Sistema — Super-Administrador SaaS{% endblock %}
 {% block content %}
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
   <div>
     <h2>👑 Panel de Super-Administrador SaaS</h2>
-    <p class="lead" style="margin:0;">Monitoreo en tiempo real de comercios, suscripciones, volumen transaccional y red de contadores en Boyacá.</p>
+    <p class="lead" style="margin:0;">Administración central de infraestructura, control de licencias por comercio, cobro de suscripciones y salud del sistema.</p>
   </div>
   <div>
     <span class="tag" style="background:#0f172a; color:#4ade80; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:8px;">
-      MODO SUPERVISOR • {{ hoy|date:"d/m/Y" }}
+      MODO OPERADOR CENTRAL • {{ hoy|date:"d/m/Y" }}
     </span>
   </div>
 </div>
 
-<!-- FILA SUPERIOR: METRICAS SAAS EN VIVO -->
-<div class="cards cards-5" style="grid-template-columns: repeat(6, 1fr); margin-bottom:20px;">
+<!-- ESTADO OPERACIONAL DE SERVICIOS DEL SISTEMA -->
+<div class="panel" style="margin-bottom:20px; padding:16px 20px; background:#0f172a; color:#fff; border-radius:12px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:12px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:20px;">🖥️</span>
+      <h3 style="margin:0; font-size:16px; color:#f8fafc;">Infraestructura y Salud del Sistema</h3>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <a href="/admin/" target="_blank" class="btn btn-sm" style="background:#0284c7; color:#fff; font-weight:bold;">
+        ⚙️ Base de Datos Django (/admin/)
+      </a>
+      <a href="{% url 'auditoria' %}" class="btn btn-sm" style="background:#334155; color:#f8fafc;">
+        📋 Logs de Seguridad
+      </a>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:13px;">
+    <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Servidor Web Core</span>
+      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 En Línea (Port 8001)</div>
+    </div>
+    <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Demonio Bot Telegram</span>
+      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 Polling Activo (Daemon)</div>
+    </div>
+    <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Riel de Pagos Bre-B</span>
+      <div style="color:#38bdf8; font-weight:bold; font-size:14px; margin-top:2px;">⚡ BanRep EMVCo Ready</div>
+    </div>
+    <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Sesiones Móviles Conectadas</span>
+      <div style="color:#f8fafc; font-weight:bold; font-size:14px; margin-top:2px;">📱 {{ canales_activos }} Dispositivos</div>
+    </div>
+  </div>
+</div>
+
+<!-- FILA SUPERIOR: METRICAS SAAS DEL SISTEMA (NO VENTAS DE TIENDAS) -->
+<div class="cards cards-5" style="grid-template-columns: repeat(5, 1fr); margin-bottom:20px;">
   <div class="card">
-    <span>Comercios Totales</span>
+    <span>Comercios (Tenants)</span>
     <strong>{{ total_comercios }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #10b981;">
@@ -24,28 +60,24 @@
     <strong style="color:#059669;">{{ comercios_activos }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #0284c7;">
-    <span>Plan $0 Lanzamiento</span>
+    <span>Plan $0 (Pioneros)</span>
     <strong style="color:#0284c7;">{{ comercios_plan_cero }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #ef4444;">
-    <span>En Mora / Riesgo</span>
+    <span>En Mora / Suspendidos</span>
     <strong style="color:#dc2626;">{{ comercios_mora }}</strong>
   </div>
-  <div class="card" style="border-left:4px solid var(--orange);">
-    <span>Ventas Hoy (COP)</span>
-    <strong style="font-size:18px;">$ {{ volumen_hoy|floatformat:0 }}</strong>
-  </div>
-  <div class="card" style="border-left:4px solid var(--navy);">
-    <span>Total ICA Estimado</span>
-    <strong style="font-size:18px; color:var(--navy);">$ {{ total_ica_estimado|floatformat:0 }}</strong>
+  <div class="card" style="border-left:4px solid #065f46;">
+    <span>MRR Suscripciones SaaS</span>
+    <strong style="font-size:18px; color:#065f46;">$ {{ mrr_saas|floatformat:0 }} COP</strong>
   </div>
 </div>
 
 <!-- TABLA DE COMERCIOS MULTI-TENANT -->
-<div class="panel" style="margin-bottom:20px;">
+<div class="panel" id="directorio" style="margin-bottom:20px;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-    <h3 style="margin:0; font-size:17px; color:var(--navy);">🏪 Directorio de Establecimientos Registrados</h3>
-    <small style="color:var(--muted);">Gestión de acceso, vigencia y suspensión</small>
+    <h3 style="margin:0; font-size:17px; color:var(--navy);">🏪 Directorio de Establecimientos (Tenants del Sistema)</h3>
+    <small style="color:var(--muted);">Control centralizado de acceso, plan contratado y suspensión de servicio</small>
   </div>
 
   <div class="tabla-wrap">
@@ -59,7 +91,7 @@
           <th>Vigencia Restante</th>
           <th>Contador Asignado</th>
           <th>Estado</th>
-          <th style="text-align:center;">Acción Rápida</th>
+          <th style="text-align:center;">Control de Acceso</th>
         </tr>
       </thead>
       <tbody>
@@ -93,8 +125,8 @@
             </span>
           </td>
           <td style="text-align:center;">
-            <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-danger{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de {{ c.obj.nombre }}?');">
-              {% if c.obj.estado == 'activo' %}Suspender{% else %}Reactivar{% endif %}
+            <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-danger{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de acceso para {{ c.obj.nombre }}?');">
+              {% if c.obj.estado == 'activo' %}Suspender Servicio{% else %}Reactivar Servicio{% endif %}
             </a>
           </td>
         </tr>
@@ -111,10 +143,10 @@
 </div>
 
 <!-- RED DE CONTADORES ALIADOS -->
-<div class="panel">
+<div class="panel" id="contadores">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
     <h3 style="margin:0; font-size:17px; color:var(--navy);">🤝 Red de Contadores Públicos Aliados</h3>
-    <small style="color:var(--muted);">El canal de distribución B2B2C número 1</small>
+    <small style="color:var(--muted);">Monitoreo de contadores que reciben los anexos contables e ICA de los clientes</small>
   </div>
 
   <div class="tabla-wrap">
@@ -122,23 +154,23 @@
       <thead>
         <tr>
           <th>Correo Electrónico del Contador</th>
-          <th style="text-align:center;">Tiendas Asignadas</th>
-          <th style="text-align:center;">Reportes Oficiales Generados</th>
-          <th>Estado de la Alianza</th>
+          <th style="text-align:center;">Clientes Vinculados</th>
+          <th style="text-align:center;">Reportes Enviados</th>
+          <th>Canal de Distribución</th>
         </tr>
       </thead>
       <tbody>
         {% for cont in contadores %}
         <tr>
           <td><strong>{{ cont.correo_reportes }}</strong></td>
-          <td style="text-align:center;"><span class="tag">{{ cont.total_clientes }} comercios</span></td>
-          <td style="text-align:center; font-weight:bold;">{{ cont.total_descargas }} descargas</td>
-          <td><span class="tag" style="background:#dcfce7; color:#166534;">Contador Activo</span></td>
+          <td style="text-align:center;"><span class="tag" style="background:#e0f2fe; color:#0369a1; font-weight:bold;">{{ cont.total_clientes }} negocios</span></td>
+          <td style="text-align:center;">{{ cont.total_descargas }} envíos</td>
+          <td><span style="color:#059669; font-weight:bold;">Recomendador Activo B2B2C</span></td>
         </tr>
         {% empty %}
         <tr>
           <td colspan="4" style="text-align:center; padding:20px; color:#64748b;">
-            Aún no hay contadores enlazados por correo de reportes.
+            No hay contadores asignados por los comercios todavía.
           </td>
         </tr>
         {% endfor %}
