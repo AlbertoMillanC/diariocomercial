@@ -38,7 +38,12 @@ urlpatterns = [
     # Tributario ICA Tunja (Acuerdo 0032/2020)
     path("tributario/ica/", views.declaracion_sugerida_ica_view, name="declaracion_ica"),
     path("tributario/ica/exportar/", views.exportar_declaracion_ica, name="exportar_ica"),
-    # Super-Admin Dashboard SaaS
+    # Super-Admin Dashboard SaaS & Soporte a Tiendas
     path("superadmin/", views.superadmin_dashboard, name="superadmin_dashboard"),
     path("superadmin/establecimiento/<int:pk>/toggle-estado/", views.superadmin_toggle_estado, name="superadmin_toggle_estado"),
+    path("superadmin/establecimiento/<int:pk>/asistir/", views.superadmin_asistir_tienda, name="superadmin_asistir_tienda"),
+    path("superadmin/cajero/<int:pk_user>/reset-password/", views.superadmin_cajero_reset_password, name="superadmin_cajero_reset_password"),
+    path("superadmin/cajero/<int:pk_user>/toggle-activo/", views.superadmin_cajero_toggle_activo, name="superadmin_cajero_toggle_activo"),
+    path("superadmin/cajero/<int:pk_user>/eliminar/", views.superadmin_cajero_eliminar, name="superadmin_cajero_eliminar"),
+    path("superadmin/venta/<int:pk>/anular-soporte/", views.superadmin_anular_venta_soporte, name="superadmin_anular_venta_soporte"),
 ]

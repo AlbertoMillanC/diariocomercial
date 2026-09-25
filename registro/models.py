@@ -236,14 +236,17 @@ class EnvioReporte(models.Model):
 
 
 class Auditoria(models.Model):
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.SET_NULL, null=True, blank=True, related_name="auditorias"
+    )
     usuario = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
     entidad_afectada = models.CharField(max_length=30)
     id_registro = models.IntegerField(default=0)
-    accion = models.CharField(max_length=20)
+    accion = models.CharField(max_length=30)
     valor_anterior = models.TextField(blank=True)
     valor_nuevo = models.TextField(blank=True)
     fecha_hora = models.DateTimeField(auto_now_add=True)
-    motivo = models.CharField(max_length=160, blank=True)
+    motivo = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
         return f"{self.accion} {self.entidad_afectada} #{self.id_registro}"

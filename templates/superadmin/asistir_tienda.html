@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Asistencia y Soporte a {{ establecimiento.nombre }} — Super-Admin{% endblock %}
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-ghost" style="padding:4px 8px; font-size:12px; text-decoration:none;">⬅️ Volver al Panel</a>
+      <h2 style="margin:0; font-size:22px; color:var(--navy);">🛠️ Asistencia Técnica: {{ establecimiento.nombre }}</h2>
+    </div>
+    <p class="lead" style="margin:4px 0 0 0; color:var(--muted); font-size:13px;">
+      Centro de soporte remoto: gestión de cajeros perdidos, resolución de ventas y auditoría en tiempo real.
+    </p>
+  </div>
+  <div>
+    <span class="tag" style="background:{% if establecimiento.estado == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}; font-size:13px; font-weight:bold; padding:6px 12px; border-radius:8px;">
+      ESTADO: {{ establecimiento.estado|upper }} • PLAN: {{ establecimiento.get_plan_suscripcion_display }}
+    </span>
+  </div>
+</div>
+
+<!-- 1. GESTIÓN DE CAJEROS Y DEPENDIENTES DE ESTA TIENDA -->
+<div class="panel" style="margin-bottom:20px; border-top:3px solid #0284c7;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+    <div>
+      <h3 style="margin:0; font-size:17px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+        👥 Cajeros, Dependientes y Accesos de {{ establecimiento.nombre }}
+      </h3>
+      <p style="margin:2px 0 0 0; font-size:12px; color:var(--muted);">
+        Si al comerciante se le borró un empleado o no puede ingresar, restáuralo, créale una clave o elimina usuarios no autorizados.
+      </p>
+    </div>
+    <button onclick="document.getElementById('modal-crear-cajero').style.display='flex'" class="btn" style="background:#0284c7; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">
+      ➕ Crear / Restaurar Cajero
+    </button>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Nombre Completo</th>
+          <th>Rol en la Tienda</th>
+          <th>Estado Acceso</th>
+          <th>Último Ingreso</th>
+          <th style="text-align:center;">Acciones de Soporte</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in perfiles %}
+        <tr>
+          <td><code style="font-weight:bold; color:#0f172a;">{{ p.user.username }}</code></td>
+          <td>{{ p.user.get_full_name|default:p.user.username }}</td>
+          <td>
+            <span class="tag" style="background:{% if p.es_propietario %}#fef3c7; color:#92400e;{% else %}#e0e7ff; color:#3730a3;{% endif %}; font-weight:bold;">
+              {{ p.get_rol_display }}
+            </span>
+          </td>
+          <td>
+            {% if p.user.is_active %}
+              <span style="color:#059669; font-weight:bold; font-size:12px;">🟢 Activo</span>
+            {% else %}
+              <span style="color:#dc2626; font-weight:bold; font-size:12px;">🔴 Inactivo / Bloqueado</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px; color:var(--muted);">
+            {{ p.user.last_login|date:"d/m/Y H:i"|default:"Nunca" }}
+          </td>
+          <td style="text-align:center;">
+            <div style="display:inline-flex; gap:6px;">
+              <!-- RESETEAR CLAVE -->
+              <button onclick="abrirResetClave('{{ p.user.pk }}', '{{ p.user.username|escapejs }}')" class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" title="Resetear contraseña para este usuario">
+                🔑 Cambiar Clave
+              </button>
+              <!-- TOGGLE ACTIVO -->
+              <a href="{% url 'superadmin_cajero_toggle_activo' p.user.pk %}" class="btn btn-ghost" style="padding:4px 8px; font-size:11px; color:{% if p.user.is_active %}#dc2626{% else %}#059669{% endif %};" onclick="return confirm('¿Cambiar estado de acceso para {{ p.user.username }}?');">
+                {% if p.user.is_active %}Bloquear{% else %}Activar{% endif %}
+              </a>
+              <!-- ELIMINAR -->
+              {% if not p.user.is_superuser %}
+              <form method="post" action="{% url 'superadmin_cajero_eliminar' p.user.pk %}" style="display:inline; margin:0;" onsubmit="return confirm('¿Está seguro de eliminar al usuario \'{{ p.user.username|escapejs }}\'? Esta acción fue solicitada por el dueño del comercio.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost" style="padding:4px 8px; font-size:11px; color:#ef4444;" title="Borrar cajero definitivamente">🗑️ Borrar</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="text-align:center; padding:16px; color:var(--muted);">No hay usuarios asignados a esta tienda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 2. RESOLUCIÓN DE VENTAS PROBLEMÁTICAS Y AUDITORÍA DE SOPORTE -->
+<div class="panel" style="margin-bottom:20px; border-top:3px solid #10b981;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div>
+      <h3 style="margin:0; font-size:17px; color:#0f172a;">🧾 Ventas Recientes y Soporte de Operaciones</h3>
+      <p style="margin:2px 0 0 0; font-size:12px; color:var(--muted);">
+        Si el comerciante no sabe qué pasó con una venta o necesita anular un cobro duplicado, revísalo aquí.
+      </p>
+    </div>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket / Folio</th>
+          <th>Fecha y Hora</th>
+          <th>Cajero</th>
+          <th>Concepto</th>
+          <th>Medio de Pago</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Acción de Soporte</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in ultimas_ventas %}
+        <tr style="{% if v.estado == 'anulada' %}opacity:0.6; background:#f8fafc;{% endif %}">
+          <td><code>#{{ v.id|stringformat:"05d" }}</code></td>
+          <td style="font-size:12px;">{{ v.fecha_hora|date:"d/m/Y H:i" }}</td>
+          <td style="font-size:12px;">{{ v.usuario.get_full_name|default:v.usuario.username }}</td>
+          <td style="font-size:12px;">{{ v.concepto|truncatechars:35 }}</td>
+          <td>
+            <span class="tag" style="background:#0f172a; color:#f8fafc; font-size:11px;">{{ v.get_medio_pago_display }}</span>
+          </td>
+          <td><strong style="color:#065f46;">${{ v.valor|floatformat:0 }}</strong></td>
+          <td>
+            {% if v.estado == 'anulada' %}
+              <span style="color:#dc2626; font-weight:bold; font-size:11px;">❌ ANULADA</span>
+            {% else %}
+              <span style="color:#059669; font-weight:bold; font-size:11px;">✅ VIGENTE</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if v.estado != 'anulada' %}
+            <form method="post" action="{% url 'superadmin_anular_venta_soporte' v.pk %}" style="display:inline; margin:0;" onsubmit="const m = prompt('Motivo de anulación por soporte (para el registro inmutable):', 'Venta duplicada reportada por el cliente'); if(!m) return false; this.motivo.value = m; return true;">
+              {% csrf_token %}
+              <input type="hidden" name="motivo" value="">
+              <button type="submit" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#dc2626; border:1px solid #fca5a5;" title="Anular venta y revertir inventario">
+                🛠️ Anular por Soporte
+              </button>
+            </form>
+            {% else %}
+              <span style="color:var(--muted); font-size:11px;">Sin acciones</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" style="text-align:center; padding:16px; color:var(--muted);">No hay ventas registradas en este negocio.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. CONFIGURACIÓN Y DATOS MAESTROS DEL COMERCIO -->
+<div class="panel" style="margin-bottom:20px;">
+  <h3 style="margin-top:0; font-size:17px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+    ⚙️ Editar Datos Maestros de la Tienda (A solicitud del cliente)
+  </h3>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="accion_post" value="guardar_tienda">
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.nombre.label }}</label>
+        {{ form_tienda.nombre }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.nit.label }}</label>
+        {{ form_tienda.nit }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.municipio.label }}</label>
+        {{ form_tienda.municipio }}
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.direccion.label }}</label>
+        {{ form_tienda.direccion }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.llave_bre_b.label }}</label>
+        {{ form_tienda.llave_bre_b }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.banco_receptor_bre_b.label }}</label>
+        {{ form_tienda.banco_receptor_bre_b }}
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.plan_suscripcion.label }}</label>
+        {{ form_tienda.plan_suscripcion }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form_tienda.correo_reportes.label }}</label>
+        {{ form_tienda.correo_reportes }}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="padding:9px 18px; font-weight:bold; background:#0f172a;">
+      💾 Guardar Cambios en la Ficha del Comercio
+    </button>
+  </form>
+</div>
+
+<!-- 4. LOGS DE ACTIVIDAD EN TIEMPO REAL DE ESTA TIENDA -->
+<div class="panel">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:17px; color:#0f172a;">📜 Trazabilidad y Logs en Tiempo Real de esta Tienda</h3>
+    <a href="{% url 'auditoria' %}?est={{ establecimiento.pk }}" class="btn btn-ghost" style="font-size:12px; text-decoration:none;">Ver Auditoría Completa ➔</a>
+  </div>
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha y Hora</th>
+          <th>Responsable</th>
+          <th>Acción</th>
+          <th>Entidad</th>
+          <th>Detalle / Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs_recientes %}
+        <tr>
+          <td style="font-size:12px; white-space:nowrap;">{{ log.fecha_hora|date:"d/m/Y H:i:s" }}</td>
+          <td><strong>{{ log.usuario.username|default:"Sistema" }}</strong></td>
+          <td><span class="tag">{{ log.accion }}</span></td>
+          <td>{{ log.entidad_afectada }} #{{ log.id_registro }}</td>
+          <td style="font-size:12px;">
+            <div style="color:#0f172a;">{{ log.valor_nuevo|truncatechars:80 }}</div>
+            <small style="color:var(--muted);">{{ log.motivo }}</small>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="text-align:center; padding:16px; color:var(--muted);">No hay registros de auditoría recientes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL CREAR / RESTAURAR CAJERO -->
+<div id="modal-crear-cajero" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:480px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:17px; color:#0284c7;">➕ Dar de Alta / Restaurar Cajero</h3>
+      <button onclick="document.getElementById('modal-crear-cajero').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion_post" value="crear_cajero">
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div>
+          <label style="font-weight:bold; font-size:12px;">{{ form_cajero.first_name.label }}</label>
+          {{ form_cajero.first_name }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:12px;">{{ form_cajero.last_name.label }}</label>
+          {{ form_cajero.last_name }}
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label style="font-weight:bold; font-size:12px;">{{ form_cajero.username.label }}</label>
+        {{ form_cajero.username }}
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label style="font-weight:bold; font-size:12px;">{{ form_cajero.password.label }}</label>
+        {{ form_cajero.password }}
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-weight:bold; font-size:12px;">{{ form_cajero.rol.label }}</label>
+        {{ form_cajero.rol }}
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-crear-cajero').style.display='none'" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#0284c7; border-color:#0284c7; font-weight:bold;">
+          ➕ Crear y Vincular a la Tienda
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL CAMBIAR CONTRASEÑA -->
+<div id="modal-reset-clave" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:400px; width:100%; padding:20px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:12px;">
+      <h3 style="margin:0; font-size:16px; color:#0f172a;">🔑 Cambiar Clave de Empleado</h3>
+      <button onclick="document.getElementById('modal-reset-clave').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+    <form id="form-reset-clave" method="post" action="">
+      {% csrf_token %}
+      <p style="font-size:13px; color:#334155; margin-bottom:10px;">
+        Usuario: <strong id="reset-user-name">-</strong>
+      </p>
+      <div style="margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">Nueva Contraseña Temporal:</label>
+        <input type="text" name="nueva_password" required placeholder="Escriba la nueva contraseña" style="width:100%; padding:8px; border:2px solid #0284c7; border-radius:6px; font-size:14px;">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-reset-clave').style.display='none'" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#0284c7; font-weight:bold;">Guardar Clave</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function abrirResetClave(userId, username) {
+  document.getElementById('form-reset-clave').action = `/superadmin/cajero/${userId}/reset-password/`;
+  document.getElementById('reset-user-name').innerText = username;
+  document.getElementById('modal-reset-clave').style.display = 'flex';
+}
+</script>
+
+{% endblock %}

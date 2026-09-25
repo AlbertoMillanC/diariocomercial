@@ -14,6 +14,7 @@ from .models import (
     Producto,
     Retencion,
     Venta,
+    Establecimiento,
 )
 
 
@@ -294,4 +295,47 @@ class ItemPedidoForm(forms.ModelForm):
             "cantidad_sugerida": forms.NumberInput(attrs={"step": "0.5", "min": "0.5"}),
             "unidad": forms.TextInput(attrs={"placeholder": "Kg, lb, bolsas, paquetes"}),
             "observacion": forms.TextInput(attrs={"placeholder": "Ej. Pedir a Distribuidora Los Andes"}),
+        }
+
+
+class SoporteCrearCajeroForm(forms.Form):
+    """Formulario para que el SuperAdmin asista creando o restaurando un cajero/dependiente."""
+    first_name = forms.CharField(label="Nombre del Empleado", max_length=80)
+    last_name = forms.CharField(label="Apellido", max_length=80, required=False)
+    username = forms.CharField(label="Usuario de Entrada", max_length=80)
+    password = forms.CharField(label="Contraseña Temporal", widget=forms.PasswordInput)
+    rol = forms.ChoiceField(label="Rol en el Comercio", choices=Perfil.ROLES, initial="dependiente")
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Este nombre de usuario ya existe en el sistema.")
+        return username
+
+
+class SoporteEditarTiendaForm(forms.ModelForm):
+    """Formulario para que el SuperAdmin modifique datos de un comercio a solicitud del dueño."""
+    class Meta:
+        model = Establecimiento
+        fields = [
+            "nombre",
+            "nit",
+            "municipio",
+            "direccion",
+            "llave_bre_b",
+            "tipo_llave_bre_b",
+            "banco_receptor_bre_b",
+            "plan_suscripcion",
+            "correo_reportes",
+        ]
+        labels = {
+            "nombre": "Nombre del Comercio",
+            "nit": "NIT o Cédula",
+            "municipio": "Municipio (DANE)",
+            "direccion": "Dirección Física",
+            "llave_bre_b": "Llave Bre-B (Celular / NIT / Alias)",
+            "tipo_llave_bre_b": "Tipo de Llave Bre-B",
+            "banco_receptor_bre_b": "Banco Receptor Bre-B",
+            "plan_suscripcion": "Plan de Suscripción",
+            "correo_reportes": "Correo del Contador Aliado",
         }

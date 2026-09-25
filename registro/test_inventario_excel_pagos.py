@@ -54,6 +54,11 @@ class InventarioExcelPagosTests(TestCase):
             user=self.user_cajero, establecimiento=self.est, rol="dependiente"
         )
 
+        # Super-Administrador SaaS
+        self.user_superadmin = User.objects.create_superuser(
+            username="admin.saas", password="password123", email="admin@saas.com"
+        )
+
         # Producto existente para pruebas
         self.prod_pollo = Producto.objects.create(
             establecimiento=self.est,
@@ -308,3 +313,136 @@ class InventarioExcelPagosTests(TestCase):
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         self.assertIn("conciliacion_pagos", res_excel["Content-Disposition"])
+
+    def test_06_superadmin_asistir_tienda_y_gestionar_cajeros(self):
+        """Verifica que el SuperAdmin pueda asistir a la tienda creando, restaurando o borrando cajeros."""
+        # A) Intento de usuario normal de entrar a la consola de soporte -> Denegado
+        self.client.login(username="maria.admin", password="password123")
+        url_asistir = reverse("superadmin_asistir_tienda", kwargs={"pk": self.est.pk})
+        res_no_super = self.client.get(url_asistir, follow=True)
+        self.assertContains(res_no_super, "Acceso restringido")
+
+        # B) SuperAdmin ingresa a la consola de asistencia
+        self.client.login(username="admin.saas", password="password123")
+        res_soporte = self.client.get(url_asistir)
+        self.assertEqual(res_soporte.status_code, 200)
+        self.assertContains(res_soporte, "Asistencia Técnica: Carnicería La Esperanza")
+        self.assertContains(res_soporte, "carlos.cajero")
+
+        # C) SuperAdmin crea un nuevo cajero a solicitud del dueño
+        res_crear = self.client.post(
+            url_asistir,
+            {
+                "accion_post": "crear_cajero",
+                "first_name": "Pedro",
+                "last_name": "Pérez",
+                "username": "pedro.cajero",
+                "password": "nuevaclave123",
+                "rol": "dependiente",
+            },
+            follow=True,
+        )
+        self.assertEqual(res_crear.status_code, 200)
+        self.assertContains(res_crear, "creado y vinculado")
+
+        pedro = User.objects.get(username="pedro.cajero")
+        self.assertEqual(pedro.perfil.establecimiento, self.est)
+        self.assertEqual(pedro.perfil.rol, "dependiente")
+        self.assertTrue(pedro.check_password("nuevaclave123"))
+
+        # D) SuperAdmin cambia la clave de un empleado olvidado
+        url_reset = reverse("superadmin_cajero_reset_password", kwargs={"pk_user": pedro.pk})
+        res_reset = self.client.post(url_reset, {"nueva_password": "superclave2026"}, follow=True)
+        self.assertEqual(res_reset.status_code, 200)
+        pedro.refresh_from_db()
+        self.assertTrue(pedro.check_password("superclave2026"))
+
+        # E) SuperAdmin bloquea/inactiva cajero
+        url_toggle = reverse("superadmin_cajero_toggle_activo", kwargs={"pk_user": pedro.pk})
+        res_toggle = self.client.get(url_toggle, follow=True)
+        self.assertEqual(res_toggle.status_code, 200)
+        pedro.refresh_from_db()
+        self.assertFalse(pedro.is_active)
+
+        # F) SuperAdmin borra cajero a solicitud de la tienda
+        url_del = reverse("superadmin_cajero_eliminar", kwargs={"pk_user": pedro.pk})
+        res_del = self.client.post(url_del, follow=True)
+        self.assertEqual(res_del.status_code, 200)
+        self.assertFalse(User.objects.filter(username="pedro.cajero").exists())
+
+    def test_07_superadmin_anular_venta_soporte_y_revertir_inventario(self):
+        """Verifica que el SuperAdmin pueda anular una venta problemática y revertir el inventario."""
+        self.client.login(username="admin.saas", password="password123")
+
+        # Crear venta
+        venta_err = Venta.objects.create(
+            establecimiento=self.est,
+            usuario=self.user_cajero,
+            fecha=timezone.localdate(),
+            valor=Decimal("90000"),
+            concepto="Venta 5 kg Pechuga de Pollo",
+            medio_pago="efectivo",
+            estado="vigente",
+        )
+        stock_antes = self.prod_pollo.stock_kilos
+
+        # Registrar auditoría de salida simulada
+        Auditoria.objects.create(
+            establecimiento=self.est,
+            usuario=self.user_cajero,
+            entidad_afectada="venta",
+            id_registro=venta_err.pk,
+            accion="crear",
+            valor_nuevo=f"prod={self.prod_pollo.nombre}|kilos=5.0",
+        )
+        self.prod_pollo.stock_kilos -= Decimal("5.0")
+        self.prod_pollo.save()
+
+        # Anular por soporte técnico
+        url_anular = reverse("superadmin_anular_venta_soporte", kwargs={"pk": venta_err.pk})
+        res_anular = self.client.post(url_anular, {"motivo": "Duplicada por falla de internet del cajero"}, follow=True)
+        self.assertEqual(res_anular.status_code, 200)
+
+        venta_err.refresh_from_db()
+        self.assertEqual(venta_err.estado, "anulada")
+
+        self.prod_pollo.refresh_from_db()
+        self.assertEqual(self.prod_pollo.stock_kilos, stock_antes)
+
+    def test_08_auditoria_tiempo_real_superadmin_filtros(self):
+        """Verifica la consola de auditoría global con filtros en tiempo real para el SuperAdmin."""
+        self.client.login(username="admin.saas", password="password123")
+
+        # Crear registros de auditoría
+        Auditoria.objects.create(
+            establecimiento=self.est,
+            usuario=self.user_cajero,
+            entidad_afectada="producto",
+            id_registro=self.prod_pollo.pk,
+            accion="entrada_stock",
+            valor_nuevo="Entrada +10 Kg",
+            motivo="Llegó remisión de pollo",
+        )
+        Auditoria.objects.create(
+            establecimiento=self.est,
+            usuario=self.user_superadmin,
+            entidad_afectada="soporte_tienda",
+            id_registro=self.est.pk,
+            accion="editar_tienda",
+            valor_nuevo="Actualizado NIT",
+            motivo="Soporte telefónico con doña María",
+        )
+
+        url_audit = reverse("auditoria")
+        res = self.client.get(url_audit)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.context["es_superadmin"])
+        self.assertContains(res, "Llegó remisión de pollo")
+        self.assertContains(res, "Soporte telefónico con doña María")
+
+        # Filtrar por entidad soporte_tienda
+        res_filtro = self.client.get(f"{url_audit}?entidad=soporte_tienda")
+        self.assertEqual(res_filtro.status_code, 200)
+        self.assertContains(res_filtro, "Soporte telefónico con doña María")
+        self.assertNotContains(res_filtro, "Llegó remisión de pollo")
+

@@ -28,6 +28,8 @@ from .forms import (
     EntradaStockForm,
     ImportarExcelPedidoForm,
     ConciliarPagoForm,
+    SoporteCrearCajeroForm,
+    SoporteEditarTiendaForm,
 )
 from .models import (
     ActividadCIIU,
@@ -735,19 +737,69 @@ def configuracion(request):
 
 @login_required
 def auditoria(request):
+    es_superadmin = request.user.is_superuser
     perfil = _perfil(request.user)
-    if not perfil or not perfil.es_propietario():
-        messages.error(request, "Solo el propietario consulta la auditoría.")
+
+    if not es_superadmin and (not perfil or not perfil.es_propietario()):
+        messages.error(request, "Acceso restringido: Solo el propietario o el Super-Administrador pueden consultar la auditoría.")
         return redirect("inicio")
-    filas = (
-        Auditoria.objects.filter(
-            Q(usuario__perfil__establecimiento=perfil.establecimiento)
+
+    est_id = request.GET.get("est") or ""
+    user_id = request.GET.get("user") or ""
+    entidad_filtro = request.GET.get("entidad") or ""
+    accion_filtro = request.GET.get("accion") or ""
+    desde_str = request.GET.get("desde") or ""
+    hasta_str = request.GET.get("hasta") or ""
+
+    qs = Auditoria.objects.select_related("usuario", "establecimiento").all()
+
+    if es_superadmin:
+        if est_id:
+            qs = qs.filter(Q(establecimiento_id=est_id) | Q(usuario__perfil__establecimiento_id=est_id))
+    else:
+        # Modo propietario de tienda: solo su comercio
+        qs = qs.filter(
+            Q(establecimiento=perfil.establecimiento)
+            | Q(usuario__perfil__establecimiento=perfil.establecimiento)
             | Q(usuario__isnull=True, entidad_afectada="sesion")
         )
-        .select_related("usuario")
-        .order_by("-fecha_hora")[:200]
+
+    if user_id:
+        qs = qs.filter(usuario_id=user_id)
+    if entidad_filtro:
+        qs = qs.filter(entidad_afectada=entidad_filtro)
+    if accion_filtro:
+        qs = qs.filter(accion=accion_filtro)
+    if desde_str:
+        d = parse_date(desde_str)
+        if d:
+            qs = qs.filter(fecha_hora__date__gte=d)
+    if hasta_str:
+        h = parse_date(hasta_str)
+        if h:
+            qs = qs.filter(fecha_hora__date__lte=h)
+
+    filas = qs.order_by("-fecha_hora")[:300]
+
+    establecimientos = Establecimiento.objects.all().order_by("nombre") if es_superadmin else []
+    usuarios = User.objects.all().order_by("username") if es_superadmin else User.objects.filter(perfil__establecimiento=perfil.establecimiento)
+
+    return render(
+        request,
+        "auditoria.html",
+        {
+            "filas": filas,
+            "es_superadmin": es_superadmin,
+            "establecimientos": establecimientos,
+            "usuarios": usuarios,
+            "est_actual": est_id,
+            "user_actual": user_id,
+            "entidad_actual": entidad_filtro,
+            "accion_actual": accion_filtro,
+            "desde": desde_str,
+            "hasta": hasta_str,
+        },
     )
-    return render(request, "auditoria.html", {"filas": filas})
 
 
 @login_required
@@ -1701,4 +1753,223 @@ def superadmin_toggle_estado(request, pk):
     est.save(update_fields=["estado"])
     messages.info(request, f"Establecimiento '{est.nombre}' marcado como {est.estado.upper()}.")
     return redirect("superadmin_dashboard")
+
+
+@login_required
+def superadmin_asistir_tienda(request, pk):
+    """
+    Consola de Soporte y Asistencia Técnica a Tiendas:
+    Permite al Super-Administrador asistir directamente a un comercio:
+    - Gestionar cajeros y dependientes (crear, borrar, restaurar, resetear clave).
+    - Modificar configuración de tienda (NIT, llaves Bre-B, etc.).
+    - Inspeccionar y resolver dudas sobre ventas o anular operaciones problemáticas.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    est = get_object_or_404(Establecimiento, pk=pk)
+    form_tienda = SoporteEditarTiendaForm(instance=est)
+    form_cajero = SoporteCrearCajeroForm()
+
+    if request.method == "POST":
+        accion_post = request.POST.get("accion_post")
+
+        if accion_post == "guardar_tienda":
+            form_tienda = SoporteEditarTiendaForm(request.POST, instance=est)
+            if form_tienda.is_valid():
+                form_tienda.save()
+                Auditoria.objects.create(
+                    establecimiento=est,
+                    usuario=request.user,
+                    entidad_afectada="soporte_tienda",
+                    id_registro=est.pk,
+                    accion="editar_tienda",
+                    valor_nuevo=f"NIT: {est.nit}, Bre-B: {est.llave_bre_b}, Plan: {est.plan_suscripcion}",
+                    motivo=f"Asistencia de SuperAdmin: modificación de datos a solicitud del comercio {est.nombre}",
+                )
+                messages.success(request, f"✅ Datos del comercio '{est.nombre}' actualizados correctamente.")
+                return redirect("superadmin_asistir_tienda", pk=est.pk)
+
+        elif accion_post == "crear_cajero":
+            form_cajero = SoporteCrearCajeroForm(request.POST)
+            if form_cajero.is_valid():
+                cd = form_cajero.cleaned_data
+                nuevo_user = User.objects.create_user(
+                    username=cd["username"],
+                    password=cd["password"],
+                    first_name=cd["first_name"],
+                    last_name=cd.get("last_name", ""),
+                )
+                nuevo_perfil = Perfil.objects.create(
+                    user=nuevo_user,
+                    establecimiento=est,
+                    rol=cd["rol"],
+                )
+                Auditoria.objects.create(
+                    establecimiento=est,
+                    usuario=request.user,
+                    entidad_afectada="usuario_cajero",
+                    id_registro=nuevo_user.pk,
+                    accion="crear_por_soporte",
+                    valor_nuevo=f"Usuario: {nuevo_user.username} | Rol: {nuevo_perfil.rol} | Tienda: {est.nombre}",
+                    motivo=f"Asistencia de SuperAdmin: Creación de usuario/cajero para {est.nombre}",
+                )
+                messages.success(request, f"✅ Usuario/Cajero '{nuevo_user.username}' ({nuevo_perfil.get_rol_display()}) creado y vinculado a {est.nombre}.")
+                return redirect("superadmin_asistir_tienda", pk=est.pk)
+
+    # Usuarios de la tienda
+    perfiles = Perfil.objects.filter(establecimiento=est).select_related("user")
+
+    # Últimas 25 ventas de la tienda para soporte técnico
+    ultimas_ventas = Venta.objects.filter(establecimiento=est).select_related("usuario").order_by("-fecha_hora")[:25]
+
+    # Últimos 20 logs de auditoría de la tienda
+    logs_recientes = Auditoria.objects.filter(
+        Q(establecimiento=est) | Q(usuario__perfil__establecimiento=est)
+    ).select_related("usuario").order_by("-fecha_hora")[:20]
+
+    return render(
+        request,
+        "superadmin/asistir_tienda.html",
+        {
+            "establecimiento": est,
+            "form_tienda": form_tienda,
+            "form_cajero": form_cajero,
+            "perfiles": perfiles,
+            "ultimas_ventas": ultimas_ventas,
+            "logs_recientes": logs_recientes,
+        }
+    )
+
+
+@login_required
+def superadmin_cajero_reset_password(request, pk_user):
+    """Permite al SuperAdmin cambiar la clave de un empleado o dueño de tienda para resolver olvidos."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    target_user = get_object_or_404(User, pk=pk_user)
+    perfil = getattr(target_user, "perfil", None)
+    est = perfil.establecimiento if perfil else None
+
+    if request.method == "POST":
+        nueva_pass = request.POST.get("nueva_password", "").strip()
+        if nueva_pass:
+            target_user.set_password(nueva_pass)
+            target_user.save()
+            Auditoria.objects.create(
+                establecimiento=est,
+                usuario=request.user,
+                entidad_afectada="usuario_cajero",
+                id_registro=target_user.pk,
+                accion="reset_password_soporte",
+                valor_nuevo=f"Usuario: {target_user.username}",
+                motivo=f"Asistencia de SuperAdmin: Reseteo de contraseña para {target_user.username}",
+            )
+            messages.success(request, f"🔑 Contraseña actualizada exitosamente para '{target_user.username}'.")
+        else:
+            messages.error(request, "La contraseña no puede estar vacía.")
+
+    if est:
+        return redirect("superadmin_asistir_tienda", pk=est.pk)
+    return redirect("superadmin_dashboard")
+
+
+@login_required
+def superadmin_cajero_toggle_activo(request, pk_user):
+    """Permite al SuperAdmin activar o desactivar un cajero."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    target_user = get_object_or_404(User, pk=pk_user)
+    perfil = getattr(target_user, "perfil", None)
+    est = perfil.establecimiento if perfil else None
+
+    target_user.is_active = not target_user.is_active
+    target_user.save()
+
+    estado_str = "ACTIVADO" if target_user.is_active else "DESACTIVADO"
+    Auditoria.objects.create(
+        establecimiento=est,
+        usuario=request.user,
+        entidad_afectada="usuario_cajero",
+        id_registro=target_user.pk,
+        accion="toggle_activo_soporte",
+        valor_nuevo=f"Usuario: {target_user.username} | Estado: {estado_str}",
+        motivo=f"Asistencia de SuperAdmin: {estado_str} acceso a {target_user.username}",
+    )
+    messages.info(request, f"Usuario '{target_user.username}' {estado_str.lower()} correctamente.")
+
+    if est:
+        return redirect("superadmin_asistir_tienda", pk=est.pk)
+    return redirect("superadmin_dashboard")
+
+
+@login_required
+def superadmin_cajero_eliminar(request, pk_user):
+    """Permite al SuperAdmin eliminar a un cajero solicitado por el dueño del negocio."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    target_user = get_object_or_404(User, pk=pk_user)
+    perfil = getattr(target_user, "perfil", None)
+    est = perfil.establecimiento if perfil else None
+
+    if request.method == "POST":
+        username = target_user.username
+        Auditoria.objects.create(
+            establecimiento=est,
+            usuario=request.user,
+            entidad_afectada="usuario_cajero",
+            id_registro=target_user.pk,
+            accion="eliminar_cajero_soporte",
+            valor_anterior=f"Usuario: {username} | Rol: {perfil.rol if perfil else 'N/A'}",
+            motivo=f"Asistencia de SuperAdmin: Eliminación de empleado a solicitud del comercio {est.nombre if est else ''}",
+        )
+        target_user.delete()
+        messages.success(request, f"🗑️ Usuario/Cajero '{username}' eliminado correctamente a solicitud del comercio.")
+
+    if est:
+        return redirect("superadmin_asistir_tienda", pk=est.pk)
+    return redirect("superadmin_dashboard")
+
+
+@login_required
+def superadmin_anular_venta_soporte(request, pk):
+    """Permite al SuperAdmin anular una venta problemática y revertir su inventario."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    venta = get_object_or_404(Venta, pk=pk)
+    est = venta.establecimiento
+
+    if request.method == "POST":
+        motivo = request.POST.get("motivo", "Soporte de SuperAdmin por solicitud del comerciante").strip()
+        val_ant = f"Venta #{venta.pk} | ${venta.valor} | {venta.fecha_hora} | {venta.estado}"
+
+        # Revertir inventario si aplicaba
+        reversion_txt = revertir_salida_inventario(est, venta)
+
+        venta.estado = "anulada"
+        venta.save(update_fields=["estado"])
+
+        Auditoria.objects.create(
+            establecimiento=est,
+            usuario=request.user,
+            entidad_afectada="venta",
+            id_registro=venta.pk,
+            accion="anular_por_soporte",
+            valor_anterior=val_ant,
+            valor_nuevo=f"Venta anulada por SuperAdmin. {reversion_txt}".strip(),
+            motivo=motivo,
+        )
+        messages.success(request, f"✅ Venta #{venta.pk:05d} anulada correctamente por soporte. Inventario revertido si aplicaba.")
+
+    return redirect("superadmin_asistir_tienda", pk=est.pk)
+
 

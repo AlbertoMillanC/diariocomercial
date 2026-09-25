@@ -1,40 +1,170 @@
 {% extends "base.html" %}
-{% block title %}Auditoría{% endblock %}
+{% block title %}Auditoría y Trazabilidad en Tiempo Real — DiarioComercial{% endblock %}
 {% block content %}
-<h2>Auditoría</h2>
-<p class="lead">Ediciones, anulaciones e intentos de ingreso. No se borra nada.</p>
-<div class="panel">
-  <div class="tabla-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Usuario</th>
-        <th>Acción</th>
-        <th>Entidad</th>
-        <th>Registro</th>
-        <th>Antes</th>
-        <th>Después</th>
-        <th>Motivo</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for a in filas %}
-      <tr>
-        <td>{{ a.fecha_hora }}</td>
-        <td>{{ a.usuario|default:"—" }}</td>
-        <td>{{ a.accion }}</td>
-        <td>{{ a.entidad_afectada }}</td>
-        <td>#{{ a.id_registro }}</td>
-        <td class="mono">{{ a.valor_anterior|truncatechars:80 }}</td>
-        <td class="mono">{{ a.valor_nuevo|truncatechars:80 }}</td>
-        <td>{{ a.motivo }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="8">Todavía no hay movimientos de auditoría.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2 style="margin:0; font-size:22px; display:flex; align-items:center; gap:8px;">
+      📋 Registro de Auditoría y Trazabilidad en Tiempo Real
+    </h2>
+    <p class="lead" style="margin:4px 0 0 0; color:var(--muted); font-size:13px;">
+      Monitor de eventos inmutables: qué cambios hace cada cajero, dependiente, dueño o soporte del sistema en tiempo real.
+    </p>
+  </div>
+  <div>
+    {% if es_superadmin %}
+      <span class="tag" style="background:#0f172a; color:#38bdf8; font-weight:bold; font-size:12px; padding:6px 12px; border-radius:8px;">
+        👑 VISTA GLOBAL SUPERADMINISTRADOR (TODOS LOS COMERCIOS)
+      </span>
+    {% else %}
+      <span class="tag" style="background:#065f46; color:#a7f3d0; font-weight:bold; font-size:12px; padding:6px 12px; border-radius:8px;">
+        🛡️ AUDITORÍA DE TU COMERCIO
+      </span>
+    {% endif %}
   </div>
 </div>
+
+<!-- FILTROS EN TIEMPO REAL -->
+<div class="panel" style="padding:14px; margin-bottom:16px;">
+  <form method="get" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0;">
+    {% if es_superadmin %}
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">TIENDA / COMERCIO</label>
+      <select name="est" onchange="this.form.submit()" style="padding:6px; border-radius:6px; font-size:12px;">
+        <option value="">-- Todos los comercios --</option>
+        {% for e in establecimientos %}
+          <option value="{{ e.pk }}" {% if est_actual == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">USUARIO RESPONSABLE</label>
+      <select name="user" onchange="this.form.submit()" style="padding:6px; border-radius:6px; font-size:12px;">
+        <option value="">-- Todos los usuarios --</option>
+        {% for u in usuarios %}
+          <option value="{{ u.pk }}" {% if user_actual == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.username }} ({{ u.get_full_name|default:u.username }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">ENTIDAD AFECTADA</label>
+      <select name="entidad" onchange="this.form.submit()" style="padding:6px; border-radius:6px; font-size:12px;">
+        <option value="">-- Todas las entidades --</option>
+        <option value="venta" {% if entidad_actual == 'venta' %}selected{% endif %}>Ventas</option>
+        <option value="producto" {% if entidad_actual == 'producto' %}selected{% endif %}>Productos / Inventario</option>
+        <option value="usuario_cajero" {% if entidad_actual == 'usuario_cajero' %}selected{% endif %}>Cajeros / Usuarios</option>
+        <option value="soporte_tienda" {% if entidad_actual == 'soporte_tienda' %}selected{% endif %}>Soporte SuperAdmin</option>
+        <option value="compra" {% if entidad_actual == 'compra' %}selected{% endif %}>Compras</option>
+        <option value="sesion" {% if entidad_actual == 'sesion' %}selected{% endif %}>Sesiones / Password</option>
+      </select>
+    </div>
+
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">DESDE</label>
+      <input type="date" name="desde" value="{{ desde }}" style="padding:5px; border-radius:6px; font-size:12px;">
+    </div>
+
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">HASTA</label>
+      <input type="date" name="hasta" value="{{ hasta }}" style="padding:5px; border-radius:6px; font-size:12px;">
+    </div>
+
+    <div style="align-self:flex-end;">
+      <button class="btn btn-primary" type="submit" style="padding:7px 14px; font-size:12px;">Filtrar</button>
+      <a href="{% url 'auditoria' %}" class="btn btn-ghost" style="padding:7px 10px; font-size:12px; text-decoration:none;">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+<!-- TABLA DE LOGS -->
+<div class="panel">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <span style="font-size:12px; color:var(--muted); font-weight:bold;">
+      Mostrando los últimos {{ filas|length }} eventos registrados en el sistema:
+    </span>
+    <span style="font-size:11px; color:#10b981; font-weight:bold;">
+      🟢 Trazabilidad Inmutable Activa (Cero borrados)
+    </span>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha y Hora Exacta</th>
+          <th>Usuario Responsable</th>
+          <th>Rol / Tienda</th>
+          <th>Acción</th>
+          <th>Entidad</th>
+          <th>Registro</th>
+          <th>Detalle de Cambio (Antes ➔ Después)</th>
+          <th>Motivo / Razón</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in filas %}
+        <tr>
+          <td style="font-size:12px; white-space:nowrap; font-family:monospace; color:#334155;">
+            {{ a.fecha_hora|date:"d/m/Y H:i:s" }}
+          </td>
+          <td>
+            <strong>{{ a.usuario.username|default:"Sistema Automático" }}</strong>
+            {% if a.usuario.get_full_name %}
+              <small style="display:block; color:var(--muted); font-size:11px;">{{ a.usuario.get_full_name }}</small>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;">
+            {% if a.usuario.is_superuser %}
+              <span class="tag" style="background:#0f172a; color:#38bdf8; font-weight:bold;">SuperAdmin</span>
+            {% elif a.usuario.perfil %}
+              <span class="tag" style="background:{% if a.usuario.perfil.es_propietario %}#fef3c7; color:#92400e;{% else %}#e0e7ff; color:#3730a3;{% endif %}; font-size:11px;">
+                {{ a.usuario.perfil.get_rol_display }}
+              </span>
+              <small style="display:block; color:var(--muted); font-size:11px;">{{ a.usuario.perfil.establecimiento.nombre|truncatechars:20 }}</small>
+            {% elif a.establecimiento %}
+              <small style="color:var(--muted); font-size:11px;">{{ a.establecimiento.nombre }}</small>
+            {% else %}
+              <span style="color:var(--muted); font-size:11px;">Plataforma</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.accion == 'crear' or a.accion == 'crear_por_soporte' or a.accion == 'entrada_stock' %}
+              <span class="tag" style="background:#dcfce7; color:#166534; font-weight:bold;">{{ a.accion }}</span>
+            {% elif a.accion == 'eliminar' or a.accion == 'anular' or a.accion == 'anular_por_soporte' or a.accion == 'eliminar_cajero_soporte' %}
+              <span class="tag" style="background:#fee2e2; color:#991b1b; font-weight:bold;">{{ a.accion }}</span>
+            {% elif 'soporte' in a.accion %}
+              <span class="tag" style="background:#e0f2fe; color:#0369a1; font-weight:bold;">🛠️ {{ a.accion }}</span>
+            {% else %}
+              <span class="tag">{{ a.accion }}</span>
+            {% endif %}
+          </td>
+          <td><code style="font-size:12px;">{{ a.entidad_afectada }}</code></td>
+          <td style="font-size:12px; font-family:monospace;">#{{ a.id_registro }}</td>
+          <td style="font-size:12px; max-width:320px;">
+            {% if a.valor_anterior %}
+              <div style="color:#b91c1c; font-size:11px; margin-bottom:2px;">
+                <strong>Antes:</strong> {{ a.valor_anterior|truncatechars:100 }}
+              </div>
+            {% endif %}
+            {% if a.valor_nuevo %}
+              <div style="color:#15803d; font-size:11px;">
+                <strong>Después:</strong> {{ a.valor_nuevo|truncatechars:100 }}
+              </div>
+            {% endif %}
+          </td>
+          <td style="font-size:12px; color:#475569;">
+            {{ a.motivo|default:"Operación ordinaria del sistema" }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" style="text-align:center; padding:24px; color:var(--muted);">No hay eventos de auditoría que coincidan con los filtros.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
