@@ -1,6 +1,7 @@
 import re
 from decimal import Decimal
 from typing import Optional, Tuple
+from django.db import transaction
 from .models import Producto, Auditoria, ItemPedido
 
 
@@ -291,9 +292,11 @@ def procesar_salida_inventario(
     if not kilos or kilos <= 0:
         return prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), ""
 
-    # Descontar del inventario con precisión de gramos (3 decimales de Kilo)
-    prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
-    prod.save()
+    # Descontar del inventario con precisión de gramos y bloqueo atómico
+    with transaction.atomic():
+        prod = Producto.objects.select_for_update().get(pk=prod.pk)
+        prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
+        prod.save()
 
     libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
     gramos_str = f"{gramos:,.0f}".replace(",", ".")

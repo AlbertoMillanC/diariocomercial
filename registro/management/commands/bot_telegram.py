@@ -31,7 +31,11 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from registro.models import ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta
+from registro.models import (
+    ActividadCIIU, Auditoria, Compra, Establecimiento, Producto, Retencion, Venta,
+    VinculoCanal, Perfil
+)
+from registro.bot_service import despachar_mensaje as bot_service_despachar
 from registro.inventario_service import (
     buscar_producto_en_texto,
     consultar_producto_o_categoria,
@@ -162,8 +166,9 @@ class Command(BaseCommand):
                     texto = msg["text"].strip()
                     autor = msg.get("from", {}).get("first_name", "Usuario")
 
+                    msg_id = msg.get("message_id")
                     self.stdout.write(f"[{timezone.now().strftime('%H:%M:%S')}] {autor}: '{texto}'")
-                    self.despachar_mensaje(client, chat_id, texto, autor)
+                    self.despachar_mensaje(client, chat_id, texto, autor, msg_id=msg_id)
 
             except KeyboardInterrupt:
                 self.stdout.write(self.style.WARNING("\nDeteniendo bot de Telegram..."))
@@ -172,22 +177,46 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"Error en polling: {e}"))
                 time.sleep(2)
 
-    def despachar_mensaje(self, client, chat_id, texto, autor):
+    def despachar_mensaje(self, client, chat_id, texto, autor, msg_id=None):
         texto_limpio = texto.strip()
         cmd = texto_limpio.lower()
 
-        # 1. Comando /consolidado o /excel -> Envía archivo Excel adjunto
+        # 1. Comando /consolidado o /excel -> Envía archivo Excel adjunto (RBAC: Solo Propietario)
         if cmd in ("/consolidado", "consolidado", "/excel", "excel"):
+            vinculo = VinculoCanal.objects.select_related("usuario", "establecimiento").filter(
+                canal="telegram", identificador_externo=str(chat_id), activo=True
+            ).first()
+            if not vinculo:
+                client.send_message(
+                    chat_id,
+                    "⚠️ Tu Telegram aún no está vinculado a ningún comercio.\n"
+                    "Ve a Configuración en la plataforma web para vincularlo en 1 clic."
+                )
+                return
+
+            perfil = Perfil.objects.filter(user=vinculo.usuario, establecimiento=vinculo.establecimiento).first()
+            if perfil and not perfil.es_propietario():
+                client.send_message(
+                    chat_id,
+                    "⛔ *Acceso Restringido:* El consolidado contable en Excel está reservado exclusivamente al propietario."
+                )
+                return
+
             client.send_message(chat_id, "⏳ _Generando archivo Excel del consolidado para el contador..._")
-            archivo_bytes, nombre_archivo = self.generar_excel_consolidado()
-            caption = f"📊 *Consolidado Oficial de DiarioComercial*\n✍️ CARLOS ALBERTO MILLAN CASTAÑO / DESARROLLO WEB\nPeriodo: {date.today().strftime('%B %Y')}"
+            archivo_bytes, nombre_archivo = self.generar_excel_consolidado(est=vinculo.establecimiento)
+            caption = f"📊 *Consolidado Oficial de DiarioComercial*\nEstablecimiento: {vinculo.establecimiento.nombre}\nPeriodo: {date.today().strftime('%B %Y')}"
             client.send_document(chat_id, archivo_bytes, nombre_archivo, caption)
             return
 
-        # 2. Comando /hoy -> Cierre de caja de hoy
-        if cmd in ("/hoy", "hoy", "/caja", "caja"):
-            client.send_message(chat_id, self.generar_resumen_hoy())
-            return
+        # Para todos los demás comandos (ventas, compras, stock, cierre /hoy, etc.), delega a bot_service
+        respuesta = bot_service_despachar(
+            canal="telegram",
+            identificador_externo=str(chat_id),
+            texto_mensaje=texto_limpio,
+            identificador_mensaje=str(msg_id) if msg_id else None,
+            nombre_remitente=autor,
+        )
+        client.send_message(chat_id, respuesta)
 
         # 3. Comandos de inventario por grupos / departamentos
         if cmd in ("/inventario", "inventario", "/stock", "stock"):
@@ -769,10 +798,10 @@ class Command(BaseCommand):
         ]
         return "\n".join(lineas)
 
-    def generar_excel_consolidado(self):
+    def generar_excel_consolidado(self, est=None):
         """Genera un archivo Excel (.xlsx) oficial con diseño profesional para el contador."""
         wb = openpyxl.Workbook()
-        est = Establecimiento.objects.first()
+        est = est or Establecimiento.objects.first()
         hoy = date.today()
         inicio_mes = hoy.replace(day=1)
 

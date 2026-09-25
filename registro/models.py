@@ -5,13 +5,52 @@ from django.db import models
 from django.utils import timezone
 
 
+class Municipio(models.Model):
+    """Municipio de Colombia según codificación DANE (ej. 15001 Tunja, 11001 Bogotá)."""
+    codigo_dane = models.CharField(max_length=10, unique=True, db_index=True)
+    nombre = models.CharField(max_length=80)
+    departamento = models.CharField(max_length=80)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.departamento}) - {self.codigo_dane}"
+
+
 class Establecimiento(models.Model):
+    PLANES_SUSCRIPCION = (
+        ("lanzamiento_cero", "Plan $0 (Lanzamiento / Prueba)"),
+        ("activo", "Activo (Al Día)"),
+        ("mora", "En Mora"),
+        ("suspendido", "Suspendido"),
+    )
+    MODOS_OPERACION = (
+        ("nativo", "Modo Nativo (POS Principal)"),
+        ("shadow", "Modo Shadow (Intercepta POS Legacy)"),
+    )
     nombre = models.CharField(max_length=120)
     nit = models.CharField(max_length=20, blank=True)
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.SET_NULL, null=True, blank=True, related_name="establecimientos"
+    )
     direccion = models.CharField(max_length=160, blank=True)
     actividad_economica = models.CharField(max_length=80, blank=True)
     correo_reportes = models.EmailField(blank=True)
     estado = models.CharField(max_length=12, default="activo")
+    
+    # Parámetros Bre-B (Interoperabilidad BanRep)
+    llave_bre_b = models.CharField(max_length=60, blank=True, help_text="Celular, NIT o Alias Bre-B registrado")
+    tipo_llave_bre_b = models.CharField(max_length=20, default="celular")
+    banco_receptor_bre_b = models.CharField(max_length=80, blank=True, help_text="Entidad financiera receptora")
+    
+    # Billing SaaS & Modo de Entrada
+    plan_suscripcion = models.CharField(max_length=20, choices=PLANES_SUSCRIPCION, default="lanzamiento_cero")
+    modo_operacion = models.CharField(max_length=20, choices=MODOS_OPERACION, default="nativo")
+    fecha_fin_prueba = models.DateField(null=True, blank=True)
+    fecha_ultimo_pago = models.DateField(null=True, blank=True)
+    bono_incentivo_acumulado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
     def __str__(self):
         return self.nombre
@@ -85,6 +124,7 @@ class Venta(models.Model):
         ("nequi", "Nequi"),
         ("daviplata", "Daviplata"),
         ("transferencia", "Transferencia"),
+        ("bre_b", "Bre-B"),
     )
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
     usuario = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -108,8 +148,10 @@ class Venta(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        if self.fecha_hora:
+        if not self.fecha and self.fecha_hora:
             self.fecha = timezone.localtime(self.fecha_hora).date()
+        elif self.fecha and self.fecha_hora and timezone.localtime(self.fecha_hora).date() != self.fecha:
+            self.fecha_hora = self.fecha_hora.replace(year=self.fecha.year, month=self.fecha.month, day=self.fecha.day)
         if self.motivo and not self.concepto:
             self.concepto = self.motivo.nombre
         if self.actividad:
@@ -279,3 +321,194 @@ class ItemPedido(models.Model):
 
     def __str__(self):
         return f"{self.nombre_producto} ({self.get_origen_display()}) - {self.estado}"
+
+
+# ============================================================================
+# FASE 1: MULTI-TENANCY, SEGURIDAD & VINCULACIÓN DE CANALES
+# ============================================================================
+
+class VinculoCanal(models.Model):
+    """Asociación permanente entre un canal de mensajería (Telegram/WhatsApp) y un usuario/tienda."""
+    CANALES = (
+        ("telegram", "Telegram"),
+        ("whatsapp", "WhatsApp"),
+    )
+    canal = models.CharField(max_length=20, choices=CANALES, default="telegram")
+    identificador_externo = models.CharField(
+        max_length=64, db_index=True, help_text="chat_id de Telegram o número telefónico de WhatsApp"
+    )
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="vinculos_canal")
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="vinculos_canal"
+    )
+    username_externo = models.CharField(max_length=80, blank=True)
+    nombre_remitente = models.CharField(max_length=120, blank=True)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ("canal", "identificador_externo")
+        indexes = [
+            models.Index(fields=["canal", "identificador_externo"], name="vinculo_canal_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.canal}:{self.identificador_externo} ➔ {self.establecimiento.nombre} ({self.usuario.username})"
+
+
+class TokenVinculacion(models.Model):
+    """Token criptográfico efímero para vinculación en 1 toque (Deep Linking: t.me/bot?start=auth_XYZ)."""
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    expira = models.DateTimeField()
+    usado = models.BooleanField(default=False)
+
+    def es_valido(self):
+        return not self.usado and timezone.now() <= self.expira
+
+    def __str__(self):
+        return f"Token {self.token[:8]}... ➔ {self.establecimiento.nombre}"
+
+
+class MensajeProcesado(models.Model):
+    """Idempotencia: previene duplicados causados por reintentos de red de Telegram o WhatsApp."""
+    canal = models.CharField(max_length=20)
+    identificador_mensaje = models.CharField(max_length=128, unique=True, db_index=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    respuesta_cacheada = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.canal}:{self.identificador_mensaje}"
+
+
+# ============================================================================
+# FASE 2: CRM POPULAR, FIADOS & DOMICILIOS HIPERLOCALES
+# ============================================================================
+
+class Cliente(models.Model):
+    """CRM Popular: Vecinos y compradores del barrio para fiados, domicilios y marketing por WhatsApp."""
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="clientes")
+    nombre = models.CharField(max_length=120)
+    telefono = models.CharField(max_length=20, db_index=True, blank=True, help_text="WhatsApp celular")
+    nit_cedula = models.CharField(max_length=20, blank=True, help_text="Cédula o NIT para soporte fiscal")
+    direccion = models.CharField(max_length=160, blank=True)
+    punto_referencia = models.CharField(
+        max_length=160, blank=True, help_text="Crucial en barrios: 'frente a la panadería, reja negra'"
+    )
+    saldo_fiado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    cupo_credito_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("100000"))
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_ultimo_pedido = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["establecimiento", "telefono"], name="cliente_est_tel_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.telefono or 'Sin tel'}) - Saldo: ${self.saldo_fiado}"
+
+
+# ============================================================================
+# FASE 3: BRE-B (PAGOS INTEROPERABLES EN TIEMPO REAL BANREP)
+# ============================================================================
+
+class TransaccionBreB(models.Model):
+    """Registro de pagos interoperables inmediatos cuenta a cuenta (Bre-B / BanRep)."""
+    ESTADOS = (
+        ("iniciada", "Esperando Pago"),
+        ("aprobada", "Aprobada y Liquidada"),
+        ("rechazada", "Rechazada por Banco"),
+        ("expirada", "Expirada"),
+    )
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="transacciones_bre_b"
+    )
+    referencia_unica = models.CharField(max_length=64, unique=True, db_index=True)
+    token_visual_corto = models.CharField(
+        max_length=8, blank=True, help_text="Micro-token de 3 dígitos (ej: #819) para validación en mostrador"
+    )
+    monto = models.DecimalField(max_digits=14, decimal_places=2)
+    llave_utilizada = models.CharField(max_length=60)
+    id_transaccion_banrep = models.CharField(max_length=80, blank=True, null=True, db_index=True)
+    banco_origen = models.CharField(max_length=80, blank=True)
+    payload_emvco = models.TextField(blank=True)
+    venta = models.OneToOneField(
+        Venta, on_delete=models.SET_NULL, null=True, blank=True, related_name="transaccion_bre_b"
+    )
+    comando_original = models.CharField(max_length=160, blank=True)
+    estado = models.CharField(max_length=15, choices=ESTADOS, default="iniciada")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_confirmacion = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["referencia_unica", "estado"], name="breb_ref_est_idx"),
+        ]
+
+    def __str__(self):
+        return f"Bre-B {self.referencia_unica[-8:]} ${self.monto} ({self.estado})"
+
+
+# ============================================================================
+# FASE 4: TRIBUTARIO MULTI-MUNICIPIO & EXÓGENA MUNICIPAL
+# ============================================================================
+
+class ReglaTributariaMunicipio(models.Model):
+    """Reglas paramétricas del Estatuto Tributario Municipal (ICA, Avisos, Bomberil)."""
+    municipio = models.OneToOneField(
+        Municipio, on_delete=models.CASCADE, related_name="regla_ica"
+    )
+    porcentaje_avisos_y_tableros = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("15.00"), help_text="% sobre impuesto neto ICA (Ley 97/1913)"
+    )
+    porcentaje_sobretasa_bomberil = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("5.00"), help_text="% sobre impuesto neto ICA (Ley 1575/2012)"
+    )
+    base_minima_declarante_uvt = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00"), help_text="0 si declara desde el primer peso"
+    )
+    meses_periodo_ica = models.PositiveSmallIntegerField(
+        default=2, help_text="2 para bimestral (Tunja régimen común), 12 para anual"
+    )
+    acuerdo_municipal_referencia = models.CharField(
+        max_length=100, default="Acuerdo 0032 de 2020", help_text="Norma local vigente"
+    )
+
+    def __str__(self):
+        return f"Regla ICA {self.municipio.nombre} (Avisos: {self.porcentaje_avisos_y_tableros}%, Bomberos: {self.porcentaje_sobretasa_bomberil}%)"
+
+
+class RegistroExogenaMunicipal(models.Model):
+    """Base de auditoría para la generación anual de Medios Magnéticos Municipales (Exógena)."""
+    TIPOS = (
+        ("compra", "Compras y Servicios Recibidos"),
+        ("venta", "Ingresos Obtenidos por Tercero"),
+        ("reteica_practicado", "Retenciones de ICA Practicadas"),
+        ("reteica_asumido", "Retenciones de ICA que le practicaron"),
+    )
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="registros_exogena"
+    )
+    municipio = models.ForeignKey(Municipio, on_delete=models.CASCADE)
+    año_gravable = models.PositiveIntegerField(default=2026)
+    tipo_registro = models.CharField(max_length=25, choices=TIPOS)
+    nit_tercero = models.CharField(max_length=20, db_index=True)
+    nombre_razon_social = models.CharField(max_length=160)
+    direccion_tercero = models.CharField(max_length=160, blank=True)
+    monto_base = models.DecimalField(max_digits=14, decimal_places=2)
+    monto_impuesto_retencion = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    tarifa_aplicada = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("0"))
+    fecha_transaccion = models.DateField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["establecimiento", "año_gravable", "tipo_registro"], name="exogena_est_año_idx"),
+        ]
+
+    def __str__(self):
+        return f"Exógena {self.año_gravable} [{self.tipo_registro}] {self.nit_tercero}: ${self.monto_base}"
+
