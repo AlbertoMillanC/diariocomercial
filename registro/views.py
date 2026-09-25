@@ -1042,29 +1042,97 @@ def exportar_declaracion_ica(request):
     liq = liquidar_declaracion_sugerida_ica(est, desde, hasta)
     reng = liq.get("renglones", {})
 
+    cont = liq.get("contribuyente", {})
+    act_c = liq.get("actividades_c", {})
+
+    def fmt(val):
+        return f"${val:,.0f}".replace(",", ".")
+
     lineas = [
-        f"ANEXO TRIBUTARIO ICA - {est.nombre.upper()}",
-        f"MUNICIPIO: {liq.get('municipio', 'Tunja')}",
-        f"NORMATIVA: {liq.get('normativa', 'Acuerdo 0032/2020')}",
-        f"PERIODO: {desde} AL {hasta}",
-        "--------------------------------------------------",
-        f"1. Ingresos Brutos Totales: ${reng.get('1_ingresos_brutos', Decimal('0')):,.2f}",
-        f"2. Menos Ingresos Fuera del Municipio: ${reng.get('2_ingresos_fuera_municipio', Decimal('0')):,.2f}",
-        f"3. Menos Devoluciones y Descuentos: ${reng.get('3_devoluciones_descuentos', Decimal('0')):,.2f}",
-        f"4. Base Gravable Neta: ${reng.get('4_base_gravable_neta', Decimal('0')):,.2f}",
-        f"5. Impuesto Neto de Industria y Comercio: ${reng.get('5_impuesto_neto_ica', Decimal('0')):,.2f}",
-        f"6. Avisos y Tableros (15%): ${reng.get('6_impuesto_avisos_tableros_15pct', Decimal('0')):,.2f}",
-        f"7. Sobretasa Bomberil (5%): ${reng.get('7_sobretasa_bomberil', Decimal('0')):,.2f}",
-        f"8. Total Impuesto a Cargo: ${reng.get('8_total_impuesto_a_cargo', Decimal('0')):,.2f}",
-        f"9. Menos Retenciones ICA que le practicaron: ${reng.get('9_menos_retenciones_ica_a_favor', Decimal('0')):,.2f}",
-        f"10. SALDO SUGERIDO A PAGAR: ${reng.get('10_total_saldo_a_pagar', Decimal('0')):,.2f}",
-        "--------------------------------------------------",
-        "DISCLAIMER LEGAL: Borrador de precálculo sugerido para apoyo contable.",
-        "Requiere revision y firma obligatoria de Contador Publico titulado.",
+        "================================================================================",
+        f"ALCALDÍA MAYOR DE TUNJA - SECRETARÍA DE HACIENDA PÚBLICA (NIT: 891800846-1)",
+        f"FORMULARIO ÚNICO NACIONAL DE DECLARACIÓN Y PAGO DEL IMPUESTO DE INDUSTRIA Y COMERCIO (02)",
+        "ANEXO TRIBUTARIO ICA Y BORRADOR SUGERIDO DE LIQUIDACIÓN OFICIAL",
+        "================================================================================",
+        f"MUNICIPIO: {liq.get('municipio', 'Tunja')} | DEPARTAMENTO: {cont.get('departamento', 'BOYACÁ')}",
+        f"AÑO GRAVABLE: {liq.get('periodo', {}).get('ano_gravable', desde.year)} | PERIODO LIQUIDADO: {desde} AL {hasta}",
+        f"FECHA MÁXIMA SUGERIDA PRESENTACIÓN: {liq.get('periodo', {}).get('fecha_maxima', '')}",
+        f"NÚMERO DE FORMULARIO SUGERIDO: {liq.get('formulario_numero', '')}",
+        "",
+        "--- SECCIÓN A: INFORMACIÓN DEL CONTRIBUYENTE ---",
+        f"1. Razón Social / Propietario: {cont.get('nombre', est.nombre).upper()}",
+        f"2. Identificación: {cont.get('tipo_doc', 'NIT')} {cont.get('documento', est.nit)}-{cont.get('dv', '0')}",
+        f"3. Dirección Notificación: {cont.get('direccion', '')} | Ciudad: {cont.get('municipio_nombre', 'TUNJA')}",
+        f"4. Teléfono: {cont.get('telefono', '')} | 5. Correo: {cont.get('correo', '')}",
+        f"6. No. Establecimientos: {cont.get('no_establecimientos', 1)} | 7. Clasificación: {cont.get('clasificacion', 'COMÚN')}",
+        "",
+        "--- SECCIÓN B: BASE GRAVABLE ---",
+        f"08. Total Ingresos Ordinarios y Extraordinarios en Todo el País: {fmt(reng.get('8_total_ingresos_pais', Decimal('0')))}",
+        f"09. Menos Ingresos Fuera de este Municipio o Distrito: -{fmt(reng.get('9_ingresos_fuera_municipio', Decimal('0')))}",
+        f"10. TOTAL INGRESOS EN ESTE MUNICIPIO (R08 - R09): {fmt(reng.get('10_total_ingresos_municipio', Decimal('0')))}",
+        f"11. Menos Devoluciones, Rebajas y Descuentos: -{fmt(reng.get('11_devoluciones_descuentos', Decimal('0')))}",
+        f"12. Menos Exportaciones: -{fmt(reng.get('12_exportaciones', Decimal('0')))}",
+        f"13. Menos Venta de Activos Fijos: -{fmt(reng.get('13_venta_activos_fijos', Decimal('0')))}",
+        f"14. Menos Actividades Excluidas o No Sujetas: -{fmt(reng.get('14_no_gravados_excluidos', Decimal('0')))}",
+        f"15. Menos Otras Actividades Exentas por Acuerdo: -{fmt(reng.get('15_exentas_municipio', Decimal('0')))}",
+        f"16. TOTAL INGRESOS GRAVABLES (R10 - R11 - R12 - R13 - R14 - R15): {fmt(reng.get('16_total_ingresos_gravables', Decimal('0')))}",
+        "",
+        "--- SECCIÓN C: DISCRIMINACIÓN DE ACTIVIDADES GRAVADAS ---",
     ]
+
+    for i in (1, 2, 3):
+        act_info = act_c.get(f"actividad_{i}")
+        if act_info:
+            lineas.append(
+                f"   Actividad {i}: CIIU {act_info.get('codigo_ciiu')} - {act_info.get('descripcion')} | "
+                f"Base: {fmt(act_info.get('ingresos_gravados', Decimal('0')))} | Tarifa: {act_info.get('tarifa_x_mil')}x1000 | "
+                f"Impuesto: {fmt(act_info.get('impuesto_liquidado', Decimal('0')))}"
+            )
+
+    lineas.extend([
+        f"17. TOTAL IMPUESTO GRAVADO: {fmt(reng.get('17_total_impuesto_gravado', Decimal('0')))}",
+        f"18. Generación de Energía (Capacidad 0 KW) | 19. Impuesto Ley 56/1981: {fmt(reng.get('19_impuesto_ley_56', Decimal('0')))}",
+        "",
+        "--- SECCIÓN D: LIQUIDACIÓN PRIVADA ---",
+        f"20. IMPUESTO DE INDUSTRIA Y COMERCIO (R17 + R19): {fmt(reng.get('20_impuesto_industria_comercio', Decimal('0')))}",
+        f"21. Impuesto de Avisos y Tableros (15% de R20): {fmt(reng.get('21_impuesto_avisos_tableros', Decimal('0')))}",
+        f"22. Pago por Unidades Comerciales Sector Financiero: {fmt(reng.get('22_pago_unidades_financiero', Decimal('0')))}",
+        f"23. Sobretasa Bomberil (Ley 1575/2012 - 5%): {fmt(reng.get('23_sobretasa_bomberil', Decimal('0')))}",
+        f"24. Sobretasa de Seguridad (Ley 1421/2011): {fmt(reng.get('24_sobretasa_seguridad', Decimal('0')))}",
+        f"25. TOTAL IMPUESTO A CARGO (R20+R21+R22+R23+R24): {fmt(reng.get('25_total_impuesto_a_cargo', Decimal('0')))}",
+        f"26. Menos Exención o Exoneración sobre Impuesto: -{fmt(reng.get('26_exenciones_impuesto', Decimal('0')))}",
+        f"27. Menos Retenciones que le practicaron a favor (ReteICA): -{fmt(reng.get('27_menos_retenciones_ica_favor', Decimal('0')))}",
+        f"28. Menos Autorretenciones practicadas: -{fmt(reng.get('28_menos_autorretenciones', Decimal('0')))}",
+        f"29. Menos Anticipo liquidado año anterior: -{fmt(reng.get('29_menos_anticipo_anterior', Decimal('0')))}",
+        f"30. Anticipo del año siguiente: {fmt(reng.get('30_anticipo_siguiente', Decimal('0')))}",
+        f"31. Sanciones (Extemporaneidad / Corrección / Inexactitud): {fmt(reng.get('31_sanciones', Decimal('0')))}",
+        f"32. Menos Saldo a Favor del Periodo Anterior: -{fmt(reng.get('32_menos_saldo_favor_anterior', Decimal('0')))}",
+        f"33. TOTAL SALDO A CARGO (R25-R26-R27-R28-R29+R30+R31-R32): {fmt(reng.get('33_total_saldo_a_cargo', Decimal('0')))}",
+        f"34. TOTAL SALDO A FAVOR: {fmt(reng.get('34_total_saldo_a_favor', Decimal('0')))}",
+        "",
+        "--- SECCIÓN E: PAGO ---",
+        f"35. VALOR A PAGAR: {fmt(reng.get('35_valor_a_pagar', Decimal('0')))}",
+        f"36. Menos Descuento por Pronto Pago: -{fmt(reng.get('36_descuento_pronto_pago', Decimal('0')))}",
+        f"37. Intereses de Mora: +{fmt(reng.get('37_intereses_mora', Decimal('0')))}",
+        f"38. TOTAL A PAGAR (R35 - R36 + R37): {fmt(reng.get('38_total_a_pagar', Decimal('0')))}",
+        f"39. Pago Voluntario: {fmt(reng.get('39_pago_voluntario', Decimal('0')))}",
+        f"40. TOTAL CON APORTE VOLUNTARIO (R38 + R39): {fmt(reng.get('40_total_con_pago_voluntario', Decimal('0')))}",
+        "",
+        "--- SECCIÓN F: FIRMAS DE RESPONSABILIDAD ---",
+        f"FIRMA DECLARANTE: ___________________________ Nombre: {cont.get('nombre', est.nombre)} (CC/NIT: {cont.get('documento')})",
+        "FIRMA CONTADOR:   ___________________________ T.P. No: _________________",
+        "FIRMA REVISOR FISCAL: _______________________ T.P. No: _________________",
+        "",
+        "================================================================================",
+        "*** DOCUMENTO NO VÁLIDO PARA PRESENTAR EN BANCOS ***",
+        "Recuerde que este es un borrador oficial de precálculo sugerido para facilitar",
+        "el diligenciamiento electrónico en el portal de la Secretaría de Hacienda de Tunja.",
+        "DISCLAIMER LEGAL: La liquidación privada requiere firma obligatoria de Contador Público titulado (Ley 43/1990).",
+        "================================================================================",
+    ])
     contenido = "\r\n".join(lineas)
     resp = HttpResponse(contenido, content_type="text/plain; charset=utf-8")
-    resp["Content-Disposition"] = f'attachment; filename="ica_tunja_{desde}_{hasta}.txt"'
+    resp["Content-Disposition"] = f'attachment; filename="formulario02_ica_tunja_{desde}_{hasta}.txt"'
     return resp
 
 

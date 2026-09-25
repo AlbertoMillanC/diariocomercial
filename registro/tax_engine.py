@@ -120,7 +120,10 @@ def liquidar_declaracion_sugerida_ica(
     impuesto_avisos_tableros = (impuesto_neto_ica * factor_avisos).quantize(Decimal("1"))
     sobretasa_bomberil = (impuesto_neto_ica * factor_bomberos).quantize(Decimal("1"))
 
-    total_impuesto_a_cargo = impuesto_neto_ica + impuesto_avisos_tableros + sobretasa_bomberil
+    # Sobretasa de Seguridad (Ley 1421 de 2011 / Acuerdo Municipal)
+    sobretasa_seguridad = Decimal("0")
+
+    total_impuesto_a_cargo = impuesto_neto_ica + impuesto_avisos_tableros + sobretasa_bomberil + sobretasa_seguridad
 
     # 5. Menos Retenciones de ICA que le practicaron clientes al negocio (ReteICA a favor)
     retenciones_favor = Retencion.objects.filter(
@@ -130,7 +133,75 @@ def liquidar_declaracion_sugerida_ica(
         estado="vigente",
     ).aggregate(total=Sum("valor"))["total"] or Decimal("0")
 
-    saldo_neto_a_pagar = max(Decimal("0"), total_impuesto_a_cargo - retenciones_favor)
+    # Mapeo oficial Formulario Único Nacional (Formulario 02 - Tunja)
+    r8_ingresos_pais = ingresos_brutos
+    r9_ingresos_fuera = ingresos_fuera_municipio or Decimal("0")
+    r10_ingresos_municipio = max(Decimal("0"), r8_ingresos_pais - r9_ingresos_fuera)
+    r11_devoluciones = devoluciones_descuentos or Decimal("0")
+    r12_exportaciones = Decimal("0")
+    r13_venta_activos = Decimal("0")
+    r14_no_gravados = Decimal("0")
+    r15_exentas = Decimal("0")
+    r16_total_ingresos_gravables = max(
+        Decimal("0"),
+        r10_ingresos_municipio - r11_devoluciones - r12_exportaciones - r13_venta_activos - r14_no_gravados - r15_exentas
+    )
+
+    r17_total_impuesto_gravado = impuesto_neto_ica
+    r18_capacidad_kw = 0
+    r19_impuesto_ley_56 = Decimal("0")
+    r20_impuesto_ica = r17_total_impuesto_gravado + r19_impuesto_ley_56
+    r21_avisos_tableros = impuesto_avisos_tableros
+    r22_sector_financiero = Decimal("0")
+    r23_sobretasa_bomberil = sobretasa_bomberil
+    r24_sobretasa_seguridad = sobretasa_seguridad
+    r25_total_impuesto_cargo = total_impuesto_a_cargo
+
+    r26_exenciones = Decimal("0")
+    r27_retenciones_favor = retenciones_favor
+    r28_autorretenciones = Decimal("0")
+    r29_anticipo_anterior = Decimal("0")
+    r30_anticipo_siguiente = Decimal("0")
+    r31_sanciones = Decimal("0")
+    r32_saldo_favor_anterior = Decimal("0")
+
+    subtotal_cargo = (
+        r25_total_impuesto_cargo - r26_exenciones - r27_retenciones_favor
+        - r28_autorretenciones - r29_anticipo_anterior + r30_anticipo_siguiente
+        + r31_sanciones - r32_saldo_favor_anterior
+    )
+
+    if subtotal_cargo >= 0:
+        r33_saldo_cargo = subtotal_cargo
+        r34_saldo_favor = Decimal("0")
+    else:
+        r33_saldo_cargo = Decimal("0")
+        r34_saldo_favor = abs(subtotal_cargo)
+
+    r35_valor_pagar = r33_saldo_cargo
+    r36_descuento_pronto_pago = Decimal("0")
+    r37_intereses_mora = Decimal("0")
+    r38_total_pagar = max(Decimal("0"), r35_valor_pagar - r36_descuento_pronto_pago + r37_intereses_mora)
+    r39_pago_voluntario = Decimal("0")
+    r40_total_con_pago_voluntario = r38_total_pagar + r39_pago_voluntario
+
+    # Dígito de verificación para el NIT
+    nit_digitos = "".join(c for c in (establecimiento.nit or "") if c.isdigit())
+    dv = "0"
+    if nit_digitos:
+        pesos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71]
+        suma = sum(int(c) * pesos[i] for i, c in enumerate(reversed(nit_digitos)) if i < len(pesos))
+        res = suma % 11
+        dv = str(11 - res) if res > 1 else str(res)
+
+    # Organización de actividades C para las 3 casillas oficiales
+    act1 = desglose_actividades[0] if len(desglose_actividades) > 0 else None
+    act2 = desglose_actividades[1] if len(desglose_actividades) > 1 else None
+    act3 = desglose_actividades[2] if len(desglose_actividades) > 2 else None
+    otras_act = desglose_actividades[3:] if len(desglose_actividades) > 3 else []
+
+    ano_grav = fecha_fin.year
+    num_form = f"2602{establecimiento.id:04d}{ano_grav}"
 
     return {
         "establecimiento": establecimiento.nombre,
@@ -140,18 +211,79 @@ def liquidar_declaracion_sugerida_ica(
         "periodo": {
             "fecha_inicio": fecha_inicio.strftime("%d/%m/%Y"),
             "fecha_fin": fecha_fin.strftime("%d/%m/%Y"),
+            "ano_gravable": ano_grav,
+            "fecha_maxima": f"29/05/{ano_grav + 1}",
+        },
+        "formulario_numero": num_form,
+        "contribuyente": {
+            "nombre": establecimiento.nombre,
+            "tipo_doc": "NIT" if len(nit_digitos) > 8 else "C.C.",
+            "documento": establecimiento.nit or "0",
+            "dv": dv,
+            "direccion": establecimiento.direccion or "CRA 10 # 15-20 CENTRO",
+            "departamento": municipio.departamento.upper() if municipio else "BOYACÁ",
+            "municipio_nombre": municipio.nombre.upper() if municipio else "TUNJA",
+            "telefono": getattr(establecimiento, "llave_bre_b", "") or "3103083452",
+            "correo": establecimiento.correo_reportes or "comercio@diariocomercial.co",
+            "no_establecimientos": 1,
+            "clasificacion": "COMÚN",
+            "matricula_mercantil": f"TUN-{establecimiento.id:06d}",
+        },
+        "actividades_c": {
+            "actividad_1": act1,
+            "actividad_2": act2,
+            "actividad_3": act3,
+            "otras": otras_act,
+            "total_ingresos": r16_total_ingresos_gravables,
+            "total_impuesto": r17_total_impuesto_gravado,
         },
         "renglones": {
-            "1_ingresos_brutos": ingresos_brutos,
-            "2_ingresos_fuera_municipio": ingresos_fuera_municipio,
-            "3_devoluciones_descuentos": devoluciones_descuentos,
-            "4_base_gravable_neta": base_gravable_neta,
-            "5_impuesto_neto_ica": impuesto_neto_ica,
-            "6_impuesto_avisos_tableros_15pct": impuesto_avisos_tableros,
-            "7_sobretasa_bomberil": sobretasa_bomberil,
-            "8_total_impuesto_a_cargo": total_impuesto_a_cargo,
-            "9_menos_retenciones_ica_a_favor": retenciones_favor,
-            "10_total_saldo_a_pagar": saldo_neto_a_pagar,
+            # Numeración oficial Formulario 02 (Tunja)
+            "8_total_ingresos_pais": r8_ingresos_pais,
+            "9_ingresos_fuera_municipio": r9_ingresos_fuera,
+            "10_total_ingresos_municipio": r10_ingresos_municipio,
+            "11_devoluciones_descuentos": r11_devoluciones,
+            "12_exportaciones": r12_exportaciones,
+            "13_venta_activos_fijos": r13_venta_activos,
+            "14_no_gravados_excluidos": r14_no_gravados,
+            "15_exentas_municipio": r15_exentas,
+            "16_total_ingresos_gravables": r16_total_ingresos_gravables,
+            "17_total_impuesto_gravado": r17_total_impuesto_gravado,
+            "18_generacion_energia": r18_capacidad_kw,
+            "19_impuesto_ley_56": r19_impuesto_ley_56,
+            "20_impuesto_industria_comercio": r20_impuesto_ica,
+            "21_impuesto_avisos_tableros": r21_avisos_tableros,
+            "22_pago_unidades_financiero": r22_sector_financiero,
+            "23_sobretasa_bomberil": r23_sobretasa_bomberil,
+            "24_sobretasa_seguridad": r24_sobretasa_seguridad,
+            "25_total_impuesto_a_cargo": r25_total_impuesto_cargo,
+            "26_exenciones_impuesto": r26_exenciones,
+            "27_menos_retenciones_ica_favor": r27_retenciones_favor,
+            "28_menos_autorretenciones": r28_autorretenciones,
+            "29_menos_anticipo_anterior": r29_anticipo_anterior,
+            "30_anticipo_siguiente": r30_anticipo_siguiente,
+            "31_sanciones": r31_sanciones,
+            "32_menos_saldo_favor_anterior": r32_saldo_favor_anterior,
+            "33_total_saldo_a_cargo": r33_saldo_cargo,
+            "34_total_saldo_a_favor": r34_saldo_favor,
+            "35_valor_a_pagar": r35_valor_pagar,
+            "36_descuento_pronto_pago": r36_descuento_pronto_pago,
+            "37_intereses_mora": r37_intereses_mora,
+            "38_total_a_pagar": r38_total_pagar,
+            "39_pago_voluntario": r39_pago_voluntario,
+            "40_total_con_pago_voluntario": r40_total_con_pago_voluntario,
+
+            # Compatibilidad hacia atrás con tests existentes
+            "1_ingresos_brutos": r8_ingresos_pais,
+            "2_ingresos_fuera_municipio": r9_ingresos_fuera,
+            "3_devoluciones_descuentos": r11_devoluciones,
+            "4_base_gravable_neta": r16_total_ingresos_gravables,
+            "5_impuesto_neto_ica": r20_impuesto_ica,
+            "6_impuesto_avisos_tableros_15pct": r21_avisos_tableros,
+            "7_sobretasa_bomberil": r23_sobretasa_bomberil,
+            "8_total_impuesto_a_cargo": r25_total_impuesto_cargo,
+            "9_menos_retenciones_ica_a_favor": r27_retenciones_favor,
+            "10_total_saldo_a_pagar": r33_saldo_cargo,
         },
         "desglose_ciiu": desglose_actividades,
     }

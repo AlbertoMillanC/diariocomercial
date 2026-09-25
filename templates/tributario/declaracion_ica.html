@@ -1,23 +1,160 @@
 {% extends "base.html" %}
-{% block title %}Declaración Sugerida ICA Tunja — DiarioComercial{% endblock %}
+{% block title %}Formulario 02 ICA Tunja — Declaración y Pago — DiarioComercial{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+<style>
+  .form-02-wrap {
+    background: #fff;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    padding: 16px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #0f172a;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
+  .form-02-header {
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+  .form-02-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 6px;
+  }
+  .f-box {
+    border: 1px solid #334155;
+    padding: 4px 6px;
+    font-size: 11px;
+    background: #fff;
+  }
+  .f-box label {
+    display: block;
+    font-size: 9px;
+    text-transform: uppercase;
+    color: #475569;
+    font-weight: bold;
+    margin-bottom: 2px;
+  }
+  .f-box .val {
+    font-size: 12px;
+    font-weight: bold;
+    color: #0f172a;
+  }
+  .sec-header {
+    background: #0f172a;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    border-radius: 2px;
+  }
+  .t-renglones {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .t-renglones th, .t-renglones td {
+    border: 1px solid #cbd5e1;
+    padding: 4px 6px;
+  }
+  .t-renglones th {
+    background: #f1f5f9;
+    font-weight: bold;
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+  .t-renglones td.num {
+    width: 32px;
+    text-align: center;
+    font-weight: bold;
+    background: #f8fafc;
+  }
+  .t-renglones td.monto {
+    text-align: right;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .t-renglones tr.total-row {
+    background: #f8fafc;
+    font-weight: bold;
+  }
+  .t-renglones tr.destacado {
+    background: #ecfdf5;
+    font-weight: bold;
+  }
+  .t-renglones tr.destacado td.monto {
+    color: #065f46;
+    font-size: 13px;
+  }
+  .f-firmas {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .firma-card {
+    border: 1px dashed #64748b;
+    padding: 10px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 10px;
+  }
+  @media print {
+    body { background: #fff !important; }
+    header, nav, .periodos-panel, .semaforo-box, .btn-actions, .disclaimer-box, footer {
+      display: none !important;
+    }
+    .form-02-wrap {
+      border: 1px solid #000 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+    }
+    .sec-header {
+      background: #000 !important;
+      color: #fff !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .t-renglones th {
+      background: #eee !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+</style>
+
+<!-- ACCIONES SUPERIORES Y CONTROLES -->
+<div class="btn-actions" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
   <div>
-    <h2>🏛️ Declaración Sugerida de ICA (Tunja, Boyacá)</h2>
-    <p class="lead" style="margin:0;">Liquidación oficial paramétrica bajo el <strong>{{ liq.normativa|default:"Acuerdo 0032 de 2020" }}</strong> de la Secretaría de Hacienda de Tunja.</p>
+    <h2>🏛️ Formulario Único Nacional ICA Tunja (Formulario 02)</h2>
+    <p class="lead" style="margin:0;">
+      Liquidación oficial paramétrica bajo el <strong>Planilla de Liquidación Acuerdo 0032</strong> de la Secretaría de Hacienda de Tunja.
+    </p>
   </div>
   <div style="display:flex; gap:8px;">
-    <button onclick="window.print()" class="btn btn-ghost">🖨️ Imprimir Borrador</button>
+    <button onclick="window.print()" class="btn btn-ghost">🖨️ Imprimir Formulario Oficial</button>
     <a href="{% url 'exportar_ica' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}" class="btn btn-primary" id="btn-exportar-ica" style="background:var(--teal);">
-      📥 Descargar Anexo Contador
+      📥 Descargar Anexo Contador (.txt)
     </a>
   </div>
 </div>
 
 <!-- FILTRO DE PERIODO TRIBUTARIO -->
-<div class="panel" style="margin-bottom:16px; padding:12px 16px;">
+<div class="panel periodos-panel" style="margin-bottom:16px; padding:12px 16px;">
   <form method="get" class="periodos-rapidos">
-    <strong>Bimestre / Periodo:</strong>
+    <strong>Bimestre / Periodo Gravable:</strong>
     <a href="?periodo=hoy" class="btn btn-ghost btn-sm">Hoy</a>
     <a href="?periodo=este_mes" class="btn btn-ghost btn-sm">Este Mes</a>
     <a href="?periodo=mes_anterior" class="btn btn-ghost btn-sm">Mes Anterior</a>
@@ -31,152 +168,525 @@
   </form>
 </div>
 
-<!-- SEMAFORO DE TRANQUILIDAD TRIBUTARIA (EXIGENCIA UX/UI) -->
-<div style="background:#ecfdf5; border:2px solid #10b981; border-radius:14px; padding:20px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+<!-- SEMAFORO DE TRANQUILIDAD TRIBUTARIA -->
+<div class="semaforo-box" style="background:#ecfdf5; border:2px solid #10b981; border-radius:14px; padding:18px 20px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
   <div style="display:flex; gap:14px; align-items:center;">
-    <div style="font-size:42px;">🟢</div>
+    <div style="font-size:40px;">🟢</div>
     <div>
-      <span class="tag" style="background:#059669; color:#fff; font-weight:bold; font-size:12px;">ESTADO: AL DÍA Y CUADRADO</span>
-      <h3 style="margin:6px 0 2px; color:#065f46; font-size:20px;">Su negocio duerme tranquilo frente a la Alcaldía de Tunja</h3>
-      <p style="margin:0; font-size:14px; color:#047857;">
-        Periodo: <strong>{{ liq.periodo.fecha_inicio }}</strong> al <strong>{{ liq.periodo.fecha_fin }}</strong> • Municipio: <strong>{{ liq.municipio }}</strong>
+      <span class="tag" style="background:#059669; color:#fff; font-weight:bold; font-size:11px;">ESTADO: AL DÍA Y CUADRADO</span>
+      <h3 style="margin:4px 0 2px; color:#065f46; font-size:19px;">Su negocio duerme tranquilo frente a la Alcaldía de Tunja</h3>
+      <p style="margin:0; font-size:13px; color:#047857;">
+        Periodo: <strong>{{ liq.periodo.fecha_inicio }}</strong> al <strong>{{ liq.periodo.fecha_fin }}</strong> • Municipio: <strong>{{ liq.municipio }}</strong> • Acuerdo 0032
       </p>
     </div>
   </div>
   <div style="text-align:right;">
-    <span style="font-size:13px; color:#047857; font-weight:bold; text-transform:uppercase;">Saldo Sugerido a Pagar en Bancos</span>
-    <div style="font-size:32px; font-weight:900; color:#065f46;">
-      $ {{ liq.renglones.10_total_saldo_a_pagar|floatformat:0 }} COP
+    <span style="font-size:12px; color:#047857; font-weight:bold; text-transform:uppercase;">Saldo Sugerido a Pagar en Bancos (R33 / R38)</span>
+    <div style="font-size:30px; font-weight:900; color:#065f46;">
+      $ {{ liq.renglones.33_total_saldo_a_cargo|floatformat:0 }} COP
     </div>
   </div>
 </div>
 
-<!-- FORMULARIO OFICIAL EN RENGLONES MUNICIPALES -->
-<div class="panel" style="margin-bottom:20px;">
-  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--line); padding-bottom:8px; margin-bottom:12px;">
-    <h3 style="margin:0; font-size:17px; color:var(--navy);">Planilla de Liquidación Acuerdo 0032 (Tunja)</h3>
-    <small style="color:var(--muted);">Valores exactos consolidados desde sus ventas diarias</small>
+<!-- ========================================================================= -->
+<!-- FORMULARIO ÚNICO NACIONAL OFICIAL FORMULARIO 02 (TUNJA - BOYACÁ)          -->
+<!-- ========================================================================= -->
+<div class="form-02-wrap">
+
+  <!-- CABECERA INSTITUCIONAL OFICIAL -->
+  <div class="form-02-header">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #0f172a; padding-bottom:8px; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-size:28px;">🏛️</div>
+        <div>
+          <div style="font-size:14px; font-weight:900; letter-spacing:0.5px; color:#0f172a;">ALCALDÍA MAYOR DE TUNJA</div>
+          <div style="font-size:11px; font-weight:bold; color:#334155;">DEPARTAMENTO ADMINISTRATIVO DE HACIENDA PÚBLICA</div>
+          <div style="font-size:10px; color:#64748b;">NIT: 891800846-1</div>
+        </div>
+      </div>
+      <div style="text-align:center; flex:1; padding:0 12px;">
+        <div style="font-size:13px; font-weight:900; line-height:1.2; text-transform:uppercase;">
+          FORMULARIO ÚNICO NACIONAL DE DECLARACIÓN Y PAGO DEL IMPUESTO DE INDUSTRIA Y COMERCIO
+        </div>
+        <div style="font-size:10px; color:#475569; margin-top:2px;">
+          Borrador Oficial Sugerido de Precálculo • Secretaría de Hacienda Municipal
+        </div>
+      </div>
+      <div style="text-align:center; border:2px solid #0f172a; padding:4px 14px; border-radius:4px; background:#f8fafc;">
+        <div style="font-size:9px; font-weight:bold; color:#475569;">FORMULARIO</div>
+        <div style="font-size:26px; font-weight:900; line-height:1; color:#0f172a;">02</div>
+      </div>
+    </div>
+
+    <!-- METADATOS DEL FORMULARIO -->
+    <div class="form-02-grid">
+      <div class="f-box" style="grid-column: span 2;">
+        <label>DEPARTAMENTO</label>
+        <div class="val">{{ liq.contribuyente.departamento }}</div>
+      </div>
+      <div class="f-box" style="grid-column: span 3;">
+        <label>MUNICIPIO O DISTRITO</label>
+        <div class="val">{{ liq.contribuyente.municipio_nombre }}</div>
+      </div>
+      <div class="f-box" style="grid-column: span 2; text-align:center;">
+        <label>AÑO GRAVABLE</label>
+        <div class="val">{{ liq.periodo.ano_gravable }}</div>
+      </div>
+      <div class="f-box" style="grid-column: span 2; text-align:center;">
+        <label>FECHA MÁXIMA PRESENT.</label>
+        <div class="val">{{ liq.periodo.fecha_maxima }}</div>
+      </div>
+      <div class="f-box" style="grid-column: span 3; text-align:right;">
+        <label>NÚMERO DE FORMULARIO</label>
+        <div class="val" style="color:#b91c1c;">{{ liq.formulario_numero }}</div>
+      </div>
+
+      <!-- OPCION DE USO -->
+      <div class="f-box" style="grid-column: span 12; display:flex; gap:16px; align-items:center; background:#f8fafc;">
+        <label style="margin:0;">OPCIÓN DE USO:</label>
+        <span style="font-weight:bold; font-size:11px;">[X] DECLARACIÓN INICIAL</span>
+        <span style="color:#64748b; font-size:11px;">[ ] SOLO PAGO</span>
+        <span style="color:#64748b; font-size:11px;">[ ] DECLARACIÓN DE CORRECCIÓN</span>
+        <span style="font-size:10px; color:#64748b; margin-left:auto;">Normativa: {{ liq.normativa }}</span>
+      </div>
+    </div>
   </div>
 
-  <div class="tabla-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:80px;">Renglón</th>
-          <th>Concepto Tributario Municipal</th>
-          <th style="width:140px; text-align:center;">Base / Tarifa</th>
-          <th style="width:180px; text-align:right;">Valor Liquidado ($ COP)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>01</strong></td>
-          <td>Ingresos Brutos Totales Obtenidos en el Periodo</td>
-          <td style="text-align:center;">Total Ventas</td>
-          <td style="text-align:right; font-weight:bold;">$ {{ liq.renglones.1_ingresos_brutos|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>02</strong></td>
-          <td>Menos: Ingresos obtenidos fuera de Tunja (Territorialidad)</td>
-          <td style="text-align:center;">Deducción Art. 40</td>
-          <td style="text-align:right; color:#991b1b;">- $ {{ liq.renglones.2_ingresos_fuera_municipio|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>03</strong></td>
-          <td>Menos: Devoluciones, rebajas y descuentos en ventas</td>
-          <td style="text-align:center;">Anulaciones / Notas</td>
-          <td style="text-align:right; color:#991b1b;">- $ {{ liq.renglones.3_devoluciones_descuentos|floatformat:0 }}</td>
-        </tr>
-        <tr style="background:#f8fafc; font-weight:bold;">
-          <td><strong>04</strong></td>
-          <td>BASE GRAVABLE NETA DE ICA</td>
-          <td style="text-align:center;">(R01 - R02 - R03)</td>
-          <td style="text-align:right; color:var(--navy); font-size:16px;">$ {{ liq.renglones.4_base_gravable_neta|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>05</strong></td>
-          <td>Impuesto Neto de Industria y Comercio</td>
-          <td style="text-align:center;">Tarifas x mil CIIU</td>
-          <td style="text-align:right; font-weight:bold;">$ {{ liq.renglones.5_impuesto_neto_ica|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>06</strong></td>
-          <td>Impuesto de Avisos y Tableros (Ley 97 de 1913)</td>
-          <td style="text-align:center;"><span class="tag">15.00%</span> de R05</td>
-          <td style="text-align:right;">$ {{ liq.renglones.6_impuesto_avisos_tableros_15pct|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>07</strong></td>
-          <td>Sobretasa Bomberil (Ley 1575 de 2012)</td>
-          <td style="text-align:center;"><span class="tag">5.00%</span> de R05</td>
-          <td style="text-align:right;">$ {{ liq.renglones.7_sobretasa_bomberil|floatformat:0 }}</td>
-        </tr>
-        <tr style="background:#f1f5f9; font-weight:bold;">
-          <td><strong>08</strong></td>
-          <td>TOTAL IMPUESTO A CARGO MUNICIPAL</td>
-          <td style="text-align:center;">(R05 + R06 + R07)</td>
-          <td style="text-align:right; color:var(--navy); font-size:16px;">$ {{ liq.renglones.8_total_impuesto_a_cargo|floatformat:0 }}</td>
-        </tr>
-        <tr>
-          <td><strong>09</strong></td>
-          <td>Menos: Retenciones de ICA que le practicaron (ReteICA a favor)</td>
-          <td style="text-align:center;">Soportes Terceros</td>
-          <td style="text-align:right; color:#166534;">- $ {{ liq.renglones.9_menos_retenciones_ica_a_favor|floatformat:0 }}</td>
-        </tr>
-        <tr style="background:#ecfdf5; font-weight:900; font-size:18px;">
-          <td><strong>10</strong></td>
-          <td style="color:#065f46;">TOTAL SALDO SUGERIDO A PAGAR A LA ALCALDÍA DE TUNJA</td>
-          <td style="text-align:center; color:#065f46;">(R08 - R09)</td>
-          <td style="text-align:right; color:#065f46;">$ {{ liq.renglones.10_total_saldo_a_pagar|floatformat:0 }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN A. INFORMACIÓN DEL CONTRIBUYENTE                                 -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">A. INFORMACIÓN DEL CONTRIBUYENTE</div>
+  <div class="form-02-grid" style="margin-bottom:8px;">
+    <div class="f-box" style="grid-column: span 9;">
+      <label>1. APELLIDOS Y NOMBRES DEL PROPIETARIO O RAZÓN SOCIAL</label>
+      <div class="val">{{ liq.contribuyente.nombre|upper }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 3;">
+      <label>NO. REGISTRO INDUSTRIA Y COMERCIO</label>
+      <div class="val">{{ liq.contribuyente.matricula_mercantil }}</div>
+    </div>
+
+    <div class="f-box" style="grid-column: span 5;">
+      <label>2. IDENTIFICACIÓN Y D.V.</label>
+      <div class="val">
+        <strong>[{{ liq.contribuyente.tipo_doc }}]</strong> {{ liq.contribuyente.documento }}
+        <span style="background:#e2e8f0; padding:1px 6px; border-radius:3px; margin-left:6px;">D.V. {{ liq.contribuyente.dv }}</span>
+      </div>
+    </div>
+    <div class="f-box" style="grid-column: span 4; font-size:10px;">
+      <label>¿ES CONSORCIO O UNIÓN TEMPORAL?</label>
+      <div class="val" style="font-size:11px;">NO</div>
+    </div>
+    <div class="f-box" style="grid-column: span 3; font-size:10px;">
+      <label>¿PATRIMONIO AUTÓNOMO?</label>
+      <div class="val" style="font-size:11px;">NO</div>
+    </div>
+
+    <div class="f-box" style="grid-column: span 6;">
+      <label>3. DIRECCIÓN DE NOTIFICACIÓN</label>
+      <div class="val">{{ liq.contribuyente.direccion|upper }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 3;">
+      <label>DEPTO. NOTIFICACIÓN</label>
+      <div class="val">{{ liq.contribuyente.departamento }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 3;">
+      <label>MUNICIPIO NOTIFICACIÓN</label>
+      <div class="val">{{ liq.contribuyente.municipio_nombre }}</div>
+    </div>
+
+    <div class="f-box" style="grid-column: span 3;">
+      <label>4. TELÉFONO</label>
+      <div class="val">{{ liq.contribuyente.telefono }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 5;">
+      <label>5. CORREO ELECTRÓNICO</label>
+      <div class="val">{{ liq.contribuyente.correo }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 2; text-align:center;">
+      <label>6. No. ESTABLECIMIENTOS</label>
+      <div class="val">{{ liq.contribuyente.no_establecimientos }}</div>
+    </div>
+    <div class="f-box" style="grid-column: span 2; text-align:center;">
+      <label>7. CLASIFICACIÓN</label>
+      <div class="val">{{ liq.contribuyente.clasificacion }}</div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN B. BASE GRAVABLE (RENGLONES 8 AL 16)                              -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">B. BASE GRAVABLE</div>
+  <table class="t-renglones">
+    <thead>
+      <tr>
+        <th style="width:40px; text-align:center;">Renglón</th>
+        <th>Concepto Base Gravable</th>
+        <th style="width:200px; text-align:right;">Valor ($ COP)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">8</td>
+        <td>TOTAL INGRESOS ORDINARIOS Y EXTRAORDINARIOS DEL PERIODO EN TODO EL PAÍS</td>
+        <td class="monto">$ {{ liq.renglones.8_total_ingresos_pais|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">9</td>
+        <td>MENOS INGRESOS FUERA DE ESTE MUNICIPIO O DISTRITO</td>
+        <td class="monto" style="color:#991b1b;">- $ {{ liq.renglones.9_ingresos_fuera_municipio|floatformat:0 }}</td>
+      </tr>
+      <tr class="total-row">
+        <td class="num">10</td>
+        <td><strong>TOTAL INGRESOS ORDINARIOS Y EXTRAORDINARIOS EN ESTE MUNICIPIO (Renglón 8 menos 9)</strong></td>
+        <td class="monto" style="font-size:12px;">$ {{ liq.renglones.10_total_ingresos_municipio|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">11</td>
+        <td>MENOS INGRESOS POR DEVOLUCIONES, REBAJAS, DESCUENTOS</td>
+        <td class="monto" style="color:#991b1b;">- $ {{ liq.renglones.11_devoluciones_descuentos|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">12</td>
+        <td>MENOS INGRESOS POR EXPORTACIONES</td>
+        <td class="monto">- $ {{ liq.renglones.12_exportaciones|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">13</td>
+        <td>MENOS INGRESOS POR VENTA DE ACTIVOS FIJOS</td>
+        <td class="monto">- $ {{ liq.renglones.13_venta_activos_fijos|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">14</td>
+        <td>MENOS INGRESOS POR ACTIVIDADES EXCLUIDAS O NO SUJETAS Y OTROS INGRESOS NO GRAVADOS</td>
+        <td class="monto">- $ {{ liq.renglones.14_no_gravados_excluidos|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">15</td>
+        <td>MENOS INGRESOS POR OTRAS ACTIVIDADES EXENTAS EN ESTE MUNICIPIO O DISTRITO (Por Acuerdo)</td>
+        <td class="monto">- $ {{ liq.renglones.15_exentas_municipio|floatformat:0 }}</td>
+      </tr>
+      <tr class="destacado">
+        <td class="num" style="background:#d1fae5; color:#065f46;">16</td>
+        <td><strong>TOTAL INGRESOS GRAVABLES (Renglón 10 menos 11, 12, 13, 14 y 15)</strong></td>
+        <td class="monto">$ {{ liq.renglones.16_total_ingresos_gravables|floatformat:0 }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN C. DISCRIMINACIÓN DE ACTIVIDADES GRAVADAS                        -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">C. DISCR. ACTIVIDADES GRAVADAS</div>
+  <table class="t-renglones">
+    <thead>
+      <tr>
+        <th>Actividades Gravadas</th>
+        <th style="width:100px; text-align:center;">Código CIIU</th>
+        <th style="width:170px; text-align:right;">Ingresos Gravados</th>
+        <th style="width:120px; text-align:center;">Tarifa (por mil)</th>
+        <th style="width:180px; text-align:right;">Valor Impuesto ($)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- ACTIVIDAD 1 -->
+      <tr>
+        <td>
+          <strong>ACTIVIDAD 1 (PRINCIPAL)</strong>
+          {% if liq.actividades_c.actividad_1 %}
+            <div style="font-size:10px; color:#475569;">{{ liq.actividades_c.actividad_1.descripcion }}</div>
+          {% endif %}
+        </td>
+        <td style="text-align:center; font-weight:bold;">
+          {{ liq.actividades_c.actividad_1.codigo_ciiu|default:"4722" }}
+        </td>
+        <td class="monto">
+          $ {{ liq.actividades_c.actividad_1.ingresos_gravados|default:liq.renglones.16_total_ingresos_gravables|floatformat:0 }}
+        </td>
+        <td style="text-align:center;">
+          <span class="tag">{{ liq.actividades_c.actividad_1.tarifa_x_mil|default:"6.00" }} x mil</span>
+        </td>
+        <td class="monto" style="font-weight:bold;">
+          $ {{ liq.actividades_c.actividad_1.impuesto_liquidado|default:liq.renglones.17_total_impuesto_gravado|floatformat:0 }}
+        </td>
+      </tr>
+
+      <!-- ACTIVIDAD 2 -->
+      <tr>
+        <td><strong>ACTIVIDAD 2</strong> {% if liq.actividades_c.actividad_2 %}<div style="font-size:10px; color:#475569;">{{ liq.actividades_c.actividad_2.descripcion }}</div>{% endif %}</td>
+        <td style="text-align:center;">{{ liq.actividades_c.actividad_2.codigo_ciiu|default:"0" }}</td>
+        <td class="monto">$ {{ liq.actividades_c.actividad_2.ingresos_gravados|default:0|floatformat:0 }}</td>
+        <td style="text-align:center;">{% if liq.actividades_c.actividad_2 %}{{ liq.actividades_c.actividad_2.tarifa_x_mil }} x mil{% else %}-{% endif %}</td>
+        <td class="monto">$ {{ liq.actividades_c.actividad_2.impuesto_liquidado|default:0|floatformat:0 }}</td>
+      </tr>
+
+      <!-- ACTIVIDAD 3 -->
+      <tr>
+        <td><strong>ACTIVIDAD 3</strong> {% if liq.actividades_c.actividad_3 %}<div style="font-size:10px; color:#475569;">{{ liq.actividades_c.actividad_3.descripcion }}</div>{% endif %}</td>
+        <td style="text-align:center;">{{ liq.actividades_c.actividad_3.codigo_ciiu|default:"0" }}</td>
+        <td class="monto">$ {{ liq.actividades_c.actividad_3.ingresos_gravados|default:0|floatformat:0 }}</td>
+        <td style="text-align:center;">{% if liq.actividades_c.actividad_3 %}{{ liq.actividades_c.actividad_3.tarifa_x_mil }} x mil{% else %}-{% endif %}</td>
+        <td class="monto">$ {{ liq.actividades_c.actividad_3.impuesto_liquidado|default:0|floatformat:0 }}</td>
+      </tr>
+
+      <!-- OTRAS ACTIVIDADES -->
+      <tr>
+        <td><strong>OTRAS ACTIVIDADES</strong></td>
+        <td style="text-align:center; color:#64748b;">VER DESAGREGACIÓN</td>
+        <td class="monto">$ 0</td>
+        <td style="text-align:center; color:#64748b;">N/A</td>
+        <td class="monto">$ 0</td>
+      </tr>
+
+      <!-- TOTAL INGRESOS GRAVADOS Y TOTAL IMPUESTO -->
+      <tr class="total-row">
+        <td colspan="2"><strong>TOTAL INGRESOS GRAVADOS</strong></td>
+        <td class="monto"><strong>$ {{ liq.renglones.16_total_ingresos_gravables|floatformat:0 }}</strong></td>
+        <td style="text-align:center;"><strong>17. TOTAL IMPUESTO GRAVADO</strong></td>
+        <td class="monto" style="font-size:13px; font-weight:bold; color:#065f46;">
+          $ {{ liq.renglones.17_total_impuesto_gravado|floatformat:0 }}
+        </td>
+      </tr>
+
+      <!-- GENERACION DE ENERGIA -->
+      <tr>
+        <td colspan="3">
+          <strong>18. GENERACIÓN DE ENERGÍA</strong> • CAPACIDAD INSTALADA: <strong>0 KW</strong>
+        </td>
+        <td style="text-align:center;">19. IMPUESTO LEY 56/1981</td>
+        <td class="monto">$ {{ liq.renglones.19_impuesto_ley_56|floatformat:0 }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN D. LIQUIDACIÓN PRIVADA (RENGLONES 20 AL 34)                       -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">D. LIQUIDACIÓN PRIVADA</div>
+  <table class="t-renglones">
+    <thead>
+      <tr>
+        <th style="width:40px; text-align:center;">Renglón</th>
+        <th>Concepto de Liquidación Privada</th>
+        <th style="width:140px; text-align:center;">Fórmula / Tarifa</th>
+        <th style="width:200px; text-align:right;">Valor Liquidado ($ COP)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">20</td>
+        <td><strong>IMPUESTO DE INDUSTRIA Y COMERCIO (Renglón 17+19)</strong></td>
+        <td style="text-align:center;">R17 + R19</td>
+        <td class="monto" style="font-weight:bold;">$ {{ liq.renglones.20_impuesto_industria_comercio|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">21</td>
+        <td>IMPUESTO DE AVISOS Y TABLEROS (15% del renglón 20)</td>
+        <td style="text-align:center;"><span class="tag">15.00%</span> de R20</td>
+        <td class="monto">$ {{ liq.renglones.21_impuesto_avisos_tableros|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">22</td>
+        <td>PAGO POR UNIDADES COMERCIALES ADICIONALES DEL SECTOR FINANCIERO</td>
+        <td style="text-align:center;">Sector Financiero</td>
+        <td class="monto">$ {{ liq.renglones.22_pago_unidades_financiero|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">23</td>
+        <td>SOBRETASA BOMBERIL (Ley 1575 de 2012)</td>
+        <td style="text-align:center;"><span class="tag">5.00%</span> de R20</td>
+        <td class="monto">$ {{ liq.renglones.23_sobretasa_bomberil|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">24</td>
+        <td>SOBRETASA DE SEGURIDAD (Ley 1421 de 2011)</td>
+        <td style="text-align:center;">Acuerdo Tunja</td>
+        <td class="monto">$ {{ liq.renglones.24_sobretasa_seguridad|floatformat:0 }}</td>
+      </tr>
+      <tr class="total-row" style="background:#f1f5f9;">
+        <td class="num">25</td>
+        <td><strong>TOTAL IMPUESTO A CARGO (Renglón 20+21+22+23+24)</strong></td>
+        <td style="text-align:center; font-weight:bold;">(R20..R24)</td>
+        <td class="monto" style="font-size:13px; font-weight:bold; color:var(--navy);">
+          $ {{ liq.renglones.25_total_impuesto_a_cargo|floatformat:0 }}
+        </td>
+      </tr>
+      <tr>
+        <td class="num">26</td>
+        <td>MENOS VALOR DE EXENCIÓN O EXONERACIÓN SOBRE EL IMPUESTO Y NO SOBRE LOS INGRESOS</td>
+        <td style="text-align:center;">Exenciones</td>
+        <td class="monto">- $ {{ liq.renglones.26_exenciones_impuesto|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">27</td>
+        <td>MENOS RETENCIONES QUE LE PRACTICARON A FAVOR DE ESTE MUNICIPIO O DISTRITO (ReteICA)</td>
+        <td style="text-align:center;">Retenciones Clientes</td>
+        <td class="monto" style="color:#166534;">- $ {{ liq.renglones.27_menos_retenciones_ica_favor|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">28</td>
+        <td>MENOS AUTORRETENCIONES PRACTICADAS A FAVOR DE ESTE MUNICIPIO EN ESTE PERIODO</td>
+        <td style="text-align:center;">Autorretenciones</td>
+        <td class="monto">- $ {{ liq.renglones.28_menos_autorretenciones|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">29</td>
+        <td>MENOS ANTICIPO LIQUIDADO EN EL AÑO ANTERIOR</td>
+        <td style="text-align:center;">Anticipo Previo</td>
+        <td class="monto">- $ {{ liq.renglones.29_menos_anticipo_anterior|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">30</td>
+        <td>ANTICIPO DEL AÑO SIGUIENTE (Si existe, liquide porcentaje según acuerdo municipal)</td>
+        <td style="text-align:center;">Anticipo Sig.</td>
+        <td class="monto">$ {{ liq.renglones.30_anticipo_siguiente|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">31</td>
+        <td>SANCIONES: Extemporaneidad [ ] Corrección [ ] Inexactitud [ ] Otra [ ]</td>
+        <td style="text-align:center;">Estatuto Trib.</td>
+        <td class="monto">$ {{ liq.renglones.31_sanciones|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">32</td>
+        <td>MENOS SALDO A FAVOR DEL PERIODO ANTERIOR SIN SOLICITUD DE DEVOLUCIÓN O COMPENSACIÓN</td>
+        <td style="text-align:center;">Compensación</td>
+        <td class="monto">- $ {{ liq.renglones.32_menos_saldo_favor_anterior|floatformat:0 }}</td>
+      </tr>
+      <tr class="destacado">
+        <td class="num" style="background:#d1fae5; color:#065f46;">33</td>
+        <td><strong>TOTAL SALDO A CARGO (Renglón 25-26-27-28-29+30+31-32)</strong></td>
+        <td style="text-align:center; font-weight:bold; color:#065f46;">Fórmula Oficial</td>
+        <td class="monto" style="font-size:14px; font-weight:900;">
+          $ {{ liq.renglones.33_total_saldo_a_cargo|floatformat:0 }}
+        </td>
+      </tr>
+      <tr>
+        <td class="num">34</td>
+        <td>TOTAL SALDO A FAVOR (Renglón 25-26-27-28-29+30+31-32) (Si el resultado es menor a cero)</td>
+        <td style="text-align:center;">A favor</td>
+        <td class="monto">$ {{ liq.renglones.34_total_saldo_a_favor|floatformat:0 }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN E. PAGO (RENGLONES 35 AL 40)                                      -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">E. PAGO & APORTE VOLUNTARIO</div>
+  <table class="t-renglones">
+    <thead>
+      <tr>
+        <th style="width:40px; text-align:center;">Renglón</th>
+        <th>Concepto de Pago y Descuentos</th>
+        <th style="width:140px; text-align:center;">Detalle</th>
+        <th style="width:200px; text-align:right;">Valor ($ COP)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">35</td>
+        <td>VALOR A PAGAR</td>
+        <td style="text-align:center;">Saldo R33</td>
+        <td class="monto" style="font-weight:bold;">$ {{ liq.renglones.35_valor_a_pagar|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">36</td>
+        <td>DESCUENTO POR PRONTO PAGO (Si existe, liquídelo según el acuerdo municipal)</td>
+        <td style="text-align:center;">Incentivo Tributario</td>
+        <td class="monto">- $ {{ liq.renglones.36_descuento_pronto_pago|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td class="num">37</td>
+        <td>INTERESES DE MORA</td>
+        <td style="text-align:center;">Tasa Usura SuperFin</td>
+        <td class="monto">+ $ {{ liq.renglones.37_intereses_mora|floatformat:0 }}</td>
+      </tr>
+      <tr class="total-row" style="background:#ecfdf5;">
+        <td class="num" style="background:#a7f3d0; color:#065f46;">38</td>
+        <td><strong>TOTAL A PAGAR (Renglón 35-36+37)</strong></td>
+        <td style="text-align:center; font-weight:bold; color:#065f46;">Neto Bancos</td>
+        <td class="monto" style="font-size:14px; font-weight:900; color:#065f46;">
+          $ {{ liq.renglones.38_total_a_pagar|floatformat:0 }}
+        </td>
+      </tr>
+      <tr>
+        <td class="num">39</td>
+        <td>LIQUIDE EL VALOR DEL PAGO VOLUNTARIO (Según instrucciones del Municipio)</td>
+        <td style="text-align:center;">Aporte Ciudadano</td>
+        <td class="monto">$ {{ liq.renglones.39_pago_voluntario|floatformat:0 }}</td>
+      </tr>
+      <tr class="destacado">
+        <td class="num" style="background:#065f46; color:#fff;">40</td>
+        <td><strong>TOTAL A PAGAR CON PAGO VOLUNTARIO (Renglón 38+39)</strong></td>
+        <td style="text-align:center; font-weight:bold;">R38 + R39</td>
+        <td class="monto" style="font-size:14px; font-weight:900;">
+          $ {{ liq.renglones.40_total_con_pago_voluntario|floatformat:0 }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN F. FIRMAS                                                         -->
+  <!-- ========================================================================= -->
+  <div class="sec-header">F. FIRMAS DE RESPONSABILIDAD TRIBUTARIA</div>
+  <div class="f-firmas">
+    <div class="firma-card">
+      <div style="font-weight:bold; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px;">
+        FIRMA DEL DECLARANTE
+      </div>
+      <div style="margin:20px 0 6px; border-bottom:1px solid #0f172a; width:80%;"></div>
+      <div>
+        <strong>NOMBRE:</strong> {{ liq.contribuyente.nombre|upper }}<br>
+        <strong>IDENTIFICACIÓN:</strong> {{ liq.contribuyente.tipo_doc }} {{ liq.contribuyente.documento }}
+      </div>
+    </div>
+    <div class="firma-card">
+      <div style="font-weight:bold; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px;">
+        FIRMA DEL CONTADOR
+      </div>
+      <div style="margin:20px 0 6px; border-bottom:1px solid #0f172a; width:80%;"></div>
+      <div>
+        <strong>NOMBRE:</strong> ____________________________<br>
+        <strong>C.C. / T.P. No:</strong> ____________________________
+      </div>
+    </div>
+    <div class="firma-card">
+      <div style="font-weight:bold; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px;">
+        FIRMA DEL REVISOR FISCAL
+      </div>
+      <div style="margin:20px 0 6px; border-bottom:1px solid #0f172a; width:80%;"></div>
+      <div>
+        <strong>NOMBRE:</strong> ____________________________<br>
+        <strong>T.P. No:</strong> ____________________________
+      </div>
+    </div>
+  </div>
+
+  <!-- AVISO OFICIAL TUNJA DEL FORMULARIO -->
+  <div style="margin-top:14px; padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; text-align:center;">
+    <div style="font-weight:900; color:#b91c1c; font-size:12px; margin-bottom:4px;">
+      *** DOCUMENTO NO VÁLIDO PARA PRESENTAR EN BANCOS ***
+    </div>
+    <p style="margin:0; color:#475569; line-height:1.4;">
+      Recuerde que este documento es un <strong>borrador oficial de precálculo sugerido</strong> para facilitar el diligenciamiento
+      en el portal de la <strong>Secretaría de Hacienda de Tunja</strong>. Para su validez fiscal ante el Municipio,
+      debe ser radicado con <strong>FIRMADO ELECTRÓNICO</strong> en la plataforma tributaria oficial municipal.
+    </p>
   </div>
 </div>
 
-<!-- DESGLOSE POR ACTIVIDAD CIIU -->
-<div class="panel" style="margin-bottom:20px;">
-  <h3 style="margin:0 0 10px; font-size:16px; color:var(--navy);">Desglose por Actividades Económicas (CIIU) Registradas</h3>
-  <div class="tabla-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Código CIIU</th>
-          <th>Descripción</th>
-          <th>Tarifa por Mil</th>
-          <th style="text-align:right;">Ingreso Gravado</th>
-          <th style="text-align:right;">Impuesto ICA Liquidado</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for act in liq.desglose_ciiu %}
-        <tr>
-          <td><strong>{{ act.codigo_ciiu }}</strong></td>
-          <td>{{ act.descripcion }}</td>
-          <td><span class="tag">{{ act.tarifa_x_mil }} x mil</span></td>
-          <td style="text-align:right;">$ {{ act.ingresos_actividad|floatformat:0 }}</td>
-          <td style="text-align:right; font-weight:bold;">$ {{ act.impuesto_liquidado|floatformat:0 }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5" style="text-align:center; color:#64748b; padding:16px;">
-            No se registraron ventas con actividad clasificada en este rango de fechas.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- BLINDAJE JURIDICO EXIGIDO POR EL CLIENTE ACIDO -->
-<div style="background:#fffbeb; border:2px solid #f59e0b; border-radius:12px; padding:18px; margin-bottom:24px;">
+<!-- ========================================================================= -->
+<!-- BLINDAJE JURIDICO EXIGIDO POR EL CLIENTE ACIDO                            -->
+<!-- ========================================================================= -->
+<div class="disclaimer-box" style="background:#fffbeb; border:2px solid #f59e0b; border-radius:12px; padding:18px; margin-bottom:24px;">
   <div style="display:flex; gap:12px; align-items:flex-start;">
     <div style="font-size:24px;">⚠️</div>
     <div>
       <h4 style="margin:0 0 4px; color:#b45309; font-size:15px;">AVISO LEGAL Y BLINDAJE TRIBUTARIO CONTRA SANCIONES</h4>
       <p style="margin:0 0 10px; font-size:13px; color:#92400e; line-height:1.5;">
-        El Estatuto Tributario sanciona la inexactitud fiscal con multas del 100% al 200%. DiarioComercial genera un <strong>borrador de precálculo sugerido</strong> para facilitar la labor de su Contador Público, con base en las cifras registradas en este sistema. Este documento no constituye una liquidación privada definitiva ni exime de la revisión profesional de su contador conforme a la Ley 43 de 1990.
+        El Estatuto Tributario sanciona la inexactitud fiscal con multas del 100% al 200%. DiarioComercial genera este <strong>borrador de precálculo sugerido (Formulario 02)</strong> para facilitar la labor de su Contador Público, con base en las cifras y ventas registradas en el sistema. Este anexo no constituye liquidación privada definitiva ni exime de la revisión profesional de su Contador Público titulado conforme a la Ley 43 de 1990.
       </p>
       <label style="font-size:13px; color:#78350f; font-weight:bold; display:flex; align-items:center; gap:8px; cursor:pointer;">
         <input type="checkbox" id="chk-responsabilidad" onchange="toggleDescarga(this.checked)">
