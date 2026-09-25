@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Registrar Cliente DIAN — DiarioComercial{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div>
+      <h2>➕ Registrar Cliente para Facturación Electrónica</h2>
+      <p class="lead" style="margin:0;">Registre los datos fiscales obligatorios para la expedición de Factura Electrónica UBL 2.1 y transmisión a la DIAN.</p>
+    </div>
+    <a href="{% url 'clientes_lista' %}" class="btn btn-ghost">← Volver al Directorio</a>
+  </div>
+
+  <div class="panel" style="padding: 24px;">
+    <form method="post" id="form-cliente-dian">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <!-- SECCIÓN 1: IDENTIFICACIÓN FISCAL -->
+      <h3 style="font-size:15px; border-bottom:2px solid #e2e8f0; padding-bottom:6px; margin-top:0; color:var(--navy);">
+        1. Identificación Tributaria
+      </h3>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 80px; gap:16px; margin-bottom:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.tipo_documento.label }}</label>
+          {{ form.tipo_documento }}
+          {{ form.tipo_documento.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.nit_cedula.label }} *</label>
+          {{ form.nit_cedula }}
+          {{ form.nit_cedula.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.dv.label }}</label>
+          {{ form.dv }}
+          {{ form.dv.errors }}
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: RAZÓN SOCIAL Y RÉGIMEN -->
+      <h3 style="font-size:15px; border-bottom:2px solid #e2e8f0; padding-bottom:6px; margin-top:16px; color:var(--navy);">
+        2. Razón Social y Régimen
+      </h3>
+      <div style="margin-bottom:16px;">
+        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.nombre.label }} *</label>
+        {{ form.nombre }}
+        {{ form.nombre.errors }}
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.tipo_persona.label }}</label>
+          {{ form.tipo_persona }}
+          {{ form.tipo_persona.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.regimen_fiscal.label }}</label>
+          {{ form.regimen_fiscal }}
+          {{ form.regimen_fiscal.errors }}
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: CORREO Y UBICACIÓN DIAN -->
+      <h3 style="font-size:15px; border-bottom:2px solid #e2e8f0; padding-bottom:6px; margin-top:16px; color:var(--navy);">
+        3. Entrega de Factura (XML / PDF) y Ubicación
+      </h3>
+      <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:16px; margin-bottom:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            {{ form.correo_electronico.label }} *
+            <small style="color:#0284c7; font-weight:normal;">(Donde la DIAN y el sistema enviarán el XML y PDF)</small>
+          </label>
+          {{ form.correo_electronico }}
+          {{ form.correo_electronico.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.telefono.label }}</label>
+          {{ form.telefono }}
+          {{ form.telefono.errors }}
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:16px; margin-bottom:20px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.direccion.label }}</label>
+          {{ form.direccion }}
+          {{ form.direccion.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.municipio_nombre.label }}</label>
+          {{ form.municipio_nombre }}
+          {{ form.municipio_nombre.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.departamento_nombre.label }}</label>
+          {{ form.departamento_nombre }}
+          {{ form.departamento_nombre.errors }}
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; align-items:center; border-top:1px solid #e2e8f0; padding-top:16px;">
+        <button type="submit" class="btn btn-primary" style="background:#00A859; padding:10px 24px; font-size:15px;">
+          💾 Guardar Cliente DIAN
+        </button>
+        <a href="{% url 'clientes_lista' %}" class="btn btn-ghost">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Cálculo automático del dígito de verificación en tiempo real cuando se digita NIT
+  const nitInput = document.getElementById("id_nit_cedula");
+  const tipoDocInput = document.getElementById("id_tipo_documento");
+  const dvInput = document.getElementById("id_dv");
+
+  function calcularDvDian(nit) {
+    if (!nit || isNaN(nit)) return "";
+    const primos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+    let suma = 0;
+    const nitStr = nit.trim();
+    for (let i = 0; i < nitStr.length; i++) {
+      suma += parseInt(nitStr.charAt(nitStr.length - 1 - i), 10) * primos[i];
+    }
+    const residuo = suma % 11;
+    return (residuo <= 1) ? residuo.toString() : (11 - residuo).toString();
+  }
+
+  if (nitInput && dvInput) {
+    nitInput.addEventListener("input", function() {
+      if (tipoDocInput && tipoDocInput.value === "31") {
+        dvInput.value = calcularDvDian(nitInput.value);
+      }
+    });
+    if (tipoDocInput) {
+      tipoDocInput.addEventListener("change", function() {
+        if (tipoDocInput.value === "31") {
+          dvInput.value = calcularDvDian(nitInput.value);
+        } else {
+          dvInput.value = "";
+        }
+      });
+    }
+  }
+</script>
+{% endblock %}

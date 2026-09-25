@@ -52,6 +52,21 @@ class Establecimiento(models.Model):
     fecha_ultimo_pago = models.DateField(null=True, blank=True)
     bono_incentivo_acumulado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
+    # Parámetros Facturación Electrónica DIAN
+    facturacion_electronica_habilitada = models.BooleanField(default=True)
+    resolucion_dian_numero = models.CharField(max_length=60, blank=True, default="18764000001", help_text="Resolución DIAN de Facturación")
+    prefijo_facturacion = models.CharField(max_length=10, blank=True, default="FE", help_text="Prefijo asignado por la DIAN (ej: FE)")
+    rango_desde = models.PositiveIntegerField(default=1)
+    rango_hasta = models.PositiveIntegerField(default=5000)
+    consecutivo_actual = models.PositiveIntegerField(default=1)
+
+    def siguiente_consecutivo_factura(self):
+        consec = self.consecutivo_actual
+        numero = f"{self.prefijo_facturacion}-{consec:05d}"
+        self.consecutivo_actual += 1
+        self.save(update_fields=["consecutivo_actual"])
+        return numero
+
     def __str__(self):
         return self.nombre
 
@@ -150,6 +165,34 @@ class Venta(models.Model):
     fecha_conciliacion = models.DateTimeField(
         null=True, blank=True, help_text="Fecha de verificación en extracto"
     )
+    cliente = models.ForeignKey(
+        "Cliente", on_delete=models.SET_NULL, null=True, blank=True, related_name="ventas"
+    )
+    solicita_factura_electronica = models.BooleanField(
+        default=False, help_text="Cliente solicitó Factura Electrónica con reporte individual DIAN"
+    )
+    numero_factura_electronica = models.CharField(
+        max_length=30, blank=True, help_text="Número consecutivo fiscal (ej: FE-00142)"
+    )
+    cufe = models.CharField(
+        max_length=120, blank=True, help_text="Código Único de Facturación Electrónica DIAN"
+    )
+    estado_dian = models.CharField(
+        max_length=20,
+        choices=(
+            ("no_requerida", "Consumidor Final (No requerida)"),
+            ("pendiente", "Pendiente Envío DIAN"),
+            ("aprobada", "Aprobada DIAN"),
+            ("rechazada", "Rechazada DIAN"),
+        ),
+        default="no_requerida",
+    )
+
+    @staticmethod
+    def generar_cufe(establecimiento, numero_factura, valor, fecha_hora, nit_adquirente):
+        import hashlib
+        cufe_raw = f"{numero_factura}{fecha_hora}{valor}{nit_adquirente}{establecimiento.nit}"
+        return hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
 
     class Meta:
         indexes = [
@@ -413,17 +456,48 @@ class MensajeProcesado(models.Model):
 # ============================================================================
 
 class Cliente(models.Model):
-    """CRM Popular: Vecinos y compradores del barrio para fiados, domicilios y marketing por WhatsApp."""
+    """
+    CRM y Directorio de Terceros / Adquirentes para Facturación Electrónica DIAN y Exógena.
+    Permite tanto el registro normativo de 'CONSUMIDOR FINAL' (222222222222) como
+    la identificación individual de clientes con sus requisitos tributarios.
+    """
+    TIPOS_DOC = (
+        ("13", "Cédula de Ciudadanía (CC)"),
+        ("31", "NIT (Número de Identificación Tributaria)"),
+        ("22", "Cédula de Extranjería (CE)"),
+        ("41", "Pasaporte"),
+        ("42", "Documento de Identificación Extranjero"),
+        ("47", "Permiso por Protección Temporal (PPT)"),
+    )
+    REGIMENES = (
+        ("no_responsable_iva", "No responsable de IVA (Persona Natural)"),
+        ("responsable_iva", "Responsable de IVA (Común)"),
+        ("simple", "Régimen Simple de Tributación (RST)"),
+        ("gran_contribuyente", "Gran Contribuyente"),
+    )
+    TIPOS_PERSONA = (
+        ("natural", "Persona Natural"),
+        ("juridica", "Persona Jurídica"),
+    )
+
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="clientes")
-    nombre = models.CharField(max_length=120)
+    nombre = models.CharField(max_length=120, help_text="Nombre completo o Razón Social del cliente")
+    tipo_documento = models.CharField(max_length=5, choices=TIPOS_DOC, default="13", help_text="Tipo de documento según catálogo DIAN")
+    nit_cedula = models.CharField(max_length=20, default="222222222222", db_index=True, help_text="Cédula, NIT o 222222222222 para Consumidor Final")
+    dv = models.CharField(max_length=1, blank=True, help_text="Dígito de verificación (solo si es NIT)")
+    tipo_persona = models.CharField(max_length=15, choices=TIPOS_PERSONA, default="natural")
+    regimen_fiscal = models.CharField(max_length=30, choices=REGIMENES, default="no_responsable_iva")
+    correo_electronico = models.EmailField(blank=True, help_text="Obligatorio por la DIAN para entrega de factura electrónica")
     telefono = models.CharField(max_length=20, db_index=True, blank=True, help_text="WhatsApp celular")
-    nit_cedula = models.CharField(max_length=20, blank=True, help_text="Cédula o NIT para soporte fiscal")
-    direccion = models.CharField(max_length=160, blank=True)
+    direccion = models.CharField(max_length=160, blank=True, default="Tunja, Boyacá")
+    municipio_nombre = models.CharField(max_length=80, blank=True, default="Tunja")
+    departamento_nombre = models.CharField(max_length=80, blank=True, default="Boyacá")
     punto_referencia = models.CharField(
         max_length=160, blank=True, help_text="Crucial en barrios: 'frente a la panadería, reja negra'"
     )
     saldo_fiado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     cupo_credito_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("100000"))
+    es_consumidor_final = models.BooleanField(default=False, help_text="True si corresponde al Consumidor Final de mostrador")
     activo = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_ultimo_pedido = models.DateTimeField(null=True, blank=True)
@@ -431,10 +505,11 @@ class Cliente(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["establecimiento", "telefono"], name="cliente_est_tel_idx"),
+            models.Index(fields=["establecimiento", "nit_cedula"], name="cliente_est_nit_idx"),
         ]
 
     def __str__(self):
-        return f"{self.nombre} ({self.telefono or 'Sin tel'}) - Saldo: ${self.saldo_fiado}"
+        return f"{self.nombre} ({self.nit_cedula})"
 
 
 # ============================================================================

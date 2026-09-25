@@ -350,3 +350,306 @@ def generar_resumen_exogena_anual(establecimiento: Establecimiento, año: int) -
         },
         "conteo_terceros_unicos": registros.values("nit_tercero").distinct().count(),
     }
+
+
+# ============================================================================
+# EXÓGENA NACIONAL DIAN - FORMATO 1007 (INGRESOS PROPIOS RECIBIDOS)
+# ============================================================================
+
+def obtener_o_crear_consumidor_final(establecimiento):
+    """
+    Retorna o inicializa el registro normativo DIAN de Consumidor Final para ventas generales de mostrador.
+    Normativa DIAN (Resolución 000042 de 2020 y Resolución 000165 de 2023):
+    Documento: 222222222222 (12 dígitos en Factura Electrónica UBL 2.1 / 222222222 en Exógena 1007).
+    Nombre: CONSUMIDOR FINAL.
+    """
+    from .models import Cliente
+    cliente, _ = Cliente.objects.get_or_create(
+        establecimiento=establecimiento,
+        nit_cedula="222222222222",
+        defaults={
+            "nombre": "CONSUMIDOR FINAL",
+            "tipo_documento": "13",
+            "tipo_persona": "natural",
+            "regimen_fiscal": "no_responsable_iva",
+            "correo_electronico": "consumidorfinal@dian.gov.co",
+            "direccion": "VENTA DE MOSTRADOR",
+            "municipio_nombre": "Tunja",
+            "departamento_nombre": "Boyacá",
+            "telefono": "0000000000",
+            "es_consumidor_final": True,
+        },
+    )
+    return cliente
+
+
+def liquidar_exogena_dian_formato_1007(establecimiento, año: int) -> Dict[str, Any]:
+    """
+    Genera la liquidación y discriminación para la Información Exógena DIAN - Formato 1007.
+    
+    Regla Tributaria Normativa DIAN:
+    1. Clientes que solicitaron FACTURA ELECTRÓNICA individual:
+       Se reportan uno a uno con su Cédula o NIT real, razón social, correo, dirección,
+       y la suma total de sus compras del año.
+    2. Clientes Generales de MOSTRADOR (Consumidor Final / Cuantías Menores):
+       NO se reportan individualmente. Se SUMAN todas las compras de mostrador bajo el
+       pseudonit normativo '222222222' (9 doses según la DIAN para Exógena), con razón
+       social 'CUANTÍAS MENORES - CONSUMIDOR FINAL'.
+    """
+    from django.db.models import Sum
+    from .models import Venta
+
+    ventas_ano = Venta.objects.filter(
+        establecimiento=establecimiento,
+        fecha__year=año,
+        estado="vigente",
+    ).select_related("cliente")
+
+    total_ingresos_brutos = ventas_ano.aggregate(s=Sum("valor"))["s"] or Decimal("0")
+
+    total_mostrador_consumidor_final = Decimal("0")
+    total_clientes_individuales = Decimal("0")
+    conteo_facturas_individuales = 0
+    conteo_tickets_mostrador = 0
+
+    ventas_por_cliente = {}
+
+    for v in ventas_ano:
+        cli = v.cliente
+        es_mostrador = (
+            cli is None
+            or cli.es_consumidor_final
+            or cli.nit_cedula.strip() in ("222222222222", "222222222")
+            or not v.solicita_factura_electronica
+        )
+
+        if es_mostrador:
+            total_mostrador_consumidor_final += v.valor
+            conteo_tickets_mostrador += 1
+        else:
+            conteo_facturas_individuales += 1
+            total_clientes_individuales += v.valor
+            key = (cli.nit_cedula.strip(), cli.pk)
+            if key not in ventas_por_cliente:
+                ventas_por_cliente[key] = {
+                    "cliente": cli,
+                    "nit": cli.nit_cedula.strip(),
+                    "dv": cli.dv or "",
+                    "tipo_doc": cli.tipo_documento or "13",
+                    "tipo_doc_display": cli.get_tipo_documento_display() if hasattr(cli, "get_tipo_documento_display") else "CC",
+                    "nombre": cli.nombre,
+                    "direccion": cli.direccion or "Tunja, Boyacá",
+                    "correo": cli.correo_electronico or "",
+                    "telefono": cli.telefono or "",
+                    "regimen": cli.get_regimen_fiscal_display() if hasattr(cli, "get_regimen_fiscal_display") else "No responsable IVA",
+                    "municipio": cli.municipio_nombre or (establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"),
+                    "departamento": cli.departamento_nombre or "Boyacá",
+                    "total_compras": Decimal("0"),
+                    "conteo_facturas": 0,
+                    "cantidad_facturas": 0,
+                }
+            ventas_por_cliente[key]["total_compras"] += v.valor
+            ventas_por_cliente[key]["conteo_facturas"] += 1
+            ventas_por_cliente[key]["cantidad_facturas"] += 1
+
+    lista_individuales = sorted(ventas_por_cliente.values(), key=lambda x: x["total_compras"], reverse=True)
+
+    mun_nombre = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
+    dep_nombre = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
+    dane_mun = establecimiento.municipio.codigo_dane[-3:] if establecimiento.municipio else "001"
+    dane_dep = establecimiento.municipio.codigo_dane[:2] if establecimiento.municipio else "15"
+
+    registro_consumidor_final_1007 = {
+        "concepto": "4001",
+        "tipo_doc": "43",  # En prevalidador DIAN Formato 1007 cuantías menores se reporta 43 o 13
+        "nit": "222222222",  # 9 doses reglamentario DIAN exógena
+        "nit_factura_ubl": "222222222222",  # 12 doses en factura electrónica UBL
+        "dv": "",
+        "nombre": "CUANTÍAS MENORES - CONSUMIDOR FINAL (MOSTRADOR)",
+        "pais": "169",
+        "departamento_codigo": dane_dep,
+        "municipio_codigo": dane_mun,
+        "departamento": dep_nombre,
+        "municipio": mun_nombre,
+        "ingresos_brutos": total_mostrador_consumidor_final,
+        "devoluciones": Decimal("0"),
+        "ingreso_neto": total_mostrador_consumidor_final,
+        "conteo_operaciones": conteo_tickets_mostrador,
+        "es_consolidado_mostrador": True,
+    }
+
+    total_reportado_exogena = total_mostrador_consumidor_final + total_clientes_individuales
+
+    return {
+        "establecimiento": establecimiento,
+        "año_gravable": año,
+        "total_ingresos_brutos": total_ingresos_brutos,
+        "total_mostrador_consumidor_final": total_mostrador_consumidor_final,
+        "total_clientes_individuales": total_clientes_individuales,
+        "total_reportado_exogena": total_reportado_exogena,
+        "conteo_clientes_individuales": len(lista_individuales),
+        "conteo_facturas_individuales": conteo_facturas_individuales,
+        "conteo_tickets_mostrador": conteo_tickets_mostrador,
+        "conteo_ventas_mostrador": conteo_tickets_mostrador,
+        "registro_consolidado_mostrador": registro_consumidor_final_1007,
+        "clientes_individuales": lista_individuales,
+        "cuadre_perfecto": total_ingresos_brutos == total_reportado_exogena,
+        "cuadre_exacto": total_ingresos_brutos == total_reportado_exogena,
+        "diferencia_cuadre": abs(total_ingresos_brutos - total_reportado_exogena),
+    }
+
+
+def generar_excel_exogena_formato_1007(establecimiento, año: int) -> bytes:
+    """Genera archivo Excel (.xlsx) estandarizado con la estructura del Formato 1007 de la DIAN."""
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    datos = liquidar_exogena_dian_formato_1007(establecimiento, año)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"DIAN_Formato_1007_{año}"
+
+    fill_header = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    fill_mostrador = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+    fill_total = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+    font_header = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    font_bold = Font(name="Calibri", size=10, bold=True)
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_right = Alignment(horizontal="right", vertical="center")
+
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1'),
+    )
+
+    # Título
+    ws.merge_cells("A1:L1")
+    ws["A1"] = f"DIRECCIÓN DE IMPUESTOS Y ADUANAS NACIONALES (DIAN) — INFORMACIÓN EXÓGENA FORMATO 1007 (INGRESOS)"
+    ws["A1"].font = Font(name="Calibri", size=13, bold=True, color="1E3A8A")
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws.merge_cells("A2:L2")
+    ws["A2"] = f"Comercio: {establecimiento.nombre} | NIT: {establecimiento.nit} | Año Gravable: {año} | Total Ingresos: ${datos['total_ingresos_brutos']:,.0f} COP"
+    ws["A2"].font = Font(name="Calibri", size=10, italic=True)
+
+    headers = [
+        "Concepto",
+        "Tipo Doc",
+        "Número Identificación",
+        "DV",
+        "Primer Apellido / Razón Social",
+        "Correo Electrónico",
+        "Dirección",
+        "Depto",
+        "Munc",
+        "Ingresos Brutos Recibidos ($ COP)",
+        "Devoluciones ($)",
+        "Ingreso Neto Fiscal ($)",
+    ]
+
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col_idx, value=h)
+        cell.font = font_header
+        cell.fill = fill_header
+        cell.alignment = align_center
+        cell.border = thin_border
+
+    # Fila 5: Consolidado de Mostrador / Consumidor Final (Suma de compras de clientes no identificados)
+    r_mostrador = datos["registro_consolidado_mostrador"]
+    row_num = 5
+
+    fila_cf = [
+        r_mostrador["concepto"],
+        r_mostrador["tipo_doc"],
+        r_mostrador["nit"],
+        r_mostrador["dv"],
+        r_mostrador["nombre"],
+        "consumidorfinal@dian.gov.co",
+        "VENTA DE MOSTRADOR",
+        r_mostrador["departamento_codigo"],
+        r_mostrador["municipio_codigo"],
+        float(r_mostrador["ingresos_brutos"]),
+        0.0,
+        float(r_mostrador["ingreso_neto"]),
+    ]
+
+    for col_idx, val in enumerate(fila_cf, 1):
+        cell = ws.cell(row=row_num, column=col_idx, value=val)
+        cell.fill = fill_mostrador
+        cell.border = thin_border
+        if col_idx in (10, 11, 12):
+            cell.number_format = "$#,##0"
+            cell.alignment = align_right
+        elif col_idx in (1, 2, 4, 8, 9):
+            cell.alignment = align_center
+
+    # Filas siguientes: Clientes individuales con Factura Electrónica
+    row_num += 1
+    dep_cod = establecimiento.municipio.codigo_dane[:2] if establecimiento.municipio else "15"
+    mun_cod = establecimiento.municipio.codigo_dane[-3:] if establecimiento.municipio else "001"
+
+    for cli in datos["clientes_individuales"]:
+        fila_cli = [
+            "4001",
+            cli["tipo_doc"],
+            cli["nit"],
+            cli["dv"],
+            cli["nombre"].upper(),
+            cli["correo"],
+            cli["direccion"],
+            dep_cod,
+            mun_cod,
+            float(cli["total_compras"]),
+            0.0,
+            float(cli["total_compras"]),
+        ]
+        for col_idx, val in enumerate(fila_cli, 1):
+            cell = ws.cell(row=row_num, column=col_idx, value=val)
+            cell.border = thin_border
+            if col_idx in (10, 11, 12):
+                cell.number_format = "$#,##0"
+                cell.alignment = align_right
+            elif col_idx in (1, 2, 4, 8, 9):
+                cell.alignment = align_center
+        row_num += 1
+
+    # Fila de Totales
+    ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=9)
+    total_label = ws.cell(row=row_num, column=1, value="TOTAL GENERAL DECLARADO EXÓGENA FORMATO 1007")
+    total_label.font = font_bold
+    total_label.alignment = align_right
+    total_label.fill = fill_total
+    total_label.border = thin_border
+
+    tot_bruto = ws.cell(row=row_num, column=10, value=float(datos["total_reportado_exogena"]))
+    tot_bruto.font = font_bold
+    tot_bruto.number_format = "$#,##0"
+    tot_bruto.alignment = align_right
+    tot_bruto.fill = fill_total
+    tot_bruto.border = thin_border
+
+    tot_dev = ws.cell(row=row_num, column=11, value=0.0)
+    tot_dev.font = font_bold
+    tot_dev.number_format = "$#,##0"
+    tot_dev.alignment = align_right
+    tot_dev.fill = fill_total
+    tot_dev.border = thin_border
+
+    tot_neto = ws.cell(row=row_num, column=12, value=float(datos["total_reportado_exogena"]))
+    tot_neto.font = font_bold
+    tot_neto.number_format = "$#,##0"
+    tot_neto.alignment = align_right
+    tot_neto.fill = fill_total
+    tot_neto.border = thin_border
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

@@ -30,6 +30,7 @@ from .forms import (
     ConciliarPagoForm,
     SoporteCrearCajeroForm,
     SoporteEditarTiendaForm,
+    ClienteFacturacionForm,
 )
 from .models import (
     ActividadCIIU,
@@ -47,11 +48,18 @@ from .models import (
     VinculoCanal,
     TokenVinculacion,
     TransaccionBreB,
+    Cliente,
 )
 from .bot_service import generar_token_vinculacion
 from .bre_b_service import generar_qr_dinamico_bre_b, procesar_confirmacion_bre_b
 from .print_service import generar_bytes_escpos_recibo
-from .tax_engine import liquidar_declaracion_sugerida_ica, generar_resumen_exogena_anual
+from .tax_engine import (
+    liquidar_declaracion_sugerida_ica,
+    generar_resumen_exogena_anual,
+    obtener_o_crear_consumidor_final,
+    liquidar_exogena_dian_formato_1007,
+    generar_excel_exogena_formato_1007,
+)
 from .reportes import respuesta_csv, respuesta_pdf, texto_consolidado
 from .inventario_service import (
     procesar_salida_inventario,
@@ -351,6 +359,26 @@ def venta_nueva(request):
         if venta.valor <= 0:
             messages.error(request, "El valor tiene que ser mayor a cero.")
         else:
+            # Manejo normativo DIAN de Facturación Electrónica y Consumidor Final
+            solicita_fe = form.cleaned_data.get("solicita_factura_electronica") or False
+            cliente_sel = form.cleaned_data.get("cliente")
+
+            if solicita_fe and cliente_sel:
+                venta.solicita_factura_electronica = True
+                venta.cliente = cliente_sel
+                consec = est.consecutivo_actual
+                venta.numero_factura_electronica = f"{est.prefijo_facturacion}-{consec:05d}"
+                est.consecutivo_actual += 1
+                est.save(update_fields=["consecutivo_actual"])
+                import hashlib
+                cufe_raw = f"{venta.numero_factura_electronica}{venta.fecha_hora}{venta.valor}{cliente_sel.nit_cedula}{est.nit}"
+                venta.cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
+                venta.estado_dian = "aprobada"
+            else:
+                venta.solicita_factura_electronica = False
+                venta.cliente = cliente_sel if cliente_sel else obtener_o_crear_consumidor_final(est)
+                venta.estado_dian = "no_requerida"
+
             venta.save()
             # Descontar inventario si el concepto o motivo coincide con un producto
             texto_concepto = f"{venta.concepto or ''} {venta.motivo.nombre if venta.motivo else ''}".strip()
@@ -370,9 +398,14 @@ def venta_nueva(request):
                         tercero=form.cleaned_data.get("tercero") or "",
                         estado="vigente",
                     )
-            msg_exito = "Venta guardada."
+
+            if venta.solicita_factura_electronica and venta.numero_factura_electronica:
+                msg_exito = f"🧾 Factura Electrónica #{venta.numero_factura_electronica} emitida a {venta.cliente.nombre} (CUFE: {venta.cufe[:10]}...)."
+            else:
+                msg_exito = "Venta guardada (Consumidor Final mostrador)."
+
             if prod and kilos > 0:
-                msg_exito += f" Existencias actualizadas: -{kilos} Kg (-{libras} lb) de '{prod.nombre}'. Stock: {prod.stock_kilos} Kg."
+                msg_exito += f" Stock actualizado: -{kilos} Kg (-{libras} lb) de '{prod.nombre}'."
             messages.success(request, msg_exito)
             return redirect("inicio")
     return render(
@@ -2089,5 +2122,145 @@ def superadmin_anular_venta_soporte(request, pk):
         messages.success(request, f"✅ Venta #{venta.pk:05d} anulada correctamente por soporte. Inventario revertido si aplicaba.")
 
     return redirect("superadmin_asistir_tienda", pk=est.pk)
+
+
+# ============================================================================
+# FASE 5: FACTURACIÓN ELECTRÓNICA & EXÓGENA DIAN FORMATO 1007
+# ============================================================================
+
+@login_required
+def clientes_lista(request):
+    """Directorio de Clientes / Adquirentes para Facturación Electrónica y Exógena."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    # Garantizar registro normativo de Consumidor Final
+    obtener_o_crear_consumidor_final(est)
+
+    q = (request.GET.get("q") or "").strip()
+    clientes = Cliente.objects.filter(establecimiento=est, activo=True)
+    if q:
+        clientes = clientes.filter(Q(nombre__icontains=q) | Q(nit_cedula__icontains=q) | Q(telefono__icontains=q))
+
+    clientes = clientes.order_by("-es_consumidor_final", "nombre")
+
+    return render(
+        request,
+        "clientes/lista.html",
+        {
+            "clientes": clientes,
+            "query": q,
+            "establecimiento": est,
+            "form_nuevo": ClienteFacturacionForm(),
+        }
+    )
+
+
+@login_required
+def cliente_crear(request):
+    """Creación de cliente con requisitos DIAN para facturación electrónica."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    if request.method == "POST":
+        form = ClienteFacturacionForm(request.POST)
+        if form.is_valid():
+            cli = form.save(commit=False)
+            cli.establecimiento = est
+            cli.save()
+            messages.success(request, f"✅ Cliente '{cli.nombre}' registrado para Facturación Electrónica.")
+            return redirect("clientes_lista")
+    else:
+        form = ClienteFacturacionForm()
+
+    return render(request, "clientes/form.html", {"form": form, "establecimiento": est})
+
+
+@login_required
+def api_cliente_crear_rapido(request):
+    """Endpoint AJAX para crear un cliente de facturación electrónica desde el modal de mostrador."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return JsonResponse({"error": "No autorizado"}, status=401)
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    est = perfil.establecimiento
+    form = ClienteFacturacionForm(request.POST)
+    if form.is_valid():
+        cli = form.save(commit=False)
+        cli.establecimiento = est
+        cli.save()
+        return JsonResponse({
+            "exito": True,
+            "id": cli.pk,
+            "nombre": cli.nombre,
+            "nit_cedula": cli.nit_cedula,
+            "correo": cli.correo_electronico,
+            "telefono": cli.telefono,
+            "tipo_doc": cli.tipo_documento,
+        })
+    else:
+        errores = {campo: str(err[0]) for campo, err in form.errors.items()}
+        return JsonResponse({"exito": False, "errores": errores}, status=400)
+
+
+@login_required
+def exogena_dian_view(request):
+    """
+    Consola de Información Exógena DIAN - Formato 1007 (Ingresos Propios Recibidos).
+    Suma las compras de mostrador a Consumidor Final (222222222) y discrimina
+    individualmente a los clientes que solicitaron Factura Electrónica.
+    """
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+    est = perfil.establecimiento if perfil else Establecimiento.objects.first()
+
+    ano_actual = timezone.localdate().year
+    try:
+        ano_filtro = int(request.GET.get("ano", ano_actual))
+    except Exception:
+        ano_filtro = ano_actual
+
+    datos_1007 = liquidar_exogena_dian_formato_1007(est, ano_filtro)
+
+    return render(
+        request,
+        "tributario/exogena_1007.html",
+        {
+            "establecimiento": est,
+            "año": ano_filtro,
+            "datos": datos_1007,
+            "anos_disponibles": [ano_actual, ano_actual - 1, ano_actual - 2],
+        }
+    )
+
+
+@login_required
+def exogena_dian_exportar_excel(request):
+    """Descarga el Excel oficial del Formato 1007 para el contador del negocio."""
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+    est = perfil.establecimiento if perfil else Establecimiento.objects.first()
+
+    ano_actual = timezone.localdate().year
+    try:
+        ano_filtro = int(request.GET.get("ano", ano_actual))
+    except Exception:
+        ano_filtro = ano_actual
+
+    excel_bytes = generar_excel_exogena_formato_1007(est, ano_filtro)
+    resp = HttpResponse(
+        excel_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="DIAN_Exogena_1007_{est.nit}_{ano_filtro}.xlsx"'
+    return resp
 
 

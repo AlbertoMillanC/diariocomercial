@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Información Exógena DIAN — Formato 1007 — DiarioComercial{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2>📊 Información Exógena DIAN — Formato 1007</h2>
+    <p class="lead" style="margin:0;">
+      Reporte anual de Ingresos Propios Recibidos (Concepto 4001). Consolidación de compras de mostrador vs. Facturación Electrónica individual.
+    </p>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <!-- SELECTOR DE AÑO GRAVABLE -->
+    <form method="get" style="display:inline-flex; align-items:center; gap:6px;">
+      <label for="id-ano" style="font-size:13px; font-weight:bold; color:var(--navy);">Año Gravable:</label>
+      <select name="ano" id="id-ano" onchange="this.form.submit()" style="padding:6px 12px; border-radius:6px; border:1px solid #cbd5e1; font-weight:bold;">
+        {% for a in anos_disponibles %}
+        <option value="{{ a }}" {% if a == año %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    
+    <a href="{% url 'exogena_dian_exportar_excel' %}?ano={{ año }}" class="btn btn-primary" style="background:#0284c7; display:inline-flex; align-items:center; gap:6px;">
+      📥 Descargar Excel Formato 1007 (.xlsx)
+    </a>
+  </div>
+</div>
+
+<!-- TARJETAS RESUMEN AUDITORÍA CONTABLE -->
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+  <div class="panel" style="padding:16px; border-left:4px solid #0284c7; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:bold;">Total Ventas Contables {{ año }}</div>
+    <div style="font-size:24px; font-weight:900; color:var(--navy); margin-top:4px;">
+      $ {{ datos.total_ingresos_brutos|floatformat:0 }} COP
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">100% de ingresos registrados</div>
+  </div>
+
+  <div class="panel" style="padding:16px; border-left:4px solid #f59e0b; margin:0; background:#fffbeb;">
+    <div style="font-size:11px; text-transform:uppercase; color:#b45309; font-weight:bold;">Suma Compras Mostrador (222222222)</div>
+    <div style="font-size:24px; font-weight:900; color:#b45309; margin-top:4px;">
+      $ {{ datos.total_mostrador_consumidor_final|floatformat:0 }} COP
+    </div>
+    <div style="font-size:12px; color:#78350f; margin-top:4px;">
+      {{ datos.conteo_ventas_mostrador }} ventas a Consumidor Final
+    </div>
+  </div>
+
+  <div class="panel" style="padding:16px; border-left:4px solid #10b981; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#047857; font-weight:bold;">Clientes con Factura Electrónica</div>
+    <div style="font-size:24px; font-weight:900; color:#047857; margin-top:4px;">
+      $ {{ datos.total_clientes_individuales|floatformat:0 }} COP
+    </div>
+    <div style="font-size:12px; color:#065f46; margin-top:4px;">
+      {{ datos.conteo_clientes_individuales }} adquirentes identificados
+    </div>
+  </div>
+
+  <div class="panel" style="padding:16px; border-left:4px solid {% if datos.cuadre_exacto %}#10b981{% else %}#ef4444{% endif %}; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:bold;">Auditoría de Cuadre DIAN</div>
+    <div style="font-size:20px; font-weight:900; color:{% if datos.cuadre_exacto %}#10b981{% else %}#ef4444{% endif %}; margin-top:6px;">
+      {% if datos.cuadre_exacto %}
+      ✅ Cuadre 100% Exacto
+      {% else %}
+      ⚠️ Descuadre: ${{ datos.diferencia_cuadre|floatformat:0 }}
+      {% endif %}
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">
+      Mostrador + Individuales = Total
+    </div>
+  </div>
+</div>
+
+<!-- EXPLICACIÓN NORMATIVA DIAN -->
+<div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:14px 18px; margin-bottom:20px; display:flex; gap:14px; align-items:flex-start;">
+  <span style="font-size:24px; line-height:1;">⚖️</span>
+  <div style="font-size:13px; color:#334155; line-height:1.5;">
+    <strong>Regla Normativa de Exógena para Pequeño y Mediano Comercio:</strong>
+    Según las resoluciones anuales de medios magnéticos de la DIAN, las compras realizadas por clientes que no solicitaron factura electrónica y se atendieron en mostrador se reportan de forma agrupada en una única fila bajo el identificador <strong>222222222 (Consumidor Final / Cuantías Menores)</strong>.
+    Por el contrario, los clientes a los que se les emitió <strong>Factura Electrónica</strong> figuran discriminados individualmente con su NIT/Cédula y DV para cruce tributario directo.
+  </div>
+</div>
+
+<!-- TABLA DEL FORMATO 1007 -->
+<div class="panel" style="padding:16px 20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:16px; color:var(--navy);">
+      Vista Previa Oficial Formato 1007 — Versión Prevalidador DIAN
+    </h3>
+    <span style="font-size:12px; color:#64748b;">
+      Establecimiento: <strong>{{ establecimiento.nombre }}</strong> (NIT: {{ establecimiento.nit }})
+    </span>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table class="tabla" style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:#0f172a; color:#ffffff; text-align:left;">
+          <th style="padding:10px 8px; text-align:center;">CONCEPTO</th>
+          <th style="padding:10px 8px; text-align:center;">TIPO DOC</th>
+          <th style="padding:10px 8px;">NÚMERO IDENTIFICACIÓN</th>
+          <th style="padding:10px 8px; text-align:center;">DV</th>
+          <th style="padding:10px 8px;">PRIMER APELLIDO / RAZÓN SOCIAL</th>
+          <th style="padding:10px 8px;">CORREO ELECTRÓNICO</th>
+          <th style="padding:10px 8px; text-align:center;">DEP / MUN</th>
+          <th style="padding:10px 8px; text-align:right;">INGRESOS BRUTOS RECIBIDOS</th>
+          <th style="padding:10px 8px; text-align:right;">DEVOLUCIONES</th>
+          <th style="padding:10px 8px; text-align:right;">INGRESO NETO FISCAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- FILA CONSOLIDADA DE MOSTRADOR / CUANTÍAS MENORES -->
+        <tr style="background:#fef3c7; font-weight:bold; border-bottom:2px solid #f59e0b;">
+          <td style="padding:10px 8px; text-align:center; font-family:monospace;">{{ datos.registro_consolidado_mostrador.concepto }}</td>
+          <td style="padding:10px 8px; text-align:center; font-family:monospace;">{{ datos.registro_consolidado_mostrador.tipo_doc }}</td>
+          <td style="padding:10px 8px; font-family:monospace; color:#92400e;">
+            <strong>{{ datos.registro_consolidado_mostrador.nit }}</strong>
+            <span style="font-size:10px; background:#fde68a; padding:2px 6px; border-radius:4px; margin-left:4px;">MOSTRADOR CONSOLIDADO</span>
+          </td>
+          <td style="padding:10px 8px; text-align:center; font-family:monospace;">{{ datos.registro_consolidado_mostrador.dv }}</td>
+          <td style="padding:10px 8px; color:#92400e;">{{ datos.registro_consolidado_mostrador.nombre }}</td>
+          <td style="padding:10px 8px; color:#64748b; font-size:11px;">consumidorfinal@dian.gov.co</td>
+          <td style="padding:10px 8px; text-align:center; font-family:monospace;">
+            {{ datos.registro_consolidado_mostrador.departamento_codigo }} / {{ datos.registro_consolidado_mostrador.municipio_codigo }}
+          </td>
+          <td style="padding:10px 8px; text-align:right; font-family:monospace; color:#92400e; font-size:13px;">
+            $ {{ datos.registro_consolidado_mostrador.ingresos_brutos|floatformat:0 }}
+          </td>
+          <td style="padding:10px 8px; text-align:right; font-family:monospace;">$ 0</td>
+          <td style="padding:10px 8px; text-align:right; font-family:monospace; color:#92400e; font-size:13px;">
+            $ {{ datos.registro_consolidado_mostrador.ingreso_neto|floatformat:0 }}
+          </td>
+        </tr>
+
+        <!-- FILAS CLIENTES INDIVIDUALES (FACTURA ELECTRÓNICA) -->
+        {% for cli in datos.clientes_individuales %}
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px; text-align:center; font-family:monospace;">4001</td>
+          <td style="padding:8px; text-align:center; font-family:monospace;">{{ cli.tipo_doc }}</td>
+          <td style="padding:8px; font-family:monospace;">
+            <strong>{{ cli.nit }}</strong>
+            <span style="font-size:10px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; margin-left:4px;">
+              {{ cli.cantidad_facturas }} Factura(s)
+            </span>
+          </td>
+          <td style="padding:8px; text-align:center; font-family:monospace;">{{ cli.dv }}</td>
+          <td style="padding:8px; font-weight:600;">{{ cli.nombre|upper }}</td>
+          <td style="padding:8px; font-size:11px; color:#0284c7;">{{ cli.correo|default:"—" }}</td>
+          <td style="padding:8px; text-align:center; font-family:monospace;">15 / 001</td>
+          <td style="padding:8px; text-align:right; font-family:monospace;">$ {{ cli.total_compras|floatformat:0 }}</td>
+          <td style="padding:8px; text-align:right; font-family:monospace;">$ 0</td>
+          <td style="padding:8px; text-align:right; font-family:monospace; font-weight:bold; color:var(--navy);">
+            $ {{ cli.total_compras|floatformat:0 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" style="text-align:center; padding:18px; color:#94a3b8; font-style:italic;">
+            No se emitieron facturas electrónicas a clientes individuales en este año. Todos los ingresos corresponden a compras de mostrador (Consumidor Final).
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f172a; color:#ffffff; font-weight:bold; font-size:13px;">
+          <td colspan="7" style="padding:12px 8px; text-align:right; text-transform:uppercase;">
+            TOTAL GENERAL REPORTADO EN EXÓGENA (FORMATO 1007)
+          </td>
+          <td style="padding:12px 8px; text-align:right; font-family:monospace; color:#4ade80;">
+            $ {{ datos.total_reportado_exogena|floatformat:0 }}
+          </td>
+          <td style="padding:12px 8px; text-align:right; font-family:monospace;">$ 0</td>
+          <td style="padding:12px 8px; text-align:right; font-family:monospace; color:#4ade80;">
+            $ {{ datos.total_reportado_exogena|floatformat:0 }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}

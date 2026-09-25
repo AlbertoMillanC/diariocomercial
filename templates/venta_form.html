@@ -106,6 +106,48 @@
       </div>
     </div>
 
+    <!-- SECCIÓN INTERACTIVA DE FACTURACIÓN ELECTRÓNICA DIAN & CLIENTE -->
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:14px 18px; margin: 14px 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">🧾</span>
+          <strong style="color:var(--navy); font-size:14px;">Destinatario / Facturación Electrónica DIAN</strong>
+        </div>
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:bold; font-size:13px; color:#1e293b; background:#e0f2fe; padding:4px 10px; border-radius:6px; border:1px solid #bae6fd;">
+          {{ form.solicita_factura_electronica }}
+          <span>¿Cliente solicita Factura Electrónica individual?</span>
+        </label>
+      </div>
+
+      <!-- ESTADO POR DEFECTO: CONSUMIDOR FINAL (CUANTÍAS MENORES 222222222222) -->
+      <div id="bloque-consumidor-final" style="font-size:12px; color:#15803d; background:#dcfce7; padding:8px 12px; border-radius:6px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <strong>🛒 Modo Mostrador:</strong> Venta a <strong>Consumidor Final (222222222222)</strong>. Se sumará automáticamente en el renglón global <code>222222222</code> del Formato 1007 de Exógena.
+        </div>
+        <span style="font-size:11px; background:#bbf7d0; color:#166534; padding:2px 8px; border-radius:4px; font-weight:bold;">Cuantías Menores</span>
+      </div>
+
+      <!-- ESTADO EXPANDIDO: SELECCIÓN O REGISTRO DE CLIENTE CON CORREO Y NIT -->
+      <div id="bloque-cliente-factura-e" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed #cbd5e1;">
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:260px;">
+            <label for="id_cliente" style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px; color:var(--navy);">
+              Seleccionar Cliente / Razón Social:
+            </label>
+            {{ form.cliente }}
+          </div>
+          <div>
+            <button type="button" onclick="abrirModalClienteRapido()" class="btn btn-ghost" style="border:1px solid #10b981; color:#047857; font-weight:bold; padding:8px 14px;">
+              ➕ Registrar Cliente Nuevo (DIAN)
+            </button>
+          </div>
+        </div>
+        <small style="color:#0369a1; display:block; margin-top:6px;">
+          ℹ️ Se asignará consecutivo oficial DIAN con CUFE y QR normativo enviado al correo electrónico registrado.
+        </small>
+      </div>
+    </div>
+
     <div style="display:flex; gap:12px; margin-top:16px; align-items:center;">
       <button class="btn btn-primary" type="submit" style="font-size:16px; padding:12px 24px;">Guardar Venta Tradicional</button>
       <button type="button" onclick="abrirModalBreB()" class="btn btn-accent" style="background:#00A859;">⚡ Cobrar con Bre-B</button>
@@ -217,6 +259,60 @@
   </div>
 </div>
 
+<!-- MODAL CREACIÓN RÁPIDA DE CLIENTE DIAN -->
+<div id="modal-cliente-rapido" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.85); backdrop-filter:blur(6px); z-index:10000; place-items:center;">
+  <div style="background:#fff; border-radius:20px; padding:24px; max-width:480px; width:92%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); text-align:left;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:16px; color:var(--navy);">➕ Registrar Cliente DIAN Rápido</h3>
+      <button type="button" onclick="cerrarModalClienteRapido()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+
+    <form id="form-ajax-cliente" onsubmit="guardarClienteRapido(event)">
+      <div id="ajax-cliente-errores" style="display:none; background:#fee2e2; color:#991b1b; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:12px;"></div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Tipo Doc:</label>
+          <select id="quick_tipo_documento" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+            <option value="13">Cédula Ciudadanía (13)</option>
+            <option value="31">NIT (31)</option>
+            <option value="22">Cédula Extranjería (22)</option>
+            <option value="41">Pasaporte (41)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Cédula o NIT *</label>
+          <input type="text" id="quick_nit_cedula" required placeholder="Ej: 1049654321" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Nombre Completo o Razón Social *</label>
+        <input type="text" id="quick_nombre" required placeholder="Ej: Juan Pérez o Distribuidora S.A.S." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">
+          Correo Electrónico (Para envío de Factura XML/PDF) *
+        </label>
+        <input type="email" id="quick_correo" required placeholder="cliente@correo.com" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Teléfono WhatsApp (Opcional)</label>
+        <input type="text" id="quick_telefono" placeholder="3101234567" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="cerrarModalClienteRapido()" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button type="submit" id="btn-submit-quick-cliente" class="btn btn-primary" style="background:#00A859;">
+          💾 Guardar y Seleccionar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {{ motivos_data|json_script:"motivos-data" }}
 <script>
 const motivos = JSON.parse(document.getElementById("motivos-data").textContent);
@@ -224,6 +320,93 @@ const selAct = document.getElementById("id_actividad");
 const selMot = document.getElementById("id_motivo");
 const selCli = document.getElementById("id_tipo_cliente");
 const bloque = document.getElementById("bloque-empresa");
+
+// Controles Facturación Electrónica DIAN
+const checkFacturaE = document.getElementById("id_solicita_factura_electronica");
+const bloqueConsumidorFinal = document.getElementById("bloque-consumidor-final");
+const bloqueClienteFacturaE = document.getElementById("bloque-cliente-factura-e");
+const selCliente = document.getElementById("id_cliente");
+
+function toggleFacturaElectronica() {
+  if (!checkFacturaE) return;
+  if (checkFacturaE.checked) {
+    if (bloqueConsumidorFinal) bloqueConsumidorFinal.style.display = "none";
+    if (bloqueClienteFacturaE) bloqueClienteFacturaE.style.display = "block";
+  } else {
+    if (bloqueConsumidorFinal) bloqueConsumidorFinal.style.display = "flex";
+    if (bloqueClienteFacturaE) bloqueClienteFacturaE.style.display = "none";
+  }
+}
+
+if (checkFacturaE) {
+  checkFacturaE.addEventListener("change", toggleFacturaElectronica);
+  toggleFacturaElectronica();
+}
+
+function abrirModalClienteRapido() {
+  const modal = document.getElementById("modal-cliente-rapido");
+  if (modal) modal.style.display = "grid";
+}
+
+function cerrarModalClienteRapido() {
+  const modal = document.getElementById("modal-cliente-rapido");
+  if (modal) modal.style.display = "none";
+  const errBox = document.getElementById("ajax-cliente-errores");
+  if (errBox) errBox.style.display = "none";
+}
+
+function guardarClienteRapido(e) {
+  e.preventDefault();
+  const btn = document.getElementById("btn-submit-quick-cliente");
+  const errBox = document.getElementById("ajax-cliente-errores");
+  btn.disabled = true;
+  btn.innerText = "Guardando...";
+
+  const formData = new FormData();
+  formData.append("tipo_documento", document.getElementById("quick_tipo_documento").value);
+  formData.append("nit_cedula", document.getElementById("quick_nit_cedula").value);
+  formData.append("nombre", document.getElementById("quick_nombre").value);
+  formData.append("correo_electronico", document.getElementById("quick_correo").value);
+  formData.append("telefono", document.getElementById("quick_telefono").value);
+  formData.append("csrfmiddlewaretoken", document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+  fetch("{% url 'api_cliente_crear_rapido' %}", {
+    method: "POST",
+    body: formData,
+  })
+  .then(res => res.json().then(data => ({ status: res.status, body: data })))
+  .then(({ status, body }) => {
+    btn.disabled = false;
+    btn.innerText = "💾 Guardar y Seleccionar";
+    if (status === 200 && body.exito) {
+      // Agregar opción y seleccionar en el select
+      if (selCliente) {
+        const nuevaOpcion = new Option(`${body.nombre} (${body.nit_cedula})`, body.id, true, true);
+        selCliente.add(nuevaOpcion);
+      }
+      cerrarModalClienteRapido();
+      // Aseguramos que la casilla de factura e quede activa
+      if (checkFacturaE) {
+        checkFacturaE.checked = true;
+        toggleFacturaElectronica();
+      }
+    } else {
+      if (errBox) {
+        errBox.style.display = "block";
+        const msg = body.errores ? Object.values(body.errores).join(", ") : (body.error || "Error al registrar cliente.");
+        errBox.innerText = `⚠️ ${msg}`;
+      }
+    }
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.innerText = "💾 Guardar y Seleccionar";
+    if (errBox) {
+      errBox.style.display = "block";
+      errBox.innerText = "⚠️ Error de conexión con el servidor.";
+    }
+  });
+}
 
 function filtrarMotivos() {
   const act = selAct.value;

@@ -15,6 +15,7 @@ from .models import (
     Retencion,
     Venta,
     Establecimiento,
+    Cliente,
 )
 
 
@@ -62,7 +63,17 @@ class VentaForm(forms.ModelForm):
 
     class Meta:
         model = Venta
-        fields = ["fecha_hora", "actividad", "motivo", "valor", "tipo_cliente", "medio_pago", "observacion"]
+        fields = [
+            "fecha_hora",
+            "actividad",
+            "motivo",
+            "valor",
+            "tipo_cliente",
+            "medio_pago",
+            "solicita_factura_electronica",
+            "cliente",
+            "observacion",
+        ]
         widgets = {
             "fecha_hora": forms.DateTimeInput(
                 attrs={"type": "datetime-local"},
@@ -85,23 +96,29 @@ class VentaForm(forms.ModelForm):
             acts = ActividadCIIU.objects.filter(establecimiento=establecimiento)
             self.fields["actividad"].queryset = acts
             self.fields["motivo"].queryset = MotivoVenta.objects.filter(establecimiento=establecimiento)
+            self.fields["cliente"].queryset = Cliente.objects.filter(establecimiento=establecimiento).order_by("nombre")
             if acts.count() == 1 and not self.initial.get("actividad"):
                 act = acts.first()
                 self.initial["actividad"] = act.pk
                 pred = MotivoVenta.objects.filter(actividad=act, es_predeterminado=True).first()
                 if pred:
                     self.initial["motivo"] = pred.pk
+        else:
+            self.fields["cliente"].queryset = Cliente.objects.none()
+
+        self.fields["cliente"].required = False
+        self.fields["cliente"].label = "Cliente / Adquirente (DIAN)"
+        self.fields["solicita_factura_electronica"].label = "Solicita Factura Electrónica individual DIAN"
+        self.fields["solicita_factura_electronica"].required = False
         self.fields["motivo"].required = False
         self.fields["actividad"].label = "Actividad CIIU"
         self.fields["tipo_cliente"].label = "¿A quién le vende?"
         self.fields["medio_pago"].label = "Medio de pago"
         self.fields["medio_pago"].required = False
         self.fields["medio_pago"].initial = "efectivo"
-        self.fields["fecha_hora"].label = "Fecha y hora"
-        self.fields["fecha_hora"].help_text = "Sale automática. Si necesita cambiarla, pulse el calendario."
         self.fields["observacion"].label = "Observación (opcional)"
         self.fields["observacion"].required = False
-        self.fields["observacion"].widget.attrs["placeholder"] = "Ej. fiado, domicilio"
+        self.fields["observacion"].widget.attrs["placeholder"] = "Ej. fiado, domicilio, nota"
 
     def clean_medio_pago(self):
         return self.cleaned_data.get("medio_pago") or "efectivo"
@@ -339,3 +356,76 @@ class SoporteEditarTiendaForm(forms.ModelForm):
             "plan_suscripcion": "Plan de Suscripción",
             "correo_reportes": "Correo del Contador Aliado",
         }
+
+
+class ClienteFacturacionForm(forms.ModelForm):
+    """
+    Formulario de registro y edición de clientes / adquirentes para Facturación Electrónica DIAN.
+    Valida requisitos normativos: Tipo de Documento, Cédula/NIT, Razón Social, Correo electrónico y Dirección.
+    """
+    class Meta:
+        model = Cliente
+        fields = [
+            "tipo_documento",
+            "nit_cedula",
+            "dv",
+            "nombre",
+            "tipo_persona",
+            "regimen_fiscal",
+            "correo_electronico",
+            "telefono",
+            "direccion",
+            "municipio_nombre",
+            "departamento_nombre",
+        ]
+        labels = {
+            "tipo_documento": "Tipo de Documento",
+            "nit_cedula": "Número de Identificación (Cédula o NIT)",
+            "dv": "DV",
+            "nombre": "Nombre Completo o Razón Social",
+            "tipo_persona": "Naturaleza Jurídica",
+            "regimen_fiscal": "Régimen Fiscal (Responsabilidad Tributaria)",
+            "correo_electronico": "Correo Electrónico (Recepción de Factura)",
+            "telefono": "Teléfono / Celular WhatsApp",
+            "direccion": "Dirección Fiscal",
+            "municipio_nombre": "Ciudad / Municipio",
+            "departamento_nombre": "Departamento",
+        }
+        widgets = {
+            "tipo_documento": forms.Select(attrs={"class": "form-control"}),
+            "nit_cedula": forms.TextInput(attrs={"placeholder": "Ej: 1049654321 o 901234567"}),
+            "dv": forms.TextInput(attrs={"placeholder": "0", "style": "width: 50px;"}),
+            "nombre": forms.TextInput(attrs={"placeholder": "Ej: Distribuidora Central S.A.S. o Juan Pérez"}),
+            "correo_electronico": forms.EmailInput(attrs={"placeholder": "facturas@cliente.com"}),
+            "telefono": forms.TextInput(attrs={"placeholder": "3101234567"}),
+            "direccion": forms.TextInput(attrs={"placeholder": "Carrera 10 # 18-35"}),
+            "municipio_nombre": forms.TextInput(attrs={"placeholder": "Tunja"}),
+            "departamento_nombre": forms.TextInput(attrs={"placeholder": "Boyacá"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for f in ["dv", "tipo_persona", "regimen_fiscal", "telefono", "direccion", "municipio_nombre", "departamento_nombre"]:
+            if f in self.fields:
+                self.fields[f].required = False
+
+    def clean_nit_cedula(self):
+        doc = self.cleaned_data.get("nit_cedula", "").strip()
+        if not doc:
+            raise forms.ValidationError("El número de documento es obligatorio.")
+        return doc
+
+    def clean(self):
+        cleaned_data = super().clean()
+        td = cleaned_data.get("tipo_documento")
+        nit = cleaned_data.get("nit_cedula", "")
+        dv = cleaned_data.get("dv")
+
+        if td == "31" and not dv and nit.isdigit():
+            # Algoritmo DIAN módulo 11 para calcular dígito de verificación si no fue digitado
+            primos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71]
+            suma = sum(int(d) * p for d, p in zip(reversed(nit), primos))
+            residuo = suma % 11
+            cleaned_data["dv"] = str(residuo if residuo <= 1 else 11 - residuo)
+
+        return cleaned_data

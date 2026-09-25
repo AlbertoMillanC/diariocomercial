@@ -42,11 +42,13 @@
       <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
       <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
       <a href="{% url 'pagos_electronicos' %}" class="{% if request.resolver_match.url_name == 'pagos_electronicos' %}activo{% endif %}" style="color:#38bdf8;">💳 Pagos Electrónicos</a>
+      <a href="{% url 'clientes_lista' %}" class="{% if request.resolver_match.url_name == 'clientes_lista' %}activo{% endif %}">👥 Clientes / Factura E.</a>
       <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
       <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
       <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>
       {% if user.perfil.es_propietario %}
       <a href="{% url 'declaracion_ica' %}" class="{% if request.resolver_match.url_name == 'declaracion_ica' %}activo{% endif %}" style="background:rgba(0,168,89,0.2); border:1px solid #10b981; color:#a7f3d0;">🏛️ ICA Tunja</a>
+      <a href="{% url 'exogena_dian' %}" class="{% if request.resolver_match.url_name == 'exogena_dian' %}activo{% endif %}" style="border:1px solid #38bdf8; color:#38bdf8;">📊 Exógena 1007</a>
       <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
       <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
       <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>

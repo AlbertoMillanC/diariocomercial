@@ -40,6 +40,13 @@ urlpatterns = [
     # Tributario ICA Tunja (Acuerdo 0032/2020)
     path("tributario/ica/", views.declaracion_sugerida_ica_view, name="declaracion_ica"),
     path("tributario/ica/exportar/", views.exportar_declaracion_ica, name="exportar_ica"),
+    # Clientes & Facturación Electrónica DIAN
+    path("clientes/", views.clientes_lista, name="clientes_lista"),
+    path("clientes/nuevo/", views.cliente_crear, name="cliente_crear"),
+    path("api/clientes/crear-rapido/", views.api_cliente_crear_rapido, name="api_cliente_crear_rapido"),
+    # Información Exógena DIAN Formato 1007 (Ingresos)
+    path("tributario/exogena/", views.exogena_dian_view, name="exogena_dian"),
+    path("tributario/exogena/exportar-excel/", views.exogena_dian_exportar_excel, name="exogena_dian_exportar_excel"),
     # Super-Admin Dashboard SaaS & Soporte a Tiendas
     path("superadmin/", views.superadmin_dashboard, name="superadmin_dashboard"),
     path("superadmin/establecimiento/<int:pk>/toggle-estado/", views.superadmin_toggle_estado, name="superadmin_toggle_estado"),
