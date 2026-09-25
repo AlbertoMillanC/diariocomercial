@@ -222,3 +222,57 @@ def preparar_paquete_omnicanal_venta(
         "pdf_caption": caption_pdf,
         "whatsapp_fields": whatsapp_fields,
     }
+
+
+def generar_tarjeta_qr_producto(producto) -> bytes:
+    """
+    Genera una tarjeta visual de cobro instantáneo Bre-B para un producto o servicio específico.
+    Incluye código QR interoperable, precio por unidad/kilo, nombre y categoría.
+    """
+    est = producto.establecimiento
+    monto = producto.precio_kilo
+    referencia = f"PROD-{producto.pk}-{producto.codigo_barras or 'ITEM'}"
+    return generar_imagen_qr_bre_b(
+        monto=monto,
+        establecimiento=est,
+        referencia=referencia,
+    )
+
+
+def generar_pdf_etiqueta_barras(producto) -> bytes:
+    """
+    Genera una etiqueta de código de barras profesional para rollo térmico estándar (58mm x 40mm)
+    usada por impresoras POS o etiquetadoras de mostrador (Zebra, Xprinter, etc.).
+    """
+    from reportlab.lib.pagesizes import mm
+    from reportlab.graphics.barcode import code128
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+    est = producto.establecimiento
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(29 * mm, 35 * mm, est.nombre[:30].upper())
+
+    c.setFont("Helvetica", 7.5)
+    c.drawCentredString(29 * mm, 31.5 * mm, producto.nombre[:32])
+
+    c.setFont("Helvetica-Bold", 9.5)
+    unidad_str = producto.unidad_medida.upper()
+    if producto.es_servicio:
+        precio_str = f"SERVICIO: ${producto.precio_kilo:,.0f} COP".replace(",", ".")
+    else:
+        precio_str = f"${producto.precio_kilo:,.0f} COP / {unidad_str}".replace(",", ".")
+    c.drawCentredString(29 * mm, 27 * mm, precio_str)
+
+    # Código de barras (Code128)
+    codigo_val = producto.codigo_barras or f"DC{producto.pk:06d}"
+    try:
+        bc = code128.Code128(codigo_val, barHeight=11 * mm, barWidth=0.35 * mm, humanReadable=True)
+        bc.drawOn(c, 6 * mm, 6 * mm)
+    except Exception:
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(29 * mm, 12 * mm, f"* {codigo_val} *")
+
+    c.save()
+    return buf.getvalue()

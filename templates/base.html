@@ -41,6 +41,7 @@
       <a href="{% url 'compra_nueva' %}" class="{% if request.resolver_match.url_name == 'compra_nueva' %}activo{% endif %}">Compras</a>
       <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
       <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
+      <a href="{% url 'pagos_electronicos' %}" class="{% if request.resolver_match.url_name == 'pagos_electronicos' %}activo{% endif %}" style="color:#38bdf8;">💳 Pagos Electrónicos</a>
       <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
       <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
       <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
@@ -189,19 +191,91 @@ class MotivoVentaForm(forms.ModelForm):
 class ProductoForm(forms.ModelForm):
     class Meta:
         model = Producto
-        fields = ["categoria", "nombre", "stock_kilos", "precio_kilo", "estado"]
+        fields = [
+            "codigo_barras",
+            "nombre",
+            "categoria",
+            "es_servicio",
+            "unidad_medida",
+            "costo_unitario",
+            "stock_kilos",
+            "precio_kilo",
+            "estado",
+        ]
         labels = {
+            "codigo_barras": "Código de Barras / SKU / EAN-13",
+            "nombre": "Nombre del Producto o Servicio",
             "categoria": "Categoría",
-            "nombre": "Nombre del Producto / Corte",
-            "stock_kilos": "Existencias en Kilos (Kg)",
-            "precio_kilo": "Precio por Kilo ($ COP)",
+            "es_servicio": "¿Es un servicio / mano de obra? (Sin stock físico)",
+            "unidad_medida": "Unidad de Medida",
+            "costo_unitario": "Costo de Compra Proveedor ($ COP)",
+            "stock_kilos": "Existencias Iniciales (Kg o Und)",
+            "precio_kilo": "Precio de Venta al Público ($ COP)",
             "estado": "Estado",
         }
         widgets = {
-            "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res"}),
+            "codigo_barras": forms.TextInput(attrs={"placeholder": "Ej. 7701234567890 (o escanear con pistola USB)"}),
+            "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res, Arroz Diana 1kg, Servicio de Afilado"}),
             "stock_kilos": forms.NumberInput(attrs={"step": "0.1", "min": "0"}),
             "precio_kilo": forms.NumberInput(attrs={"step": "100", "min": "0"}),
+            "costo_unitario": forms.NumberInput(attrs={"step": "100", "min": "0"}),
+            "unidad_medida": forms.TextInput(attrs={"placeholder": "kg, lb, und, servicio"}),
         }
+
+
+class EntradaStockForm(forms.Form):
+    """Formulario seguro para que dependientes y cajeros SOLO puedan agregar existencias (+)."""
+    producto_id = forms.IntegerField(widget=forms.HiddenInput())
+    cantidad = forms.DecimalField(
+        min_value=Decimal("0.05"),
+        max_digits=10,
+        decimal_places=3,
+        label="Cantidad a Ingresar / Surtir (+)",
+        help_text="Solo se permiten valores positivos para sumar al inventario.",
+        widget=forms.NumberInput(attrs={"step": "0.1", "placeholder": "Ej. 10.5"}),
+    )
+    nota_remision = forms.CharField(
+        required=False,
+        max_length=120,
+        label="N° Remisión o Nota Proveedor",
+        widget=forms.TextInput(attrs={"placeholder": "Ej. Factura 4529 Distribuidora"}),
+    )
+
+
+class ImportarExcelPedidoForm(forms.Form):
+    """Formulario para cargar pedidos e inventario masivo mediante archivo Excel (.xlsx)."""
+    archivo_excel = forms.FileField(
+        label="Seleccionar Archivo de Pedido Excel (.xlsx)",
+        help_text="Suba la plantilla estándar con los productos recibidos.",
+    )
+    registrar_compra = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="¿Registrar como Compra / Egreso del Día?",
+        help_text="Si está marcado y el archivo incluye costos, crea la compra automáticamente.",
+    )
+    proveedor = forms.CharField(
+        required=False,
+        max_length=120,
+        initial="Proveedor de Pedido",
+        label="Nombre del Proveedor (opcional)",
+        widget=forms.TextInput(attrs={"placeholder": "Ej. Frigorífico Guadalupe, Corabastos"}),
+    )
+
+    def clean_archivo_excel(self):
+        f = self.cleaned_data["archivo_excel"]
+        if not f.name.endswith((".xlsx", ".xlsm")):
+            raise forms.ValidationError("El archivo debe tener formato Excel (.xlsx).")
+        return f
+
+
+class ConciliarPagoForm(forms.Form):
+    """Formulario para conciliar transferencias Nequi/Daviplata/Bancos contra extracto."""
+    comprobante_bancario = forms.CharField(
+        max_length=100,
+        label="N° Comprobante / Aprobación Bancaria",
+        widget=forms.TextInput(attrs={"placeholder": "Ej. Aprobación M128938 o Extracto Mes"}),
+    )
 
 
 class ItemPedidoForm(forms.ModelForm):

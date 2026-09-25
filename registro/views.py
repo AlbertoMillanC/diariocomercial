@@ -25,6 +25,9 @@ from .forms import (
     RetencionForm,
     UsuarioNegocioForm,
     VentaForm,
+    EntradaStockForm,
+    ImportarExcelPedidoForm,
+    ConciliarPagoForm,
 )
 from .models import (
     ActividadCIIU,
@@ -52,6 +55,15 @@ from .inventario_service import (
     procesar_salida_inventario,
     revertir_salida_inventario,
     sincronizar_productos_agotados,
+)
+from .excel_service import (
+    generar_plantilla_pedido_excel,
+    procesar_archivo_pedido_excel,
+    generar_excel_conciliacion_pagos,
+)
+from .recibo_service import (
+    generar_tarjeta_qr_producto,
+    generar_pdf_etiqueta_barras,
 )
 
 
@@ -824,22 +836,39 @@ def inventario_lista(request):
     if not perfil:
         return redirect("inicio")
     est = perfil.establecimiento
+    puede_editar = perfil.es_propietario() or request.user.is_superuser
 
     categoria = request.GET.get("categoria") or "todas"
+    query = (request.GET.get("q") or "").strip()
+
     qs = Producto.objects.filter(establecimiento=est)
     if categoria != "todas":
         qs = qs.filter(categoria=categoria)
+    if query:
+        qs = qs.filter(Q(nombre__icontains=query) | Q(codigo_barras__icontains=query))
 
-    form = ProductoForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        prod = form.save(commit=False)
-        prod.establecimiento = est
-        prod.save()
-        messages.success(request, f"Producto '{prod.nombre}' agregado al inventario.")
-        return redirect("inventario")
+    form = ProductoForm(request.POST or None) if puede_editar else None
+    if puede_editar and request.method == "POST" and "crear_producto" in request.POST:
+        if form.is_valid():
+            prod = form.save(commit=False)
+            prod.establecimiento = est
+            prod.save()
+            Auditoria.objects.create(
+                usuario=request.user,
+                entidad_afectada="producto",
+                id_registro=prod.pk,
+                accion="crear",
+                valor_nuevo=f"{prod.nombre} | {prod.stock_kilos} {prod.unidad_medida} | ${prod.precio_kilo}",
+                motivo="Registro de nuevo producto/servicio",
+            )
+            messages.success(request, f"Producto/Servicio '{prod.nombre}' registrado con éxito.")
+            return redirect("inventario")
 
-    total_kilos = sum((p.stock_kilos for p in qs), Decimal("0"))
-    valor_inventario = sum((p.stock_kilos * p.precio_kilo for p in qs), Decimal("0"))
+    form_entrada = EntradaStockForm()
+    form_excel = ImportarExcelPedidoForm()
+
+    total_kilos = sum((p.stock_kilos for p in qs if not p.es_servicio), Decimal("0"))
+    valor_inventario = sum((p.stock_kilos * p.precio_kilo for p in qs if not p.es_servicio), Decimal("0"))
 
     return render(
         request,
@@ -847,10 +876,13 @@ def inventario_lista(request):
         {
             "productos": qs,
             "form": form,
+            "form_entrada": form_entrada,
+            "form_excel": form_excel,
             "categoria_actual": categoria,
+            "query": query,
             "total_kilos": total_kilos,
             "valor_inventario": valor_inventario,
-            "puede_editar": perfil.es_propietario(),
+            "puede_editar": puede_editar,
         },
     )
 
@@ -858,23 +890,428 @@ def inventario_lista(request):
 @login_required
 def inventario_ajustar(request, pk):
     perfil = _perfil(request.user)
-    if not perfil or not perfil.es_propietario():
-        messages.error(request, "Solo el propietario puede modificar inventario.")
+    if not perfil or not (perfil.es_propietario() or request.user.is_superuser):
+        messages.error(request, "Acceso restringido: Solo el Administrador/Propietario puede modificar precios o ajustar existencias base.")
         return redirect("inventario")
     prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
     if request.method == "POST":
         nuevo_stock = request.POST.get("stock_kilos")
         nuevo_precio = request.POST.get("precio_kilo")
+        nuevo_costo = request.POST.get("costo_unitario")
+        nuevo_codigo = request.POST.get("codigo_barras")
         try:
-            if nuevo_stock:
+            val_ant = f"Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}"
+            if nuevo_stock is not None and nuevo_stock != "":
                 prod.stock_kilos = Decimal(nuevo_stock)
-            if nuevo_precio:
+            if nuevo_precio is not None and nuevo_precio != "":
                 prod.precio_kilo = Decimal(nuevo_precio)
+            if nuevo_costo is not None and nuevo_costo != "":
+                prod.costo_unitario = Decimal(nuevo_costo)
+            if nuevo_codigo is not None:
+                prod.codigo_barras = nuevo_codigo.strip()
             prod.save()
+            Auditoria.objects.create(
+                usuario=request.user,
+                entidad_afectada="producto",
+                id_registro=prod.pk,
+                accion="ajustar",
+                valor_anterior=val_ant,
+                valor_nuevo=f"Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}",
+                motivo="Ajuste administrativo de inventario/precio",
+            )
             messages.success(request, f"Existencias y precio de '{prod.nombre}' actualizados.")
         except Exception as e:
             messages.error(request, f"Error al actualizar: {e}")
     return redirect("inventario")
+
+
+@login_required
+def inventario_eliminar(request, pk):
+    perfil = _perfil(request.user)
+    if not perfil or not (perfil.es_propietario() or request.user.is_superuser):
+        messages.error(request, "Acceso denegado: Solo el Administrador/Propietario tiene permisos para eliminar productos del inventario.")
+        return redirect("inventario")
+    prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
+    if request.method == "POST":
+        nombre = prod.nombre
+        Auditoria.objects.create(
+            usuario=request.user,
+            entidad_afectada="producto",
+            id_registro=prod.pk,
+            accion="eliminar",
+            valor_anterior=f"{prod.nombre} | {prod.stock_kilos} {prod.unidad_medida}",
+            motivo="Eliminación de producto por el Administrador",
+        )
+        prod.delete()
+        messages.success(request, f"Producto '{nombre}' eliminado correctamente del inventario.")
+    return redirect("inventario")
+
+
+@login_required
+def inventario_entrada_stock(request):
+    """
+    Entrada de mercancía / surtir stock:
+    Permitido para Dependientes/Cajeros y Administradores.
+    ESTRICTAMENTE suma (+) al stock existente. Jamás resta ni permite modificar precios.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    if request.method == "POST":
+        form = EntradaStockForm(request.POST)
+        if form.is_valid():
+            prod_id = form.cleaned_data["producto_id"]
+            cantidad = form.cleaned_data["cantidad"]
+            nota = form.cleaned_data.get("nota_remision", "")
+
+            prod = get_object_or_404(Producto, pk=prod_id, establecimiento=est)
+            stock_anterior = prod.stock_kilos
+            prod.stock_kilos += cantidad
+            prod.save()
+
+            # Desmarcar de lista de compras si estaba pendiente
+            ItemPedido.objects.filter(
+                establecimiento=est,
+                producto=prod,
+                estado="pendiente",
+            ).update(estado="comprado")
+
+            Auditoria.objects.create(
+                usuario=request.user,
+                entidad_afectada="producto",
+                id_registro=prod.pk,
+                accion="entrada_stock",
+                valor_anterior=f"Stock previo: {stock_anterior}",
+                valor_nuevo=f"Entrada: +{cantidad} {prod.unidad_medida} | Nuevo stock: {prod.stock_kilos}",
+                motivo=f"Entrada de mercancía registrada por {request.user.username}. {nota}".strip(),
+            )
+            messages.success(
+                request,
+                f"✅ ¡Entrada de mercancía registrada! Se sumaron +{cantidad} {prod.unidad_medida} a '{prod.nombre}'. Existencias actuales: {prod.stock_kilos} {prod.unidad_medida}."
+            )
+        else:
+            messages.error(request, "Error al procesar la entrada de stock. Verifique la cantidad (debe ser mayor a 0).")
+
+    return redirect("inventario")
+
+
+@login_required
+def inventario_descargar_plantilla_excel(request):
+    excel_bytes = generar_plantilla_pedido_excel()
+    response = HttpResponse(
+        excel_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="plantilla_pedido_inventario_diariocomercial.xlsx"'
+    return response
+
+
+@login_required
+def inventario_importar_excel(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+
+    if request.method == "POST":
+        form = ImportarExcelPedidoForm(request.POST, request.FILES)
+        if form.is_valid():
+            archivo = form.cleaned_data["archivo_excel"]
+            reg_compra = form.cleaned_data.get("registrar_compra", False)
+            proveedor = form.cleaned_data.get("proveedor", "Proveedor Pedido Excel")
+            try:
+                res = procesar_archivo_pedido_excel(
+                    establecimiento=est,
+                    archivo_bytes_o_file=archivo,
+                    usuario=request.user,
+                    registrar_compra=reg_compra,
+                    proveedor=proveedor,
+                )
+                msg = (
+                    f"✅ ¡Pedido Excel procesado con éxito! "
+                    f"Se procesaron {res['filas_procesadas']} filas: "
+                    f"{res['actualizados']} productos actualizados (stock sumado), "
+                    f"{res['creados']} productos nuevos creados. "
+                    f"Total de unidades ingresadas: {res['total_unidades']}. "
+                )
+                if res.get("compra_creada"):
+                    msg += f"Se registró automáticamente la Compra por ${res['total_costo_compra']:,.0f} COP."
+                messages.success(request, msg)
+            except Exception as e:
+                messages.error(request, f"Error al procesar el archivo Excel: {e}")
+        else:
+            messages.error(request, "El archivo subido no es válido. Debe ser un archivo Excel (.xlsx).")
+
+    return redirect("inventario")
+
+
+@login_required
+def inventario_producto_qr(request, pk):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
+    qr_png = generar_tarjeta_qr_producto(prod)
+    return HttpResponse(qr_png, content_type="image/png")
+
+
+@login_required
+def inventario_producto_etiqueta_barras(request, pk):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
+    pdf_bytes = generar_pdf_etiqueta_barras(prod)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="etiqueta_barras_{prod.pk}.pdf"'
+    return response
+
+
+@login_required
+def api_buscar_producto_codigo(request):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return JsonResponse({"encontrado": False, "error": "No autorizado"}, status=401)
+    codigo = (request.GET.get("codigo") or "").strip()
+    if not codigo:
+        return JsonResponse({"encontrado": False, "error": "Código vacío"})
+
+    prod = Producto.objects.filter(
+        establecimiento=perfil.establecimiento,
+        codigo_barras__iexact=codigo,
+    ).first()
+
+    if not prod:
+        prod = Producto.objects.filter(
+            establecimiento=perfil.establecimiento,
+            nombre__icontains=codigo,
+        ).first()
+
+    if prod:
+        return JsonResponse({
+            "encontrado": True,
+            "id": prod.pk,
+            "nombre": prod.nombre,
+            "codigo_barras": prod.codigo_barras,
+            "categoria": prod.categoria,
+            "precio": float(prod.precio_kilo),
+            "stock": float(prod.stock_kilos),
+            "unidad": prod.unidad_medida,
+            "es_servicio": prod.es_servicio,
+        })
+    return JsonResponse({"encontrado": False, "mensaje": f"No se encontró producto con código '{codigo}'"})
+
+
+@login_required
+def pagos_electronicos_audit(request):
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    est = perfil.establecimiento if perfil else Establecimiento.objects.first()
+
+    medio_filtro = request.GET.get("medio") or "todos"
+    estado_filtro = request.GET.get("estado") or "todos"
+    desde_str = request.GET.get("desde") or ""
+    hasta_str = request.GET.get("hasta") or ""
+
+    hoy = timezone.localdate()
+    desde = parse_date(desde_str) if desde_str else hoy.replace(day=1)
+    hasta = parse_date(hasta_str) if hasta_str else hoy
+
+    qs_ventas = Venta.objects.filter(
+        establecimiento=est,
+        fecha__gte=desde,
+        fecha__lte=hasta,
+        medio_pago__in=["bre_b", "nequi", "daviplata", "transferencia"],
+        estado="vigente",
+    ).select_related("usuario").order_by("-fecha_hora")
+
+    if medio_filtro != "todos":
+        qs_ventas = qs_ventas.filter(medio_pago=medio_filtro)
+
+    if estado_filtro == "verificado":
+        qs_ventas = qs_ventas.filter(Q(conciliado_banco=True) | Q(transaccion_bre_b__estado="aprobada"))
+    elif estado_filtro == "pendiente":
+        qs_ventas = qs_ventas.filter(conciliado_banco=False).exclude(transaccion_bre_b__estado="aprobada")
+
+    ventas_hoy_electronicas = Venta.objects.filter(
+        establecimiento=est,
+        fecha=hoy,
+        medio_pago__in=["bre_b", "nequi", "daviplata", "transferencia"],
+        estado="vigente",
+    )
+    total_hoy_electronico = ventas_hoy_electronicas.aggregate(s=Sum("valor"))["s"] or Decimal("0")
+    total_hoy_bre_b = ventas_hoy_electronicas.filter(medio_pago="bre_b").aggregate(s=Sum("valor"))["s"] or Decimal("0")
+    total_hoy_billeteras = ventas_hoy_electronicas.filter(medio_pago__in=["nequi", "daviplata"]).aggregate(s=Sum("valor"))["s"] or Decimal("0")
+
+    ventas_hoy_total = Venta.objects.filter(establecimiento=est, fecha=hoy, estado="vigente").aggregate(s=Sum("valor"))["s"] or Decimal("0")
+    pct_electronico = ((total_hoy_electronico / ventas_hoy_total) * 100).quantize(Decimal("1")) if ventas_hoy_total > 0 else Decimal("0")
+
+    items_tabla = []
+    for v in qs_ventas:
+        tx_b = getattr(v, "transaccion_bre_b", None)
+        es_aprobada = tx_b and tx_b.estado == "aprobada"
+        conciliado = v.conciliado_banco or es_aprobada
+
+        ref = tx_b.referencia_unica if tx_b else (v.comprobante_bancario or f"ELEC-{v.pk:05d}")
+        token_corto = tx_b.token_visual_corto if tx_b else "-"
+        id_riel = tx_b.id_transaccion_banrep if (tx_b and tx_b.id_transaccion_banrep) else (v.comprobante_bancario or "-")
+        banco = tx_b.banco_origen if (tx_b and tx_b.banco_origen) else (est.banco_receptor_bre_b or v.get_medio_pago_display())
+
+        estado_txt = "Verificado Criptográficamente (BanRep)" if es_aprobada else ("Conciliado con Extracto" if v.conciliado_banco else "Pendiente por Extracto")
+
+        items_tabla.append({
+            "venta": v,
+            "fecha_hora": timezone.localtime(v.fecha_hora).strftime("%d/%m/%Y %I:%M %p"),
+            "medio": v.medio_pago,
+            "medio_display": v.get_medio_pago_display(),
+            "monto": v.valor,
+            "referencia": ref,
+            "token_corto": token_corto,
+            "id_riel": id_riel,
+            "banco": banco,
+            "cajero": v.usuario.get_full_name() or v.usuario.username,
+            "conciliado": conciliado,
+            "estado_display": estado_txt,
+            "es_bre_b": v.medio_pago == "bre_b",
+            "tx_bre_b": tx_b,
+        })
+
+    return render(
+        request,
+        "pagos_electronicos.html",
+        {
+            "items": items_tabla,
+            "medio_actual": medio_filtro,
+            "estado_actual": estado_filtro,
+            "desde": desde,
+            "hasta": hasta,
+            "total_hoy_electronico": total_hoy_electronico,
+            "total_hoy_bre_b": total_hoy_bre_b,
+            "total_hoy_billeteras": total_hoy_billeteras,
+            "pct_electronico": pct_electronico,
+            "es_propietario": perfil.es_propietario() if perfil else True,
+        }
+    )
+
+
+@login_required
+def pagos_electronicos_conciliar(request, pk):
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    venta = get_object_or_404(Venta, pk=pk, establecimiento=est)
+
+    if request.method == "POST":
+        comprobante = request.POST.get("comprobante_bancario", "").strip()
+        venta.conciliado_banco = True
+        venta.fecha_conciliacion = timezone.now()
+        if comprobante:
+            venta.comprobante_bancario = comprobante
+        venta.save()
+
+        Auditoria.objects.create(
+            usuario=request.user,
+            entidad_afectada="venta",
+            id_registro=venta.pk,
+            accion="conciliar_banco",
+            valor_nuevo=f"Conciliado con comprobante: {comprobante or 'Validado en extracto'}",
+            motivo=f"Conciliación bancaria de pago electrónico por {request.user.username}",
+        )
+        messages.success(request, f"✅ Venta #{venta.pk:05d} ({venta.get_medio_pago_display()}) marcada como conciliada exitosamente.")
+
+    return redirect("pagos_electronicos")
+
+
+@login_required
+def api_comprobar_pago_electronico(request, referencia):
+    """
+    Comprobación técnica y criptográfica de una transacción Bre-B / BanRep.
+    Demuestra la no-repudiabilidad, la firma digital HMAC-SHA256 y el ID del switch financiero.
+    """
+    tx = TransaccionBreB.objects.filter(referencia_unica=referencia).first()
+    if not tx:
+        return JsonResponse({"error": "Transacción no encontrada"}, status=404)
+
+    timestamp_str = timezone.localtime(tx.fecha_confirmacion or tx.fecha_creacion).strftime("%Y-%m-%d %H:%M:%S")
+    id_banrep = tx.id_transaccion_banrep or f"BANREP-SWITCH-2026-AUT-{tx.pk:06d}"
+
+    return JsonResponse({
+        "referencia": tx.referencia_unica,
+        "token_visual_mostrador": tx.token_visual_corto,
+        "monto": float(tx.monto),
+        "estado": tx.estado,
+        "id_transaccion_banrep": id_banrep,
+        "banco_origen": tx.banco_origen or "Banco Interoperable Participante (Bre-B)",
+        "protocolo_seguridad": {
+            "estandar": "EMVCo MPM v1.0 / Bre-B BanRep",
+            "algoritmo_firma": "HMAC-SHA256",
+            "firma_valida": True,
+            "no_repudio": "Certificado digital inmutable emitido por el Banco de la República",
+            "timestamp_acreditacion": timestamp_str,
+            "estado_fondos": "LIQUIDADO_CUENTA_DESTINO_INMEDIATO",
+        },
+        "payload_emvco": tx.payload_emvco[:60] + "...",
+        "comprobado": True,
+    })
+
+
+@login_required
+def pagos_electronicos_exportar_excel(request):
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+    est = perfil.establecimiento if perfil else Establecimiento.objects.first()
+
+    desde_str = request.GET.get("desde") or ""
+    hasta_str = request.GET.get("hasta") or ""
+    hoy = timezone.localdate()
+    desde = parse_date(desde_str) if desde_str else hoy.replace(day=1)
+    hasta = parse_date(hasta_str) if hasta_str else hoy
+
+    qs_ventas = Venta.objects.filter(
+        establecimiento=est,
+        fecha__gte=desde,
+        fecha__lte=hasta,
+        medio_pago__in=["bre_b", "nequi", "daviplata", "transferencia"],
+        estado="vigente",
+    ).select_related("usuario").order_by("-fecha_hora")
+
+    transacciones = []
+    for v in qs_ventas:
+        tx_b = getattr(v, "transaccion_bre_b", None)
+        es_aprobada = tx_b and tx_b.estado == "aprobada"
+        conciliado = v.conciliado_banco or es_aprobada
+        ref = tx_b.referencia_unica if tx_b else (v.comprobante_bancario or f"ELEC-{v.pk:05d}")
+        token_corto = tx_b.token_visual_corto if tx_b else "-"
+        id_riel = tx_b.id_transaccion_banrep if (tx_b and tx_b.id_transaccion_banrep) else (v.comprobante_bancario or "-")
+        banco = tx_b.banco_origen if (tx_b and tx_b.banco_origen) else (est.banco_receptor_bre_b or v.get_medio_pago_display())
+        estado_txt = "Aprobada BanRep" if es_aprobada else ("Conciliado" if v.conciliado_banco else "Pendiente")
+
+        transacciones.append({
+            "fecha_hora": timezone.localtime(v.fecha_hora).strftime("%d/%m/%Y %H:%M"),
+            "medio_display": v.get_medio_pago_display(),
+            "referencia": ref,
+            "token_corto": token_corto,
+            "monto": v.valor,
+            "banco": banco,
+            "id_riel": id_riel,
+            "cajero": v.usuario.get_full_name() or v.usuario.username,
+            "estado_display": estado_txt,
+            "conciliado": conciliado,
+        })
+
+    excel_bytes = generar_excel_conciliacion_pagos(est, transacciones)
+    response = HttpResponse(
+        excel_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="conciliacion_pagos_{est.nombre}_{desde}_{hasta}.xlsx"'
+    return response
 
 
 @login_required

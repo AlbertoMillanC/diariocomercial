@@ -1,111 +1,414 @@
 {% extends "base.html" %}
 {% load dinero %}
-{% block title %}Inventario y Existencias{% endblock %}
+{% block title %}Inventario, Códigos de Barras y Pedidos Excel - DiarioComercial{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
   <div>
-    <h2 style="margin:0;">Inventario y Existencias</h2>
-    <p class="lead" style="margin:4px 0 0 0;">Control de existencias físicas y precios por Kilo, Libra y Gramo.</p>
+    <h2 style="margin:0; font-size:22px; display:flex; align-items:center; gap:8px;">
+      📦 Inventario, Códigos de Barras y Pedidos Excel
+    </h2>
+    <p class="lead" style="margin:4px 0 0 0; color:var(--muted); font-size:13px;">
+      Control de existencias físicas, servicios con QR Bre-B, etiquetas de códigos de barras e importación masiva por Excel.
+    </p>
   </div>
-  <div>
-    <a href="{% url 'pedidos' %}" class="btn btn-primary" style="background:#b91c1c; border-color:#b91c1c; color:#fff; text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:bold;">🛒 Lista de Compras / Faltantes</a>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="{% url 'inventario_descargar_plantilla_excel' %}" class="btn" style="background:#065f46; color:#fff; text-decoration:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px;" title="Descargar formato estándar compatible con sistemas POS y retail">
+      📥 Descargar Plantilla Excel (.xlsx)
+    </a>
+    <button onclick="document.getElementById('modal-excel').style.display='flex'" class="btn" style="background:#1d4ed8; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer;" title="Subir archivo Excel para sumar pedido al stock">
+      📤 Cargar Pedido Excel
+    </button>
+    <a href="{% url 'pedidos' %}" class="btn" style="background:#b91c1c; color:#fff; text-decoration:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px;">
+      🛒 Lista de Compras / Faltantes
+    </a>
   </div>
 </div>
 
-<div class="cards">
-  <div class="card"><span>Total en Existencias</span><strong>{{ total_kilos|floatformat:1 }} Kg</strong></div>
-  <div class="card"><span>Total en Libras</span><strong>{{ total_kilos|floatformat:1 }} x 2 lb</strong></div>
-  <div class="card"><span>Valor del Inventario</span><strong>{{ valor_inventario|pesos }}</strong></div>
-  <div class="card"><span>Productos Registrados</span><strong>{{ productos|length }}</strong></div>
+<!-- SEGURIDAD Y PERMISOS BANNER -->
+<div style="background:{% if puede_editar %}#0f172a{% else %}#fffbeb{% endif %}; border:1px solid {% if puede_editar %}#38bdf8{% else %}#f59e0b{% endif %}; border-radius:8px; padding:10px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+  <div style="display:flex; align-items:center; gap:10px;">
+    {% if puede_editar %}
+      <span style="font-size:18px;">👑</span>
+      <div>
+        <strong style="color:#38bdf8; font-size:13px;">Modo Administrador / Propietario:</strong>
+        <span style="color:#cbd5e1; font-size:12px;"> Control total activado: Puedes crear productos/servicios, modificar precios, ajustar existencias y eliminar productos.</span>
+      </div>
+    {% else %}
+      <span style="font-size:18px;">🔒</span>
+      <div>
+        <strong style="color:#b45309; font-size:13px;">Modo Dependiente / Cajero:</strong>
+        <span style="color:#78350f; font-size:12px;"> Seguridad activa: Puedes agregar stock y registrar entradas de mercancía (+). No tienes permiso para modificar precios ni eliminar productos. El stock solo se resta mediante ventas.</span>
+      </div>
+    {% endif %}
+  </div>
+  {% if not puede_editar %}
+  <button onclick="document.getElementById('modal-surtir').style.display='flex'" class="btn" style="background:#10b981; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">
+    ➕ Entrada de Mercancía (+)
+  </button>
+  {% endif %}
 </div>
 
-<form class="filters" method="get" style="margin-top: 16px;">
-  <div>
-    <label>Filtrar por Categoría</label>
-    <select name="categoria" onchange="this.form.submit()">
-      <option value="todas" {% if categoria_actual == 'todas' %}selected{% endif %}>Todas las categorías</option>
-      <option value="carnes" {% if categoria_actual == 'carnes' %}selected{% endif %}>Carnes y Embutidos</option>
-      <option value="abarrotes" {% if categoria_actual == 'abarrotes' %}selected{% endif %}>Víveres y Abarrotes</option>
-      <option value="lacteos" {% if categoria_actual == 'lacteos' %}selected{% endif %}>Lácteos y Huevos</option>
-      <option value="fruver" {% if categoria_actual == 'fruver' %}selected{% endif %}>Frutas y Verduras</option>
-      <option value="bebidas" {% if categoria_actual == 'bebidas' %}selected{% endif %}>Bebidas</option>
-      <option value="aseo" {% if categoria_actual == 'aseo' %}selected{% endif %}>Aseo y Limpieza</option>
-      <option value="otros" {% if categoria_actual == 'otros' %}selected{% endif %}>Otros</option>
-    </select>
+<!-- CARDS RESUMEN -->
+<div class="cards" style="margin-bottom:16px;">
+  <div class="card">
+    <span>Total Existencias Físicas</span>
+    <strong>{{ total_kilos|floatformat:1 }} Kg</strong>
+    <small style="color:var(--muted); font-size:11px;">Equivalente a {{ total_kilos|floatformat:1 }} x 2 lb</small>
   </div>
-  <button class="btn btn-primary" type="submit">Filtrar</button>
-</form>
+  <div class="card">
+    <span>Valor Total del Inventario</span>
+    <strong style="color:#10b981;">{{ valor_inventario|pesos }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Cálculo precio venta al público</small>
+  </div>
+  <div class="card">
+    <span>Productos y Servicios</span>
+    <strong>{{ productos|length }} items</strong>
+    <small style="color:var(--muted); font-size:11px;">En el catálogo comercial</small>
+  </div>
+  <div class="card">
+    <span>Lector de Código de Barras</span>
+    <strong style="color:#38bdf8;">USB / Óptico Listo</strong>
+    <small style="color:var(--muted); font-size:11px;">EAN-13, SKU, Code128</small>
+  </div>
+</div>
 
+<!-- FILTROS Y BUSCADOR CON CÓDIGO DE BARRAS -->
+<div class="panel" style="padding:14px; margin-bottom:16px; background:var(--card-bg, #ffffff);">
+  <form method="get" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
+    <div style="flex:1; min-width:260px; position:relative;">
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">🔍 ESCANEAR CÓDIGO DE BARRAS O BUSCAR PRODUCTO</label>
+      <input type="text" name="q" id="buscador-codigo" value="{{ query }}" placeholder="Pase la pistola sobre el código o escriba nombre..." style="width:100%; padding:8px 12px; border:2px solid #38bdf8; border-radius:6px; font-size:14px;" autofocus>
+    </div>
+    <div style="min-width:180px;">
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">CATEGORÍA</label>
+      <select name="categoria" onchange="this.form.submit()" style="width:100%; padding:8px; border-radius:6px;">
+        <option value="todas" {% if categoria_actual == 'todas' %}selected{% endif %}>Todas las categorías</option>
+        <option value="carnes" {% if categoria_actual == 'carnes' %}selected{% endif %}>Carnes y Embutidos</option>
+        <option value="abarrotes" {% if categoria_actual == 'abarrotes' %}selected{% endif %}>Víveres y Abarrotes</option>
+        <option value="lacteos" {% if categoria_actual == 'lacteos' %}selected{% endif %}>Lácteos y Huevos</option>
+        <option value="fruver" {% if categoria_actual == 'fruver' %}selected{% endif %}>Frutas y Verduras</option>
+        <option value="bebidas" {% if categoria_actual == 'bebidas' %}selected{% endif %}>Bebidas</option>
+        <option value="aseo" {% if categoria_actual == 'aseo' %}selected{% endif %}>Aseo y Limpieza</option>
+        <option value="servicios" {% if categoria_actual == 'servicios' %}selected{% endif %}>Servicios y Mano de Obra</option>
+        <option value="otros" {% if categoria_actual == 'otros' %}selected{% endif %}>Otros</option>
+      </select>
+    </div>
+    <div style="align-self:flex-end;">
+      <button class="btn btn-primary" type="submit" style="padding:9px 18px;">Filtrar</button>
+      {% if query or categoria_actual != 'todas' %}
+        <a href="{% url 'inventario' %}" class="btn btn-ghost" style="padding:9px 12px; text-decoration:none;">Limpiar</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- TABLA DE INVENTARIO -->
 <div class="panel" style="margin-bottom: 24px;">
   <div class="tabla-wrap">
     <table>
       <thead>
         <tr>
-          <th>Categoría</th>
-          <th>Producto / Corte</th>
-          <th>Stock (Kilos)</th>
-          <th>Stock (Libras)</th>
-          <th>Precio / Kilo</th>
-          <th>Precio / Libra</th>
-          <th>Precio / Gramo</th>
-          {% if puede_editar %}<th>Ajuste Rápido</th>{% endif %}
+          <th>Código de Barras</th>
+          <th>Tipo / Categoría</th>
+          <th>Producto / Servicio</th>
+          <th>Stock Actual</th>
+          {% if puede_editar %}<th>Costo Compra</th>{% endif %}
+          <th>Precio de Venta</th>
+          <th>Cobro QR Bre-B</th>
+          <th>Etiqueta</th>
+          <th>{% if puede_editar %}Gestión Administrador{% else %}Entrada Mercancía{% endif %}</th>
         </tr>
       </thead>
       <tbody>
         {% for p in productos %}
-        <tr>
-          <td><span class="tag">{{ p.get_categoria_display }}</span></td>
-          <td><strong>{{ p.nombre }}</strong></td>
-          <td>{{ p.stock_kilos }} Kg</td>
-          <td>{{ p.stock_libras }} lb</td>
-          <td><strong>${{ p.precio_kilo|floatformat:0 }}</strong></td>
-          <td>${{ p.precio_libra|floatformat:0 }}</td>
-          <td>${{ p.precio_gramo }}</td>
-          {% if puede_editar %}
+        <tr id="fila-prod-{{ p.pk }}" style="{% if p.stock_kilos <= 0 and not p.es_servicio %}background:rgba(239, 68, 68, 0.05);{% endif %}">
           <td>
-            <form method="post" action="{% url 'inventario_ajustar' p.pk %}" style="display:flex; gap:6px; align-items:center;">
-              {% csrf_token %}
-              <input type="number" step="0.1" name="stock_kilos" value="{{ p.stock_kilos }}" title="Stock en Kilos" style="width:70px; padding:4px; margin:0;" required>
-              <input type="number" step="100" name="precio_kilo" value="{{ p.precio_kilo|floatformat:0 }}" title="Precio por Kilo" style="width:85px; padding:4px; margin:0;" required>
-              <button class="btn btn-ghost" type="submit" style="padding:4px 8px; font-size:12px;" title="Guardar cambios">💾</button>
-            </form>
+            {% if p.codigo_barras %}
+              <code style="background:#0f172a; color:#38bdf8; padding:3px 6px; border-radius:4px; font-size:12px; font-weight:bold;">{{ p.codigo_barras }}</code>
+            {% else %}
+              <span style="color:var(--muted); font-size:11px; italic;">Sin código</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.es_servicio %}
+              <span class="tag" style="background:#4338ca; color:#e0e7ff;">⚡ Servicio</span>
+            {% else %}
+              <span class="tag">{{ p.get_categoria_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ p.nombre }}</strong>
+            <small style="display:block; color:var(--muted); font-size:11px;">Unidad: {{ p.unidad_medida|upper }}</small>
+          </td>
+          <td>
+            {% if p.es_servicio %}
+              <span style="color:#4338ca; font-size:12px; font-weight:bold;">Inmaterial</span>
+            {% elif p.stock_kilos <= 0 %}
+              <span style="color:#ef4444; font-weight:bold; background:#fee2e2; padding:2px 6px; border-radius:4px;">🚨 Agotado (0 {{ p.unidad_medida }})</span>
+            {% elif p.stock_kilos <= 3 %}
+              <span style="color:#b45309; font-weight:bold; background:#fef3c7; padding:2px 6px; border-radius:4px;">⚠️ {{ p.stock_kilos }} {{ p.unidad_medida }} (Bajo)</span>
+            {% else %}
+              <strong style="color:#10b981;">{{ p.stock_kilos }} {{ p.unidad_medida }}</strong>
+              {% if p.unidad_medida == 'kg' %}
+                <small style="display:block; color:var(--muted); font-size:11px;">{{ p.stock_libras }} lb</small>
+              {% endif %}
+            {% endif %}
+          </td>
+          {% if puede_editar %}
+          <td style="color:var(--muted); font-size:12px;">
+            ${{ p.costo_unitario|floatformat:0 }}
           </td>
           {% endif %}
+          <td>
+            <strong style="font-size:14px; color:#0f172a;">${{ p.precio_kilo|floatformat:0 }}</strong>
+            {% if p.unidad_medida == 'kg' and not p.es_servicio %}
+              <small style="display:block; color:var(--muted); font-size:11px;">Libra: ${{ p.precio_libra|floatformat:0 }}</small>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'inventario_producto_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#065f46; border:1px solid #10b981;" title="Ver tarjeta QR Bre-B para cobrar este producto">
+              📱 QR Bre-B
+            </a>
+          </td>
+          <td>
+            <a href="{% url 'inventario_producto_etiqueta_barras' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#1d4ed8; border:1px solid #93c5fd;" title="Imprimir etiqueta térmica 58mm x 40mm">
+              🏷️ Etiqueta
+            </a>
+          </td>
+          <td>
+            {% if puede_editar %}
+              <!-- FORMULARIO DE AJUSTE EXCLUSIVO ADMINISTRADOR -->
+              <form method="post" action="{% url 'inventario_ajustar' p.pk %}" style="display:inline-flex; gap:4px; align-items:center; margin:0;">
+                {% csrf_token %}
+                <input type="number" step="0.1" name="stock_kilos" value="{{ p.stock_kilos }}" title="Ajustar Stock" style="width:65px; padding:3px; margin:0; font-size:12px;" required>
+                <input type="number" step="100" name="precio_kilo" value="{{ p.precio_kilo|floatformat:0 }}" title="Ajustar Precio Venta" style="width:75px; padding:3px; margin:0; font-size:12px;" required>
+                <button class="btn btn-ghost" type="submit" style="padding:3px 6px; font-size:11px;" title="Guardar cambios">💾</button>
+              </form>
+              <!-- BOTÓN ELIMINAR EXCLUSIVO ADMINISTRADOR -->
+              <form method="post" action="{% url 'inventario_eliminar' p.pk %}" style="display:inline; margin:0;" onsubmit="return confirm('¿Está seguro de eliminar \'{{ p.nombre|escapejs }}\' del inventario? Esta acción no se puede deshacer.');">
+                {% csrf_token %}
+                <button type="submit" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:13px; padding:2px 4px;" title="Eliminar Producto (Solo Administrador)">🗑️</button>
+              </form>
+            {% else %}
+              <!-- BOTÓN SUMAR STOCK EXCLUSIVO DEPENDIENTES -->
+              <button onclick="abrirSurtir('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.stock_kilos }}', '{{ p.unidad_medida }}')" class="btn" style="background:#10b981; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:4px; cursor:pointer;">
+                ➕ Surtir (+)
+              </button>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8">No hay productos registrados en esta categoría.</td></tr>
+        <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--muted);">No se encontraron productos o servicios registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- SECCIÓN INFERIOR SEGÚN ROL -->
 {% if puede_editar %}
-<div class="panel" style="max-width: 600px;">
-  <h3>➕ Agregar Nuevo Producto o Corte</h3>
+<div class="panel" style="max-width: 750px; margin-top:20px; border-top:3px solid #065f46;">
+  <h3 style="margin-top:0; color:#065f46; display:flex; align-items:center; gap:8px;">
+    ➕ Registrar Nuevo Producto o Servicio (con Código de Barras & QR)
+  </h3>
+  <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+    Como Administrador, puedes crear nuevos productos tangibles o servicios (fletes, afilados, asesorías). Se generará automáticamente su código de barras y tarjeta QR Bre-B.
+  </p>
   <form method="post">
     {% csrf_token %}
-    <div>
-      <label>{{ form.categoria.label }}</label>
-      {{ form.categoria }}
-    </div>
-    <div>
-      <label>{{ form.nombre.label }}</label>
-      {{ form.nombre }}
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+    <input type="hidden" name="crear_producto" value="1">
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
       <div>
-        <label>{{ form.stock_kilos.label }}</label>
-        {{ form.stock_kilos }}
+        <label style="font-weight:bold; font-size:12px;">{{ form.nombre.label }} *</label>
+        {{ form.nombre }}
       </div>
       <div>
-        <label>{{ form.precio_kilo.label }}</label>
+        <label style="font-weight:bold; font-size:12px;">{{ form.codigo_barras.label }}</label>
+        {{ form.codigo_barras }}
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:10px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.categoria.label }}</label>
+        {{ form.categoria }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.unidad_medida.label }}</label>
+        {{ form.unidad_medida }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.es_servicio.label }}</label>
+        {{ form.es_servicio }}
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:10px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.costo_unitario.label }}</label>
+        {{ form.costo_unitario }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.precio_kilo.label }} *</label>
         {{ form.precio_kilo }}
       </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">{{ form.stock_kilos.label }}</label>
+        {{ form.stock_kilos }}
+      </div>
     </div>
-    <button class="btn btn-primary" type="submit" style="margin-top:10px;">Registrar Producto</button>
+
+    <button class="btn btn-primary" type="submit" style="padding:10px 20px; font-weight:bold; background:#065f46; border-color:#065f46;">
+      💾 Guardar Producto / Servicio en Inventario
+    </button>
+  </form>
+</div>
+{% else %}
+<div class="panel" style="max-width: 600px; margin-top:20px; background:#f8fafc; border:1px solid #cbd5e1;">
+  <h3 style="margin-top:0; color:#0f172a;">📥 Entrada Rápida de Mercancía / Surtir Stock</h3>
+  <p style="font-size:12px; color:var(--muted);">
+    Ingresa las cantidades de los productos que acabas de recibir de los proveedores. Estas cantidades se SUMARÁN automáticamente al stock.
+  </p>
+  <form method="post" action="{% url 'inventario_entrada_stock' %}">
+    {% csrf_token %}
+    <div style="margin-bottom:12px;">
+      <label style="font-weight:bold; font-size:12px;">Seleccionar Producto:</label>
+      <select name="producto_id" required style="width:100%; padding:8px; border-radius:6px;">
+        <option value="">-- Selecciona un producto para surtir --</option>
+        {% for p in productos %}
+          {% if not p.es_servicio %}
+            <option value="{{ p.pk }}">{{ p.nombre }} (Stock actual: {{ p.stock_kilos }} {{ p.unidad_medida }})</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+      <div>
+        <label style="font-weight:bold; font-size:12px;">Cantidad Recibida (+):</label>
+        <input type="number" step="0.1" name="cantidad" min="0.1" placeholder="Ej. 15.0" required style="width:100%; padding:8px; border-radius:6px;">
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px;">N° Remisión / Proveedor:</label>
+        <input type="text" name="nota_remision" placeholder="Ej. Remisión 894 Frigorífico" style="width:100%; padding:8px; border-radius:6px;">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit" style="background:#10b981; border-color:#10b981; font-weight:bold;">
+      ➕ Sumar Mercancía al Inventario
+    </button>
   </form>
 </div>
 {% endif %}
+
+<!-- MODAL PARA CARGAR PEDIDO EN HOJA EXCEL -->
+<div id="modal-excel" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:550px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+      <h3 style="margin:0; font-size:18px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+        📊 Importar Pedido / Remisión en Excel (.xlsx)
+      </h3>
+      <button onclick="document.getElementById('modal-excel').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+    
+    <p style="font-size:13px; color:#475569; margin-bottom:14px; line-height:1.5;">
+      Cargue la remisión o pedido de su proveedor en formato estándar Excel (.xlsx). Si los productos ya existen, el sistema <strong>SUMARÁ las cantidades</strong> a sus existencias actuales. Si son nuevos, los creará en el catálogo.
+    </p>
+
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <strong style="color:#166534; font-size:13px;">¿No tienes el formato estándar?</strong>
+        <p style="margin:2px 0 0 0; font-size:11px; color:#15803d;">Descárgalo con ejemplos de carnes, víveres y servicios.</p>
+      </div>
+      <a href="{% url 'inventario_descargar_plantilla_excel' %}" class="btn" style="background:#065f46; color:#fff; text-decoration:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold;">
+        Descargar Plantilla
+      </a>
+    </div>
+
+    <form method="post" action="{% url 'inventario_importar_excel' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div style="margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">Archivo de Pedido Excel (.xlsx):</label>
+        <input type="file" name="archivo_excel" accept=".xlsx, .xlsm" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">Nombre del Proveedor (Opcional):</label>
+        <input type="text" name="proveedor" placeholder="Ej. Frigorífico del Oriente, Corabastos" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+      </div>
+
+      <div style="margin-bottom:18px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" name="registrar_compra" id="reg_compra" checked style="width:16px; height:16px;">
+        <label for="reg_compra" style="font-size:12px; color:#334155; cursor:pointer;">
+          <strong>Registrar automáticamente como Compra del día</strong> (si el archivo incluye costos de compra).
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-excel').style.display='none'" class="btn btn-ghost" style="padding:8px 16px;">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#1d4ed8; border-color:#1d4ed8; font-weight:bold; padding:8px 18px;">
+          📥 Procesar y Sumar al Inventario
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL RÁPIDO PARA SURTIR STOCK (PARA DEPENDIENTES) -->
+<div id="modal-surtir" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:480px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+      <h3 style="margin:0; font-size:17px; color:#065f46;">➕ Registrar Entrada de Mercancía</h3>
+      <button onclick="document.getElementById('modal-surtir').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+    <form method="post" action="{% url 'inventario_entrada_stock' %}">
+      {% csrf_token %}
+      <input type="hidden" name="producto_id" id="modal-surtir-id" value="">
+      <p style="font-size:13px; color:#334155; margin-bottom:12px;">
+        Producto: <strong id="modal-surtir-nombre">-</strong><br>
+        Existencias actuales: <span id="modal-surtir-stock" style="color:#065f46; font-weight:bold;">-</span>
+      </p>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">Cantidad a Ingresar / Surtir (+):</label>
+        <input type="number" step="0.1" name="cantidad" min="0.1" placeholder="Ej. 10.5" required style="width:100%; padding:8px; border:2px solid #10b981; border-radius:6px; font-size:16px; font-weight:bold;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">N° Remisión / Factura Proveedor (Opcional):</label>
+        <input type="text" name="nota_remision" placeholder="Ej. Factura 4529" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-surtir').style.display='none'" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#065f46; border-color:#065f46; font-weight:bold;">
+          ➕ Confirmar Entrada de Mercancía
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function abrirSurtir(id, nombre, stock, unidad) {
+  document.getElementById('modal-surtir-id').value = id;
+  document.getElementById('modal-surtir-nombre').innerText = nombre;
+  document.getElementById('modal-surtir-stock').innerText = stock + ' ' + unidad;
+  document.getElementById('modal-surtir').style.display = 'flex';
+}
+
+// Búsqueda instantánea si se usa pistola lectora de código de barras
+const inputBuscador = document.getElementById('buscador-codigo');
+if (inputBuscador) {
+  let timerScan = null;
+  inputBuscador.addEventListener('input', function() {
+    clearTimeout(timerScan);
+    const val = this.value.trim();
+    // Si tiene longitud típica de código de barras (8 a 14 dígitos numéricos)
+    if (/^\d{8,14}$/.test(val)) {
+      timerScan = setTimeout(() => {
+        this.form.submit();
+      }, 350);
+    }
+  });
+}
+</script>
 
 {% endblock %}

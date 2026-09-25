@@ -18,6 +18,18 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
     
+    <!-- BARRA LECTORA DE CÓDIGO DE BARRAS / SKU -->
+    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 16px; margin-bottom:18px; display:flex; gap:14px; align-items:center;">
+      <span style="font-size:24px;">🏷️</span>
+      <div style="flex:1;">
+        <label for="barcode-scanner" style="display:block; font-size:12px; font-weight:bold; color:#166534; margin-bottom:4px;">
+          PISTOLA LECTORA DE CÓDIGO DE BARRAS / BÚSQUEDA RÁPIDA (USB / ÓPTICO)
+        </label>
+        <input type="text" id="barcode-scanner" placeholder="Pase el escáner sobre el producto o ingrese código/nombre..." style="width:100%; padding:9px 12px; border:2px solid #10b981; border-radius:6px; font-size:15px; font-weight:bold;" autofocus>
+      </div>
+      <div id="barcode-info-box" style="font-size:12px; color:#15803d; font-weight:bold; min-width:200px; text-align:right;"></div>
+    </div>
+
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
       <div>
         <p>{{ form.fecha_hora.label_tag }} {{ form.fecha_hora }}<br><small>{{ form.fecha_hora.help_text }}</small></p>
@@ -316,6 +328,49 @@ function reproducirChimeExito() {
     osc.start();
     osc.stop(audioCtx.currentTime + 0.6);
   } catch(e) {}
+}
+
+// Lector de código de barras (USB / óptico)
+const scannerInput = document.getElementById("barcode-scanner");
+const infoBox = document.getElementById("barcode-info-box");
+if (scannerInput) {
+  let timerBarcode = null;
+  scannerInput.addEventListener("input", function() {
+    clearTimeout(timerBarcode);
+    const code = this.value.trim();
+    if (!code) {
+      if (infoBox) infoBox.innerHTML = "";
+      return;
+    }
+    // Auto-consulta si el escáner envía Enter o código de barras
+    timerBarcode = setTimeout(() => {
+      fetch(`/api/productos/buscar/?codigo=${encodeURIComponent(code)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.encontrado) {
+            // Autocompletar valor y motivo
+            const valorInput = document.getElementById("id_valor");
+            const motivoInput = document.getElementById("id_nuevo_motivo");
+            const obsInput = document.getElementById("id_observacion");
+            if (valorInput) valorInput.value = Math.round(data.precio);
+            if (motivoInput && !motivoInput.value) motivoInput.value = data.nombre;
+            if (obsInput && !obsInput.value) obsInput.value = `SKU: ${data.codigo_barras || 'N/A'}`;
+
+            infoBox.innerHTML = `
+              <span style="color:#065f46; font-size:12px;">
+                ✅ <strong>${data.nombre}</strong><br>
+                Precio: <strong>$${Math.round(data.precio).toLocaleString('es-CO')} COP</strong> | Stock: ${data.stock} ${data.unidad}
+              </span>
+            `;
+          } else {
+            infoBox.innerHTML = `<span style="color:#b45309; font-size:12px;">⚠️ No registrado (${code})</span>`;
+          }
+        })
+        .catch(err => {
+          console.error(err);
+        });
+    }, 250);
+  });
 }
 </script>
 {% endblock %}

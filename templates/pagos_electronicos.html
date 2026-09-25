@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Auditoría y Conciliación de Pagos Electrónicos - DiarioComercial{% endblock %}
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2 style="margin:0; font-size:22px; display:flex; align-items:center; gap:8px;">
+      💳 Auditoría y Conciliación de Pagos Electrónicos
+    </h2>
+    <p class="lead" style="margin:4px 0 0 0; color:var(--muted); font-size:13px;">
+      Seguimiento y comprobación de transacciones Bre-B (BanRep), Nequi, Daviplata y transferencias bancarias sin mezclar con el efectivo.
+    </p>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <a href="{% url 'pagos_electronicos_exportar_excel' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&medio={{ medio_actual }}&estado={{ estado_actual }}" class="btn" style="background:#065f46; color:#fff; text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+      📊 Exportar Conciliación a Excel (.xlsx)
+    </a>
+  </div>
+</div>
+
+<!-- METRICAS DE PAGOS DIGITALES -->
+<div class="cards" style="margin-bottom:16px;">
+  <div class="card">
+    <span>Total Electrónico Hoy</span>
+    <strong style="color:#065f46;">${{ total_hoy_electronico|floatformat:0 }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Riel Bre-B + Billeteras</small>
+  </div>
+  <div class="card">
+    <span>Riel Bre-B (BanRep) Hoy</span>
+    <strong style="color:#10b981;">${{ total_hoy_bre_b|floatformat:0 }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Liquidación instantánea en 2s</small>
+  </div>
+  <div class="card">
+    <span>Nequi / Daviplata Hoy</span>
+    <strong style="color:#8b5cf6;">${{ total_hoy_billeteras|floatformat:0 }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Transferencias QR de billeteras</small>
+  </div>
+  <div class="card">
+    <span>Penetración Pago Digital</span>
+    <strong style="color:#38bdf8;">{{ pct_electronico }}%</strong>
+    <small style="color:var(--muted); font-size:11px;">Del total transaccionado hoy</small>
+  </div>
+</div>
+
+<!-- BANNER EXPLICATIVO: ¿CÓMO SE COMPRUEBAN LOS PAGOS ELECTRÓNICOS? -->
+<div style="background:#0f172a; border:1px solid #1e293b; border-left:4px solid #10b981; border-radius:8px; padding:16px; margin-bottom:16px; color:#f8fafc;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+    <div>
+      <h4 style="margin:0 0 6px 0; font-size:15px; color:#38bdf8; display:flex; align-items:center; gap:8px;">
+        🛡️ ¿Cómo se comprueban y auditan los pagos electrónicos contra fraudes?
+      </h4>
+      <p style="margin:0 0 10px 0; font-size:12px; color:#94a3b8; max-width:850px; line-height:1.5;">
+        A diferencia de los "pantallazos verdes falsos" de Nequi que muestran clientes malintencionados en el mostrador, DiarioComercial implementa 3 mecanismos de comprobación bancaria inmutable:
+      </p>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; font-size:12px;">
+    <div style="background:#1e293b; padding:10px; border-radius:6px; border:1px solid #334155;">
+      <strong style="color:#10b981;">1. Firma Criptográfica Webhook Bre-B:</strong>
+      <p style="margin:4px 0 0 0; color:#cbd5e1;">El switch del Banco de la República firma la notificación con HMAC-SHA256. El sistema comprueba matemáticamente que los fondos ingresaron a la cuenta del comercio antes de registrar la venta.</p>
+    </div>
+    <div style="background:#1e293b; padding:10px; border-radius:6px; border:1px solid #334155;">
+      <strong style="color:#38bdf8;">2. Micro-Token de Mostrador (#819):</strong>
+      <p style="margin:4px 0 0 0; color:#cbd5e1;">Código efímero de 3 dígitos generado por Bre-B que el cajero ve en su pantalla y el cliente ve en su app bancaria en el mismo segundo.</p>
+    </div>
+    <div style="background:#1e293b; padding:10px; border-radius:6px; border:1px solid #334155;">
+      <strong style="color:#f59e0b;">3. Conciliación con Extracto Bancario:</strong>
+      <p style="margin:4px 0 0 0; color:#cbd5e1;">Para transferencias de billeteras manuales, el administrador o contador coteja el número de comprobante contra el extracto bancario y sella la auditoría oficial.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FILTROS DE AUDITORÍA -->
+<div class="panel" style="padding:14px; margin-bottom:16px;">
+  <form method="get" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">MEDIO / RIEL</label>
+      <select name="medio" onchange="this.form.submit()" style="padding:7px; border-radius:6px;">
+        <option value="todos" {% if medio_actual == 'todos' %}selected{% endif %}>Todos los medios digitales</option>
+        <option value="bre_b" {% if medio_actual == 'bre_b' %}selected{% endif %}>⚡ Bre-B (Banco de la República)</option>
+        <option value="nequi" {% if medio_actual == 'nequi' %}selected{% endif %}>🟣 Nequi</option>
+        <option value="daviplata" {% if medio_actual == 'daviplata' %}selected{% endif %}>🔴 Daviplata</option>
+        <option value="transferencia" {% if medio_actual == 'transferencia' %}selected{% endif %}>🏦 Transferencia Bancaria</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">ESTADO AUDITORÍA</label>
+      <select name="estado" onchange="this.form.submit()" style="padding:7px; border-radius:6px;">
+        <option value="todos" {% if estado_actual == 'todos' %}selected{% endif %}>Todos los estados</option>
+        <option value="verificado" {% if estado_actual == 'verificado' %}selected{% endif %}>✅ Verificado / Conciliado</option>
+        <option value="pendiente" {% if estado_actual == 'pendiente' %}selected{% endif %}>⏳ Pendiente por Extracto</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">DESDE</label>
+      <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}" style="padding:6px; border-radius:6px;">
+    </div>
+    <div>
+      <label style="display:block; font-size:11px; font-weight:bold; margin-bottom:4px; color:var(--muted);">HASTA</label>
+      <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}" style="padding:6px; border-radius:6px;">
+    </div>
+    <div style="align-self:flex-end;">
+      <button class="btn btn-primary" type="submit" style="padding:8px 16px;">Filtrar</button>
+      <a href="{% url 'pagos_electronicos' %}" class="btn btn-ghost" style="padding:8px 12px; text-decoration:none;">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+<!-- TABLA DE AUDITORÍA DETALLADA -->
+<div class="panel">
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha y Hora</th>
+          <th>Canal / Riel</th>
+          <th>Referencia Única</th>
+          <th>Token Mostrador</th>
+          <th>Monto</th>
+          <th>Banco / Destino</th>
+          <th>ID Riel / Comprobante</th>
+          <th>Cajero</th>
+          <th>Estado de Auditoría</th>
+          <th>Comprobación</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td style="font-size:12px; white-space:nowrap;">{{ it.fecha_hora }}</td>
+          <td>
+            {% if it.medio == 'bre_b' %}
+              <span class="tag" style="background:#065f46; color:#a7f3d0; font-weight:bold;">⚡ Bre-B BanRep</span>
+            {% elif it.medio == 'nequi' %}
+              <span class="tag" style="background:#4a044e; color:#f0abfc;">🟣 Nequi</span>
+            {% elif it.medio == 'daviplata' %}
+              <span class="tag" style="background:#7f1d1d; color:#fca5a5;">🔴 Daviplata</span>
+            {% else %}
+              <span class="tag" style="background:#1e3a8a; color:#93c5fd;">🏦 Transferencia</span>
+            {% endif %}
+          </td>
+          <td>
+            <code style="font-size:11px; color:#0f172a; font-weight:bold;">{{ it.referencia }}</code>
+          </td>
+          <td style="text-align:center;">
+            {% if it.token_corto != '-' %}
+              <span style="background:#0f172a; color:#f59e0b; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:12px;">{{ it.token_corto }}</span>
+            {% else %}
+              <span style="color:var(--muted);">-</span>
+            {% endif %}
+          </td>
+          <td>
+            <strong style="font-size:14px; color:#065f46;">${{ it.monto|floatformat:0 }}</strong>
+          </td>
+          <td style="font-size:12px; color:var(--muted);">{{ it.banco }}</td>
+          <td style="font-size:12px;">
+            {% if it.id_riel != '-' %}
+              <code>{{ it.id_riel }}</code>
+            {% else %}
+              <span style="color:#94a3b8; italic;">Por verificar</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;">{{ it.cajero }}</td>
+          <td>
+            {% if it.conciliado %}
+              <span style="color:#065f46; font-weight:bold; font-size:11px; background:#dcfce7; padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">
+                ✅ {{ it.estado_display }}
+              </span>
+            {% else %}
+              <span style="color:#b45309; font-weight:bold; font-size:11px; background:#fef3c7; padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">
+                ⏳ {{ it.estado_display }}
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if it.es_bre_b %}
+              <button onclick="comprobarBreB('{{ it.referencia }}')" class="btn" style="background:#065f46; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:4px; cursor:pointer;" title="Consultar firma criptográfica del Banco de la República">
+                🔍 Comprobar Riel
+              </button>
+            {% else %}
+              {% if it.conciliado %}
+                <span style="color:var(--muted); font-size:11px;">Auditoría OK</span>
+              {% else %}
+                <button onclick="abrirConciliar('{{ it.venta.pk }}', '{{ it.medio_display }}', '{{ it.monto|floatformat:0 }}')" class="btn" style="background:#1d4ed8; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:4px; cursor:pointer;" title="Ingresar comprobante de extracto">
+                  ✔️ Conciliar
+                </button>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" style="text-align:center; padding:24px; color:var(--muted);">
+            No se encontraron transacciones electrónicas en el período seleccionado.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL COMPROBACIÓN CRIPTOGRÁFICA RIEL BRE-B -->
+<div id="modal-comprobar-breb" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#0f172a; color:#f8fafc; border:1px solid #10b981; border-radius:12px; max-width:550px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:16px; color:#10b981; display:flex; align-items:center; gap:8px;">
+        ⚡ Certificado Digital de Transacción Bre-B (BanRep)
+      </h3>
+      <button onclick="document.getElementById('modal-comprobar-breb').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#94a3b8;">&times;</button>
+    </div>
+    <div id="contenido-comprobacion" style="font-size:12px; line-height:1.6;">
+      <p style="text-align:center; color:#94a3b8;">Consultando riel de pagos...</p>
+    </div>
+    <div style="text-align:right; margin-top:16px; border-top:1px solid #334155; padding-top:12px;">
+      <button onclick="document.getElementById('modal-comprobar-breb').style.display='none'" class="btn" style="background:#334155; color:#fff; border:none; padding:6px 14px; border-radius:4px; cursor:pointer;">Cerrar Certificado</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONCILIACIÓN CON EXTRACTO MANUAL -->
+<div id="modal-conciliar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:450px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:17px; color:#1d4ed8;">✔️ Conciliación Bancaria</h3>
+      <button onclick="document.getElementById('modal-conciliar').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+    <form id="form-conciliar" method="post" action="">
+      {% csrf_token %}
+      <p style="font-size:13px; color:#334155; margin-bottom:12px;">
+        Venta por: <strong id="conciliar-medio">-</strong> | Monto: <strong id="conciliar-monto" style="color:#065f46;">-</strong>
+      </p>
+      <div style="margin-bottom:16px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px;">N° de Comprobante / Aprobación del Extracto Bancario:</label>
+        <input type="text" name="comprobante_bancario" required placeholder="Ej. Aprobación #M892183 o Folio Extracto 2026-03" style="width:100%; padding:8px; border:2px solid #1d4ed8; border-radius:6px; font-size:14px;">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-conciliar').style.display='none'" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#1d4ed8; border-color:#1d4ed8; font-weight:bold;">
+          ✔️ Sellar Conciliación Oficial
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function comprobarBreB(ref) {
+  const modal = document.getElementById('modal-comprobar-breb');
+  const box = document.getElementById('contenido-comprobacion');
+  modal.style.display = 'flex';
+  box.innerHTML = '<p style="text-align:center; color:#94a3b8;">Consultando estado criptográfico en Riel BanRep...</p>';
+
+  fetch(`/api/pagos-electronicos/${ref}/comprobar/`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        box.innerHTML = `<p style="color:#ef4444;">Error: ${data.error}</p>`;
+        return;
+      }
+      box.innerHTML = `
+        <div style="background:#1e293b; padding:12px; border-radius:6px; margin-bottom:10px; border-left:3px solid #10b981;">
+          <strong style="color:#10b981; font-size:13px;">ESTADO EN EL RIEL: ${data.estado.toUpperCase()} (FONDOS ACREDITADOS)</strong>
+          <p style="margin:4px 0 0 0; color:#94a3b8; font-size:11px;">${data.protocolo_seguridad.no_repudio}</p>
+        </div>
+        <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+          <tr><td style="color:#94a3b8; padding:3px 0;">Referencia:</td><td><code>${data.referencia}</code></td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">ID Switch BanRep:</td><td><strong style="color:#38bdf8;">${data.id_transaccion_banrep}</strong></td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">Token Mostrador:</td><td><span style="background:#0f172a; color:#f59e0b; padding:2px 6px; border-radius:4px; font-weight:bold;">${data.token_visual_mostrador}</span></td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">Banco Pagador:</td><td>${data.banco_origen}</td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">Algoritmo Firma:</td><td><span style="color:#10b981;">${data.protocolo_seguridad.algoritmo_firma} (Válida)</span></td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">Timestamp Riel:</td><td>${data.protocolo_seguridad.timestamp_acreditacion}</td></tr>
+          <tr><td style="color:#94a3b8; padding:3px 0;">Estado Fondos:</td><td><span style="color:#a7f3d0;">${data.protocolo_seguridad.estado_fondos}</span></td></tr>
+        </table>
+        <div style="margin-top:12px; padding:8px; background:#0b1329; border-radius:4px; font-family:monospace; font-size:10px; color:#64748b; word-break:break-all;">
+          EMVCo Trama: ${data.payload_emvco}
+        </div>
+      `;
+    })
+    .catch(err => {
+      box.innerHTML = `<p style="color:#ef4444;">Error de red al consultar el riel: ${err}</p>`;
+    });
+}
+
+function abrirConciliar(idVenta, medio, monto) {
+  document.getElementById('form-conciliar').action = `/pagos-electronicos/${idVenta}/conciliar/`;
+  document.getElementById('conciliar-medio').innerText = medio;
+  document.getElementById('conciliar-monto').innerText = '$' + monto;
+  document.getElementById('modal-conciliar').style.display = 'flex';
+}
+</script>
+
+{% endblock %}

@@ -141,6 +141,15 @@ class Venta(models.Model):
     medio_pago = models.CharField(max_length=20, choices=MEDIOS_PAGO, default="efectivo")
     ica_estimado = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     estado = models.CharField(max_length=12, default="vigente")
+    comprobante_bancario = models.CharField(
+        max_length=100, blank=True, help_text="N° de comprobante / aprobación electrónica"
+    )
+    conciliado_banco = models.BooleanField(
+        default=False, help_text="Verificado contra extracto bancario o riel"
+    )
+    fecha_conciliacion = models.DateTimeField(
+        null=True, blank=True, help_text="Fecha de verificación en extracto"
+    )
 
     class Meta:
         indexes = [
@@ -248,13 +257,26 @@ class Producto(models.Model):
         ("fruver", "Frutas y Verduras"),
         ("bebidas", "Bebidas"),
         ("aseo", "Aseo y Limpieza"),
+        ("servicios", "Servicios y Mano de Obra"),
         ("otros", "Otros"),
     )
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="productos")
     categoria = models.CharField(max_length=20, choices=CATEGORIAS, default="carnes")
     nombre = models.CharField(max_length=120)
-    stock_kilos = models.DecimalField(max_digits=12, decimal_places=3, default=0, help_text="Existencias en Kilogramos con precisión de gramos")
-    precio_kilo = models.DecimalField(max_digits=12, decimal_places=2, help_text="Precio por Kilo")
+    codigo_barras = models.CharField(
+        max_length=64, blank=True, db_index=True, help_text="Código de barras EAN-13, SKU o referencia"
+    )
+    es_servicio = models.BooleanField(
+        default=False, help_text="Marcar si es un servicio o mano de obra sin control de stock físico"
+    )
+    unidad_medida = models.CharField(
+        max_length=20, default="kg", help_text="kg, lb, und, paquete, servicio"
+    )
+    costo_unitario = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0"), help_text="Costo de compra al proveedor"
+    )
+    stock_kilos = models.DecimalField(max_digits=12, decimal_places=3, default=0, help_text="Existencias en Kilogramos o Unidades")
+    precio_kilo = models.DecimalField(max_digits=12, decimal_places=2, help_text="Precio por Kilo o Unidad")
     estado = models.CharField(max_length=12, default="activo")
 
     class Meta:
