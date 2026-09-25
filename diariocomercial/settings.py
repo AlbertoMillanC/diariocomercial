@@ -142,6 +142,12 @@ LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'login'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'diariocomercial@localhost'
-
 TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
+
+# ============================================================================
+# PARÁMETROS SAAS, COBRANZA BRE-B Y SOPORTE OFICIAL
+# ============================================================================
+SAAS_LLAVE_PAGOS_BRE_B = "3028530041"      # Llave Bre-B / BanRep / Nequi oficial para cobro de suscripciones
+SAAS_WHATSAPP_CONTACTO = "3146922087"      # WhatsApp técnico y de contacto soporte de la plataforma
+SAAS_TARIFA_MENSUAL_COP = 19900            # Tarifa plana de suscripción mensual ($19.900 COP)
+

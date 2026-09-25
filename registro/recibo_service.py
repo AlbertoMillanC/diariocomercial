@@ -4,16 +4,19 @@ Generador omnicanal de Recibos/Facturas en PDF y Tarjetas de Pago con Código QR
 (Arquitectura WeChat Pay adaptada al comercio popular colombiano para Telegram y WhatsApp).
 """
 import io
+import base64
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from PIL import Image, ImageDraw
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode.qr import QrCodeWidget
+from django.conf import settings
 from django.utils import timezone
 
 from .models import Venta, Establecimiento, TransaccionBreB
-from .bre_b_service import generar_qr_dinamico_bre_b
+from .bre_b_service import generar_qr_dinamico_bre_b, generar_payload_emvco_saas
+
 
 
 def generar_imagen_qr_bre_b(
@@ -82,6 +85,78 @@ def generar_imagen_qr_bre_b(
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def generar_imagen_qr_suscripcion_saas(
+    establecimiento: Establecimiento,
+    monto: Decimal = Decimal("19900"),
+    referencia: str = "",
+) -> Tuple[bytes, str, str]:
+    """
+    Genera la tarjeta visual QR de cobro de suscripción SaaS con:
+    - Llave oficial BanRep / Bre-B: 3028530041
+    - WhatsApp técnico / contacto: 3146922087
+    - Tarjeta gráfica con banner Bre-B y código QR EMVCo escaneable.
+    Retorna: (bytes_png, payload_emvco, qr_base64)
+    """
+    llave = getattr(settings, "SAAS_LLAVE_PAGOS_BRE_B", "3028530041")
+    ref = referencia or f"SAAS-{establecimiento.pk}-{int(monto)}"
+    payload_emvco = generar_payload_emvco_saas(
+        monto=monto,
+        referencia=ref,
+        llave=llave,
+        tipo_llave="celular",
+        beneficiario="DIARIOCOMERCIAL SAAS",
+    )
+
+    widget = QrCodeWidget(payload_emvco)
+    widget.qr.make()
+    mod_count = widget.qr.getModuleCount()
+
+    box = 8
+    border = 3
+    qr_size = (mod_count + border * 2) * box
+
+    card_w = max(qr_size + 40, 360)
+    card_h = qr_size + 150
+
+    img = Image.new("RGB", (card_w, card_h), "#ffffff")
+    draw = ImageDraw.Draw(img)
+
+    # 1. Encabezado Verde Bre-B
+    draw.rectangle([(0, 0), (card_w, 50)], fill="#065f46")
+    draw.text((16, 10), "⚡ BRE-B • SUSCRIPCIÓN SAAS", fill="#ffffff")
+    draw.text((16, 28), f"PAGO INTEROPERABLE BANREP • LLAVE: {llave}", fill="#a7f3d0")
+
+    # 2. Dibujar módulos del QR
+    x_offset = (card_w - qr_size) // 2
+    y_offset = 60
+    for r in range(mod_count):
+        for c in range(mod_count):
+            if widget.qr.isDark(r, c):
+                x0 = x_offset + (c + border) * box
+                y0 = y_offset + (r + border) * box
+                x1 = x0 + box - 1
+                y1 = y0 + box - 1
+                draw.rectangle([(x0, y0), (x1, y1)], fill="#0f172a")
+
+    # 3. Pie con monto y datos de pago
+    draw.rectangle([(0, card_h - 66), (card_w, card_h)], fill="#f8fafc")
+    draw.line([(0, card_h - 66), (card_w, card_h - 66)], fill="#cbd5e1", width=1)
+
+    monto_fmt = f"${monto:,.0f} COP".replace(",", ".")
+    comercio_nom = establecimiento.nombre[:26].upper()
+    whatsapp_contacto = getattr(settings, "SAAS_WHATSAPP_CONTACTO", "3146922087")
+
+    draw.text((16, card_h - 58), f"TOTAL A PAGAR: {monto_fmt}", fill="#065f46")
+    draw.text((16, card_h - 40), f"Tienda: {comercio_nom} • Llave Bre-B: {llave}", fill="#334155")
+    draw.text((16, card_h - 22), f"WhatsApp Soporte / Envío soporte: {whatsapp_contacto}", fill="#64748b")
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    raw_bytes = buf.getvalue()
+    b64 = base64.b64encode(raw_bytes).decode("utf-8")
+    return raw_bytes, payload_emvco, b64
 
 
 def generar_pdf_recibo_venta(venta: Venta) -> bytes:

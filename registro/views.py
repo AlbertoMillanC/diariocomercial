@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 import urllib.parse
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -2136,11 +2137,19 @@ def superadmin_comercio_cobrar(request, pk):
     else:
         form = RegistrarPagoSuscripcionForm(initial={"monto": Decimal("19900"), "periodo_dias": 30})
 
+    from .recibo_service import generar_imagen_qr_suscripcion_saas
+    monto_cobro = Decimal("19900")
+    _, payload_emvco, qr_base64 = generar_imagen_qr_suscripcion_saas(est, monto=monto_cobro)
+
+    llave_saas = getattr(settings, "SAAS_LLAVE_PAGOS_BRE_B", "3028530041")
+    whatsapp_soporte = getattr(settings, "SAAS_WHATSAPP_CONTACTO", "3146922087")
     contacto_dueno = est.llave_bre_b if est.tipo_llave_bre_b == "celular" else ""
+
     mensaje_whatsapp_cobro = (
         f"Hola {est.nombre}, te saludamos de DiarioComercial. "
-        f"Tu suscripción mensual ($19.900 COP) está pendiente de renovación. "
-        f"Puedes pagar de inmediato a través de Bre-B / BanRep o Nequi a la llave oficial del sistema. "
+        f"Para renovar tu mensualidad ($19.900 COP), puedes pagar al instante escaneando el código QR Bre-B "
+        f"o transfiriendo a la llave {llave_saas} (Nequi / Daviplata / Bancolombia / Bre-B). "
+        f"Una vez realizado el pago, envía tu soporte a nuestro WhatsApp de soporte técnico: {whatsapp_soporte}. "
         f"¡Gracias por confiar en DiarioComercial!"
     )
 
@@ -2153,9 +2162,29 @@ def superadmin_comercio_cobrar(request, pk):
             "hoy": hoy,
             "contacto_dueno": contacto_dueno,
             "mensaje_whatsapp_cobro": mensaje_whatsapp_cobro,
+            "llave_saas": llave_saas,
+            "whatsapp_soporte": whatsapp_soporte,
+            "qr_base64": qr_base64,
+            "payload_emvco": payload_emvco,
             "historial_pagos": est.pagos_suscripcion.all()[:10],
         },
     )
+
+
+@login_required
+def superadmin_descargar_qr_suscripcion(request, pk):
+    """Retorna la imagen PNG pura de la tarjeta QR de cobro de suscripción Bre-B."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    est = get_object_or_404(Establecimiento, pk=pk)
+    from .recibo_service import generar_imagen_qr_suscripcion_saas
+    raw_png, _, _ = generar_imagen_qr_suscripcion_saas(est, monto=Decimal("19900"))
+    resp = HttpResponse(raw_png, content_type="image/png")
+    resp["Content-Disposition"] = f'attachment; filename="QR_Cobro_BreB_{est.pk}.png"'
+    return resp
+
 
 
 @login_required

@@ -58,6 +58,7 @@ urlpatterns = [
     path("superadmin/comercios/nuevo/", views.superadmin_comercio_crear, name="superadmin_comercio_crear"),
     path("superadmin/establecimiento/<int:pk>/eliminar/", views.superadmin_comercio_eliminar, name="superadmin_comercio_eliminar"),
     path("superadmin/establecimiento/<int:pk>/cobrar/", views.superadmin_comercio_cobrar, name="superadmin_comercio_cobrar"),
+    path("superadmin/establecimiento/<int:pk>/descargar-qr/", views.superadmin_descargar_qr_suscripcion, name="superadmin_descargar_qr_suscripcion"),
     path("superadmin/establecimiento/<int:pk>/cambiar-plan/", views.superadmin_comercio_cambiar_plan, name="superadmin_comercio_cambiar_plan"),
     path("superadmin/establecimiento/<int:pk>/toggle-estado/", views.superadmin_toggle_estado, name="superadmin_toggle_estado"),
     path("superadmin/establecimiento/<int:pk>/asistir/", views.superadmin_asistir_tienda, name="superadmin_asistir_tienda"),

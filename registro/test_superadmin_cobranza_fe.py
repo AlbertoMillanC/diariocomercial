@@ -104,11 +104,21 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.client.force_login(self.superadmin)
         url = reverse("superadmin_comercio_cobrar", kwargs={"pk": self.est.pk})
         
-        # GET: Renderiza pantalla de cobranza y mensaje de WhatsApp
+        # GET: Renderiza pantalla de cobranza, QR visual y mensaje de WhatsApp
         resp_get = self.client.get(url)
         self.assertEqual(resp_get.status_code, 200)
         self.assertContains(resp_get, "Cobro y Gestión de Suscripción SaaS")
         self.assertContains(resp_get, "19.900")
+        self.assertContains(resp_get, "3028530041") # Llave oficial Bre-B
+        self.assertContains(resp_get, "3146922087") # WhatsApp técnico
+        self.assertContains(resp_get, "data:image/png;base64,") # QR visual presente
+
+        # Descarga de imagen QR pura (.PNG)
+        url_qr = reverse("superadmin_descargar_qr_suscripcion", kwargs={"pk": self.est.pk})
+        resp_qr = self.client.get(url_qr)
+        self.assertEqual(resp_qr.status_code, 200)
+        self.assertEqual(resp_qr["Content-Type"], "image/png")
+        self.assertTrue(len(resp_qr.content) > 500)
 
         # POST: Asienta el pago de la mensualidad
         fecha_fin_previa = self.est.fecha_fin_prueba

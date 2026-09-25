@@ -186,3 +186,42 @@ def procesar_confirmacion_bre_b(
     monto_fmt = f"{int(monto_acreditado):,}".replace(",", ".")
     texto_voz = f"¡Bre-B recibido: {monto_fmt} pesos de {nombre_pagador}!"
     return True, texto_voz, venta, tx
+
+
+def generar_payload_emvco_saas(
+    monto: Decimal,
+    referencia: str,
+    llave: str = "3028530041",
+    tipo_llave: str = "celular",
+    beneficiario: str = "DIARIOCOMERCIAL SAAS",
+    ciudad: str = "TUNJA",
+) -> str:
+    """Genera el payload EMVCo MPM oficial de cobro Bre-B para suscripciones SaaS."""
+    subtag_guid = format_tlv("00", "co.gov.banrep.bre-b")
+    subtag_key = format_tlv("01", f"{tipo_llave}:{llave}")
+    tag_26 = format_tlv("26", f"{subtag_guid}{subtag_key}")
+
+    subtag_ref = format_tlv("05", referencia[:25])
+    subtag_terminal = format_tlv("07", "DC-SAAS-BILLING")
+    tag_62 = format_tlv("62", f"{subtag_ref}{subtag_terminal}")
+
+    monto_str = f"{monto:.2f}"
+    nombre_limpio = "".join(c for c in normalizar_texto(beneficiario) if c.isalnum() or c == " ")[:25].upper()
+    ciudad_limpia = ciudad[:15].upper()
+
+    trama_base = (
+        format_tlv("00", "01") +                # Versión EMVCo
+        format_tlv("01", "12") +                # 12 = Dinámico (monto fijo)
+        tag_26 +                                # Bre-B BanRep
+        format_tlv("52", "7372") +              # MCC (Computer Software Services)
+        format_tlv("53", "170") +               # ISO 4217 COP
+        format_tlv("54", monto_str) +           # Monto de la mensualidad
+        format_tlv("58", "CO") +                # País Colombia
+        format_tlv("59", nombre_limpio) +       # DIARIOCOMERCIAL SAAS
+        format_tlv("60", ciudad_limpia) +       # TUNJA
+        tag_62 +                                # Datos adicionales
+        "6304"                                  # Tag 63 CRC
+    )
+    crc = calcular_crc16_ccitt(trama_base)
+    return f"{trama_base[:-4]}{format_tlv('63', crc)}"
+
