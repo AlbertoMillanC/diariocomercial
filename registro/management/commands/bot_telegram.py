@@ -84,10 +84,11 @@ class TelegramClient:
                 f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption}\r\n".encode("utf-8")
             )
 
+        mime_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         header = (
             f"--{boundary}\r\n"
             f"Content-Disposition: form-data; name=\"document\"; filename=\"{filename}\"\r\n"
-            f"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+            f"Content-Type: {mime_type}\r\n\r\n"
         ).encode("utf-8")
         parts.append(header)
         parts.append(file_bytes)
@@ -97,6 +98,40 @@ class TelegramClient:
         body = b"".join(parts)
         req = urllib.request.Request(
             f"{self.base_url}/sendDocument",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def send_photo(self, chat_id, photo_bytes, caption=""):
+        boundary = "----TelegramFormBoundary" + hex(int(time.time() * 1000))[2:]
+        parts = []
+
+        parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode("utf-8")
+        )
+        if caption:
+            parts.append(
+                f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption}\r\n".encode("utf-8")
+            )
+
+        header = (
+            f"--{boundary}\r\n"
+            f"Content-Disposition: form-data; name=\"photo\"; filename=\"qr_bre_b.png\"\r\n"
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode("utf-8")
+        parts.append(header)
+        parts.append(photo_bytes)
+        parts.append(b"\r\n")
+        parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+        body = b"".join(parts)
+        req = urllib.request.Request(
+            f"{self.base_url}/sendPhoto",
             data=body,
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         )
@@ -208,15 +243,56 @@ class Command(BaseCommand):
             client.send_document(chat_id, archivo_bytes, nombre_archivo, caption)
             return
 
-        # Para todos los demás comandos (ventas, compras, stock, cierre /hoy, etc.), delega a bot_service
-        respuesta = bot_service_despachar(
+        # Para todos los demás comandos (ventas, compras, stock, cierre /hoy, cobro Bre-B), delega a bot_service
+        resultado = bot_service_despachar(
             canal="telegram",
             identificador_externo=str(chat_id),
             texto_mensaje=texto_limpio,
             identificador_mensaje=str(msg_id) if msg_id else None,
             nombre_remitente=autor,
+            return_adjuntos=True,
         )
+        if isinstance(resultado, tuple):
+            respuesta, venta_obj, cobro_info = resultado
+        else:
+            respuesta, venta_obj, cobro_info = resultado, None, None
+
         client.send_message(chat_id, respuesta)
+
+        # Si se registró una venta, enviar automáticamente el QR Bre-B y la factura / recibo en PDF
+        if venta_obj:
+            try:
+                from registro.recibo_service import preparar_paquete_omnicanal_venta
+                paquete = preparar_paquete_omnicanal_venta(venta_obj)
+                # 1. Enviar Código QR Bre-B (Estilo WeChat Pay para pagar en mostrador)
+                client.send_photo(chat_id, paquete["qr_bytes"], caption=paquete["qr_caption"])
+                # 2. Enviar Factura / Recibo de Pago en PDF
+                client.send_document(chat_id, paquete["pdf_bytes"], paquete["pdf_filename"], caption=paquete["pdf_caption"])
+            except Exception as e_adj:
+                self.stdout.write(self.style.WARNING(f"Aviso generando adjuntos venta #{venta_obj.pk}: {e_adj}"))
+
+        # Si fue una solicitud de cobro Bre-B directo (/cobrar o /qr)
+        elif cobro_info:
+            try:
+                from registro.recibo_service import generar_imagen_qr_bre_b
+                tx = cobro_info["tx"]
+                est_cobro = cobro_info.get("establecimiento") or Establecimiento.objects.first()
+                qr_bytes = generar_imagen_qr_bre_b(
+                    monto=cobro_info["monto"],
+                    establecimiento=est_cobro,
+                    referencia=tx.referencia_unica,
+                    payload_emvco=cobro_info["payload"],
+                )
+                monto_fmt = f"${cobro_info['monto']:,.0f} COP".replace(",", ".")
+                caption = (
+                    f"⚡ *Código QR Bre-B para Cobro en Mostrador (WeChat Pay)*\n"
+                    f"💰 *Monto exacto:* {monto_fmt}\n"
+                    f"Ref: {tx.token_visual_corto} • {tx.referencia_unica[:18]}\n"
+                    f"📲 El cliente puede escanear con Nequi, Daviplata o cualquier banco."
+                )
+                client.send_photo(chat_id, qr_bytes, caption=caption)
+            except Exception as e_cobro:
+                self.stdout.write(self.style.WARNING(f"Aviso generando QR cobro: {e_cobro}"))
 
         # 3. Comandos de inventario por grupos / departamentos
         if cmd in ("/inventario", "inventario", "/stock", "stock"):

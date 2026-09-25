@@ -51,6 +51,15 @@ class Command(BaseCommand):
             user=carlos, defaults={"establecimiento": est, "rol": "dependiente"}
         )
 
+        admin_user, _ = User.objects.get_or_create(
+            username="admin_saas",
+            defaults={"first_name": "Operador", "last_name": "SaaS", "email": "admin@diariocomercial.co"},
+        )
+        admin_user.set_password("tunja2026")
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.save()
+
         c4711, _ = ActividadCIIU.objects.get_or_create(
             establecimiento=est,
             codigo="4711",

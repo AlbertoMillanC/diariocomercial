@@ -62,7 +62,8 @@ def despachar_mensaje(
     identificador_mensaje: Optional[str] = None,
     username_externo: str = "",
     nombre_remitente: str = "",
-) -> str:
+    return_adjuntos: bool = False,
+) -> Any:
     """
     Punto de entrada único agnóstico para Telegram, WhatsApp o simuladores.
     Aplica:
@@ -123,15 +124,15 @@ def despachar_mensaje(
                 f"Escribe un valor o producto (ej: `40 mil carne molida nequi`) para probar."
             )
             _cachear_respuesta(canal, identificador_mensaje, resp)
-            return resp
+            return (resp, None, None) if return_adjuntos else resp
         elif tok and tok.usado:
             resp = "⚠️ Este código de vinculación ya fue utilizado previamente."
             _cachear_respuesta(canal, identificador_mensaje, resp)
-            return resp
+            return (resp, None, None) if return_adjuntos else resp
         else:
             resp = "❌ Código de vinculación inválido o expirado. Genera uno nuevo en el panel de Configuración."
             _cachear_respuesta(canal, identificador_mensaje, resp)
-            return resp
+            return (resp, None, None) if return_adjuntos else resp
 
     # Si no está vinculado, rechazo amable con instrucciones
     if not vinculo:
@@ -145,7 +146,7 @@ def despachar_mensaje(
             "_(Si tienes un código de acceso, envíalo directamente aquí)_."
         )
         _cachear_respuesta(canal, identificador_mensaje, resp)
-        return resp
+        return (resp, None, None) if return_adjuntos else resp
 
     # Identificar Rol del Usuario
     establecimiento = vinculo.establecimiento
@@ -165,36 +166,63 @@ def despachar_mensaje(
                 "están reservados exclusivamente al propietario del negocio."
             )
             _cachear_respuesta(canal, identificador_mensaje, resp)
-            return resp
+            return (resp, None, None) if return_adjuntos else resp
 
     # Ejecución de Arqueo / Cierre
     if t_norm.startswith(("/hoy", "cierre de caja", "arqueo", "cierre")):
         resp = _generar_arqueo_hoy(establecimiento)
         _cachear_respuesta(canal, identificador_mensaje, resp)
-        return resp
+        return (resp, None, None) if return_adjuntos else resp
 
     # Ayuda y Comandos
     if t_norm.startswith(("/ayuda", "/comandos", "/guia", "ayuda", "comandos")):
         resp = _generar_ayuda(es_propietario)
         _cachear_respuesta(canal, identificador_mensaje, resp)
-        return resp
+        return (resp, None, None) if return_adjuntos else resp
 
     # Consulta de Stock / Precios
     if t_norm.startswith(("/stock", "/precio", "stock", "precio", "cuanto queda", "hay")):
         resp = _consultar_stock(establecimiento, texto)
         _cachear_respuesta(canal, identificador_mensaje, resp)
-        return resp
+        return (resp, None, None) if return_adjuntos else resp
 
     # Registro de Compra / Gasto
     if t_norm.startswith(("/compra", "compra", "gasto", "factura compra")):
         resp = _registrar_compra(establecimiento, usuario, texto)
         _cachear_respuesta(canal, identificador_mensaje, resp)
-        return resp
+        return (resp, None, None) if return_adjuntos else resp
 
-    # 4.2 Registro de Venta (Flujo Natural del Mostrador)
-    resp = _registrar_venta(establecimiento, usuario, texto)
+    # 4.2 Cobro Rápido con Código QR Bre-B (Estilo WeChat Pay)
+    if t_norm.startswith(("/cobrar", "cobrar", "/qr", "qr", "generar qr", "cobro qr")):
+        val, _ = parsear_dinero(texto)
+        if not val or val <= 0:
+            resp = (
+                "❓ Indique el monto para generar el código QR Bre-B.\n"
+                "Ejemplo: `/cobrar 45 mil` o `/qr 20000 pechuga`."
+            )
+            _cachear_respuesta(canal, identificador_mensaje, resp)
+            return (resp, None, None) if return_adjuntos else resp
+
+        from .bre_b_service import generar_qr_dinamico_bre_b
+        tx, payload = generar_qr_dinamico_bre_b(
+            establecimiento=establecimiento,
+            monto=val,
+            comando_original=texto,
+        )
+        valor_fmt = f"${val:,.0f} COP".replace(",", ".")
+        resp = (
+            f"⚡ *Cobro Bre-B Generado (WeChat Pay):* {valor_fmt}\n"
+            f"Ref: `{tx.referencia_unica}` • Token: `{tx.token_visual_corto}`\n\n"
+            f"📲 Muestre el siguiente código QR al cliente en su mostrador para pagar en 2 segundos desde *Nequi, Daviplata, Bancolombia* o cualquier banco."
+        )
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        cobro_info = {"monto": val, "tx": tx, "payload": payload, "establecimiento": establecimiento}
+        return (resp, None, cobro_info) if return_adjuntos else resp
+
+    # 4.3 Registro de Venta (Flujo Natural del Mostrador)
+    resp, venta_creada = _registrar_venta(establecimiento, usuario, texto)
     _cachear_respuesta(canal, identificador_mensaje, resp)
-    return resp
+    return (resp, venta_creada, None) if return_adjuntos else resp
 
 
 def _cachear_respuesta(canal: str, id_msg: Optional[str], respuesta: str):
@@ -236,7 +264,8 @@ def _registrar_venta(establecimiento: Establecimiento, usuario: User, texto: str
     if not val_final or val_final <= 0:
         return (
             "❓ No entendí el valor de la venta.\n"
-            "Ejemplo: `40 mil carne molida nequi` o `2 libras pechuga`."
+            "Ejemplo: `40 mil carne molida nequi` o `2 libras pechuga`.",
+            None,
         )
 
     # Actividad principal para ICA
@@ -266,7 +295,7 @@ def _registrar_venta(establecimiento: Establecimiento, usuario: User, texto: str
     if info_inv:
         resp += f"\n{info_inv}"
 
-    return resp
+    return resp, venta
 
 
 def _registrar_compra(establecimiento: Establecimiento, usuario: User, texto: str) -> str:

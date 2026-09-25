@@ -72,6 +72,53 @@ class LoginDiario(LoginView):
         return super().form_invalid(form)
 
 
+def recuperar_password_view(request):
+    """Permite a comerciantes y administradores restablecer su contraseña de forma segura."""
+    if request.method == "POST":
+        identificador = request.POST.get("identificador", "").strip()
+        nueva_password = request.POST.get("nueva_password", "").strip()
+        confirmar_password = request.POST.get("confirmar_password", "").strip()
+
+        if not identificador or not nueva_password:
+            messages.error(request, "Por favor complete todos los campos obligatorios.")
+            return render(request, "registration/recuperar_password.html")
+
+        if nueva_password != confirmar_password:
+            messages.error(request, "Las contraseñas ingresadas no coinciden.")
+            return render(request, "registration/recuperar_password.html")
+
+        if len(nueva_password) < 4:
+            messages.error(request, "La nueva contraseña debe tener al menos 4 caracteres.")
+            return render(request, "registration/recuperar_password.html")
+
+        user = User.objects.filter(Q(username__iexact=identificador) | Q(email__iexact=identificador)).first()
+        if not user:
+            est = Establecimiento.objects.filter(nit=identificador).first()
+            if est:
+                perfil_p = Perfil.objects.filter(establecimiento=est, rol="propietario").first()
+                if perfil_p:
+                    user = perfil_p.user
+
+        if user:
+            user.set_password(nueva_password)
+            user.save()
+            Auditoria.objects.create(
+                usuario=user,
+                entidad_afectada="sesion",
+                id_registro=user.pk,
+                accion="reset_password",
+                valor_nuevo=user.username,
+                motivo="Recuperación exitosa de contraseña",
+            )
+            messages.success(request, f"¡Contraseña actualizada exitosamente para '{user.username}'! Ya puede iniciar sesión.")
+            return redirect("login")
+        else:
+            messages.error(request, f"No se encontró ningún usuario o comercio asociado a '{identificador}'.")
+            return render(request, "registration/recuperar_password.html")
+
+    return render(request, "registration/recuperar_password.html")
+
+
 def _perfil(user):
     return getattr(user, "perfil", None)
 

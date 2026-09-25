@@ -174,3 +174,50 @@ class FrontendUsabilidadTests(TestCase):
         self.assertEqual(resp_toggle.status_code, 302)
         self.est.refresh_from_db()
         self.assertEqual(self.est.estado, "suspendido")
+
+    def test_06_recuperar_password_flujo_completo(self):
+        """El usuario puede restablecer su contraseña desde /recuperar-password/."""
+        # 1. GET pantalla
+        resp = self.client.get("/recuperar-password/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Recuperar Contraseña")
+
+        # 2. POST restablecer
+        resp_post = self.client.post("/recuperar-password/", {
+            "identificador": "don_ramon",
+            "nueva_password": "nueva_clave_2026",
+            "confirmar_password": "nueva_clave_2026",
+        })
+        self.assertEqual(resp_post.status_code, 302)
+        self.assertRedirects(resp_post, "/login/")
+
+        # 3. Iniciar sesión con la nueva clave
+        resp_login = self.client.post("/login/", {
+            "username": "don_ramon",
+            "password": "nueva_clave_2026",
+        })
+        self.assertEqual(resp_login.status_code, 302)
+
+    def test_07_omnicanal_recibo_pdf_y_qr_bre_b(self):
+        """Genera tarjeta QR Bre-B y recibo oficial en PDF listo para Telegram y WhatsApp."""
+        from registro.recibo_service import (
+            generar_imagen_qr_bre_b,
+            generar_pdf_recibo_venta,
+            preparar_paquete_omnicanal_venta,
+        )
+        venta = Venta.objects.create(
+            establecimiento=self.est,
+            usuario=self.owner,
+            actividad=self.ciiu,
+            fecha=timezone.localdate(),
+            valor=Decimal("35000"),
+            concepto="2 Kg de Sobrebarriga",
+            medio_pago="bre_b",
+        )
+        paquete = preparar_paquete_omnicanal_venta(venta)
+        self.assertIsNotNone(paquete["qr_bytes"])
+        self.assertTrue(len(paquete["qr_bytes"]) > 1000)
+        self.assertIsNotNone(paquete["pdf_bytes"])
+        self.assertTrue(len(paquete["pdf_bytes"]) > 500)
+        self.assertIn("messaging_product", paquete["whatsapp_fields"])
+        self.assertEqual(paquete["whatsapp_fields"]["messaging_product"], "whatsapp")

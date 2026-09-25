@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Iniciar sesión{% endblock %}
+{% block title %}Iniciar sesión — DiarioComercial{% endblock %}
 {% block content %}
 <div class="login-card">
   <div class="logo">DC</div>
@@ -12,7 +12,12 @@
     {{ form.username }}
     <label for="id_password">Contraseña</label>
     {{ form.password }}
-    <button class="btn btn-primary" type="submit">Iniciar sesión</button>
+    <button class="btn btn-primary" type="submit" style="width:100%; margin-top:8px;">Iniciar sesión</button>
   </form>
+  <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0; text-align:center;">
+    <a href="{% url 'recuperar_password' %}" style="font-size:13px; color:var(--teal); font-weight:600; text-decoration:none;">
+      🔑 ¿Olvidó su contraseña? Recuperar acceso
+    </a>
+  </div>
 </div>
 {% endblock %}
