@@ -31,7 +31,8 @@
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Municipio (DANE) *</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Municipio (DANE - 1.122 Ciudades) *</label>
+          <input type="text" id="filtro-municipios" placeholder="🔍 Escribe para filtrar (ej: Tunja, Bogotá, Cali)..." style="font-size:12px; padding:5px 8px; width:100%; border:1px solid #94a3b8; border-radius:6px; margin-bottom:6px; box-sizing:border-box;">
           {{ form.municipio }}
         </div>
         <div>
@@ -149,6 +150,20 @@ function toggleUsuarioTipo() {
 if (checkCrearNuevo) {
   checkCrearNuevo.addEventListener("change", toggleUsuarioTipo);
   toggleUsuarioTipo();
+}
+
+// Filtro en tiempo real para 1.122 municipios DANE
+const filtroMun = document.getElementById("filtro-municipios");
+const selectMun = document.getElementById("id_municipio");
+if (filtroMun && selectMun) {
+  filtroMun.addEventListener("input", function() {
+    const term = this.value.toLowerCase().trim();
+    for (let opt of selectMun.options) {
+      if (!opt.value) continue;
+      const text = opt.text.toLowerCase();
+      opt.style.display = text.includes(term) ? "" : "none";
+    }
+  });
 }
 </script>
 {% endblock %}

@@ -71,4 +71,11 @@ urlpatterns = [
     path("facturacion-electronica/<int:pk>/", views.factura_electronica_detalle, name="factura_electronica_detalle"),
     path("facturacion-electronica/<int:pk>/pdf/", views.factura_electronica_pdf, name="factura_electronica_pdf"),
     path("ventas/<int:pk>/emitir-factura-electronica/", views.venta_emitir_factura_electronica, name="venta_emitir_factura_electronica"),
+    # Cuenta Suspendida & Reactivación
+    path("cuenta-suspendida/", views.cuenta_suspendida, name="cuenta_suspendida"),
+    # Configuración Central SaaS, SMTP & Segmentación por Ciudad
+    path("superadmin/configuracion/", views.superadmin_configuracion, name="superadmin_configuracion"),
+    path("superadmin/probar-smtp/", views.superadmin_probar_smtp, name="superadmin_probar_smtp"),
+    # API Métricas en Tiempo Real para Dashboard SuperAdmin
+    path("api/superadmin/metricas-tiempo-real/", views.superadmin_metricas_tiempo_real, name="superadmin_metricas_tiempo_real"),
 ]

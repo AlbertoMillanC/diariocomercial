@@ -36,6 +36,9 @@ from .forms import (
     NuevaTiendaSedeForm,
     SuperadminNuevoComercioForm,
     RegistrarPagoSuscripcionForm,
+    ConfiguracionPlataformaSaaSForm,
+    ConfiguracionSaaSMunicipioForm,
+    ProbarSmtpForm,
 )
 from .models import (
     ActividadCIIU,
@@ -55,7 +58,11 @@ from .models import (
     TransaccionBreB,
     Cliente,
     PagoSuscripcion,
+    ConfiguracionPlataformaSaaS,
+    ConfiguracionSaaSMunicipio,
+    obtener_configuracion_saas,
 )
+from .email_service import enviar_correo_plataforma
 from .bot_service import generar_token_vinculacion
 from .bre_b_service import generar_qr_dinamico_bre_b, procesar_confirmacion_bre_b
 from .print_service import generar_bytes_escpos_recibo
@@ -1844,33 +1851,137 @@ def exportar_declaracion_ica(request):
 
 @login_required
 def superadmin_dashboard(request):
-    """Panel de monitoreo SaaS, control multi-tenant y cobranza."""
+    """Panel de monitoreo SaaS, control multi-tenant, cobranza y métricas en tiempo real."""
     if not request.user.is_superuser:
         messages.error(request, "Acceso restringido: El panel Super-Administrador es exclusivo para el operador central de la plataforma SaaS.")
         return redirect("inicio")
 
+    from datetime import timedelta
     hoy = timezone.localdate()
+    hace_30_dias = hoy - timedelta(days=29)
 
-    total_comercios = Establecimiento.objects.count()
-    comercios_activos = Establecimiento.objects.filter(estado="activo").count()
-    comercios_plan_cero = Establecimiento.objects.filter(plan_suscripcion="lanzamiento_cero").count()
-    comercios_mora = Establecimiento.objects.filter(plan_suscripcion="mora").count()
+    municipio_filtro_id = request.GET.get("municipio")
+    ventas_base = Venta.objects.all()
+    compras_base = Compra.objects.all()
+    pagos_base = PagoSuscripcion.objects.all()
+    comercios_base = Establecimiento.objects.all()
 
-    comercios_de_pago = Establecimiento.objects.filter(plan_suscripcion="activo").count()
+    municipio_seleccionado = None
+    if municipio_filtro_id:
+        try:
+            municipio_seleccionado = Municipio.objects.get(id=municipio_filtro_id)
+            ventas_base = ventas_base.filter(establecimiento__municipio=municipio_seleccionado)
+            compras_base = compras_base.filter(establecimiento__municipio=municipio_seleccionado)
+            pagos_base = pagos_base.filter(establecimiento__municipio=municipio_seleccionado)
+            comercios_base = comercios_base.filter(municipio=municipio_seleccionado)
+        except Municipio.DoesNotExist:
+            pass
+
+    # 1. Métricas de Tenants y Suscripciones
+    total_comercios = comercios_base.count()
+    comercios_activos = comercios_base.filter(estado="activo").count()
+    comercios_plan_cero = comercios_base.filter(plan_suscripcion="lanzamiento_cero").count()
+    comercios_mora = comercios_base.filter(plan_suscripcion="mora").count()
+    comercios_suspendidos = comercios_base.filter(estado="suspendido").count()
+
+    comercios_de_pago = comercios_base.filter(plan_suscripcion="activo").count()
     mrr_saas = Decimal(comercios_de_pago) * Decimal("19900")
     canales_activos = VinculoCanal.objects.filter(activo=True).count()
     usuarios_totales = User.objects.count()
 
+    # 2. Suma Total de Transacciones Consolidadas (Lo que se puede medir)
+    total_ventas_global = ventas_base.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    conteo_ventas_global = ventas_base.count()
+
+    total_compras_global = compras_base.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    conteo_compras_global = compras_base.count()
+
+    flujo_neto_global = total_ventas_global - total_compras_global
+    total_recaudo_saas = pagos_base.aggregate(t=Sum("monto"))["t"] or Decimal("0")
+    total_ica_global = ventas_base.aggregate(t=Sum("ica_estimado"))["t"] or Decimal("0")
+
+    conteo_facturas_fe = ventas_base.exclude(numero_factura_electronica="").count()
+    conteo_envios_reportes = EnvioReporte.objects.count()
+
     # Recaudos del mes actual en curso
     total_recaudado_mes = (
-        PagoSuscripcion.objects.filter(
+        pagos_base.filter(
             fecha_pago__month=hoy.month, fecha_pago__year=hoy.year
         ).aggregate(total=Sum("monto"))["total"]
         or Decimal("0")
     )
-    ultimos_pagos = PagoSuscripcion.objects.select_related("establecimiento", "registrado_por").all()[:15]
+    ultimos_pagos = pagos_base.select_related("establecimiento", "registrado_por").all()[:15]
 
-    comercios_qs = Establecimiento.objects.select_related("municipio", "propietario_creador").all().order_by("-id")
+    # 3. Líneas de Tiempo (Últimos 30 días)
+    dias = [hace_30_dias + timedelta(days=i) for i in range(30)]
+    labels_timeline = [d.strftime("%d/%m") for d in dias]
+
+    ventas_por_dia = {
+        row["fecha"]: row["total_dia"]
+        for row in ventas_base.filter(fecha__gte=hace_30_dias)
+        .values("fecha")
+        .annotate(total_dia=Sum("valor"))
+    }
+    compras_por_dia = {
+        row["fecha"]: row["total_dia"]
+        for row in compras_base.filter(fecha__gte=hace_30_dias)
+        .values("fecha")
+        .annotate(total_dia=Sum("valor"))
+    }
+    saas_por_dia = {
+        row["fecha_pago"]: row["total_dia"]
+        for row in pagos_base.filter(fecha_pago__gte=hace_30_dias)
+        .values("fecha_pago")
+        .annotate(total_dia=Sum("monto"))
+    }
+
+    serie_ventas = [float(ventas_por_dia.get(d, Decimal("0"))) for d in dias]
+    serie_compras = [float(compras_por_dia.get(d, Decimal("0"))) for d in dias]
+    serie_saas = [float(saas_por_dia.get(d, Decimal("0"))) for d in dias]
+
+    # 4. Distribución por Canal
+    ventas_bre_b = float(ventas_base.filter(medio_pago="bre_b").aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+    ventas_efectivo = float(ventas_base.filter(medio_pago="efectivo").aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+    ventas_otros = float(ventas_base.exclude(medio_pago__in=["bre_b", "efectivo"]).aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+
+    # 5. Feed de Eventos en Vivo
+    eventos_recientes = []
+    for v in ventas_base.select_related("establecimiento").order_by("-id")[:8]:
+        canal_desc = "⚡ Bre-B" if v.medio_pago == "bre_b" else "💵 Mostrador"
+        if v.numero_factura_electronica:
+            canal_desc += f" • FE {v.numero_factura_electronica}"
+        eventos_recientes.append({
+            "tipo": "venta",
+            "icono": "💰",
+            "titulo": f"Venta en {v.establecimiento.nombre}",
+            "detalle": f"${v.valor:,.0f} COP • {canal_desc}",
+            "fecha": v.fecha.strftime("%d/%m/%Y"),
+            "monto": float(v.valor),
+            "color": "#059669",
+        })
+    for p in pagos_base.select_related("establecimiento").order_by("-id")[:5]:
+        eventos_recientes.append({
+            "tipo": "pago_saas",
+            "icono": "👑",
+            "titulo": f"Pago SaaS: {p.establecimiento.nombre}",
+            "detalle": f"${p.monto:,.0f} COP • {p.get_metodo_display()} ({p.periodo_dias} días)",
+            "fecha": p.fecha_pago.strftime("%d/%m/%Y"),
+            "monto": float(p.monto),
+            "color": "#0284c7",
+        })
+    for c in compras_base.select_related("establecimiento").order_by("-id")[:5]:
+        eventos_recientes.append({
+            "tipo": "compra",
+            "icono": "📦",
+            "titulo": f"Compra: {c.establecimiento.nombre}",
+            "detalle": f"${c.valor:,.0f} COP • {c.proveedor or 'Gasto operativo'}",
+            "fecha": c.fecha.strftime("%d/%m/%Y"),
+            "monto": float(c.valor),
+            "color": "#dc2626",
+        })
+
+    # Lista de Comercios para la tabla
+    comercios_qs = comercios_base.select_related("municipio", "propietario_creador").all().order_by("-id")
     lista_comercios = []
     for c in comercios_qs:
         dias_restantes = (c.fecha_fin_prueba - hoy).days if c.fecha_fin_prueba else 30
@@ -1893,7 +2004,10 @@ def superadmin_dashboard(request):
     )
 
     form_nuevo_pago = RegistrarPagoSuscripcionForm()
+    municipios_con_comercios = Municipio.objects.filter(establecimientos__isnull=False).distinct()
+    cfg_saas = ConfiguracionPlataformaSaaS.get_solo()
 
+    import json
     return render(
         request,
         "superadmin/dashboard.html",
@@ -1902,8 +2016,18 @@ def superadmin_dashboard(request):
             "comercios_activos": comercios_activos,
             "comercios_plan_cero": comercios_plan_cero,
             "comercios_mora": comercios_mora,
+            "comercios_suspendidos": comercios_suspendidos,
             "mrr_saas": mrr_saas,
             "total_recaudado_mes": total_recaudado_mes,
+            "total_recaudo_saas": total_recaudo_saas,
+            "total_ventas_global": total_ventas_global,
+            "conteo_ventas_global": conteo_ventas_global,
+            "total_compras_global": total_compras_global,
+            "conteo_compras_global": conteo_compras_global,
+            "flujo_neto_global": flujo_neto_global,
+            "total_ica_global": total_ica_global,
+            "conteo_facturas_fe": conteo_facturas_fe,
+            "conteo_envios_reportes": conteo_envios_reportes,
             "ultimos_pagos": ultimos_pagos,
             "canales_activos": canales_activos,
             "usuarios_totales": usuarios_totales,
@@ -1911,6 +2035,16 @@ def superadmin_dashboard(request):
             "contadores": contadores,
             "form_nuevo_pago": form_nuevo_pago,
             "hoy": hoy,
+            "municipios_filtro": municipios_con_comercios,
+            "municipio_seleccionado": municipio_seleccionado,
+            "cfg_saas": cfg_saas,
+            # JSON serializados para inicialización inmediata de Chart.js
+            "timeline_labels_json": json.dumps(labels_timeline),
+            "timeline_ventas_json": json.dumps(serie_ventas),
+            "timeline_compras_json": json.dumps(serie_compras),
+            "timeline_saas_json": json.dumps(serie_saas),
+            "canales_data_json": json.dumps([ventas_bre_b, ventas_efectivo, ventas_otros]),
+            "eventos_recientes": eventos_recientes,
         },
     )
 
@@ -2430,6 +2564,246 @@ def superadmin_anular_venta_soporte(request, pk):
         messages.success(request, f"✅ Venta #{venta.pk:05d} anulada correctamente por soporte. Inventario revertido si aplicaba.")
 
     return redirect("superadmin_asistir_tienda", pk=est.pk)
+
+
+@login_required
+def cuenta_suspendida(request):
+    """Pantalla informativa y de reactivación para comercios con servicio temporalmente inactivo."""
+    perfil = getattr(request.user, "perfil", None)
+    est = perfil.establecimiento if perfil else None
+
+    # Si la cuenta no está suspendida o es superuser, redirigir a inicio
+    if request.user.is_superuser or (est and est.estado != "suspendido"):
+        return redirect("inicio")
+
+    cfg = obtener_configuracion_saas(est.municipio if est else None)
+    tarifa = cfg["tarifa_mensual_cop"]
+    llave = cfg["llave_bre_b"]
+    wa = cfg["whatsapp_soporte"]
+
+    # Generar QR Bre-B visual para reactivación
+    qr_b64 = ""
+    if est:
+        from .recibo_service import generar_imagen_qr_suscripcion_saas
+        _, _, qr_b64 = generar_imagen_qr_suscripcion_saas(est, monto=tarifa)
+
+    return render(
+        request,
+        "registro/cuenta_suspendida.html",
+        {
+            "establecimiento": est,
+            "tarifa_cop": tarifa,
+            "llave_bre_b": llave,
+            "whatsapp_soporte": wa,
+            "qr_base64": qr_b64,
+        },
+    )
+
+
+@login_required
+def superadmin_configuracion(request):
+    """Gestión de parámetros globales SaaS, conexión SMTP y segmentación por ciudades."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso exclusivo para el operador central SaaS.")
+        return redirect("inicio")
+
+    cfg_global = ConfiguracionPlataformaSaaS.get_solo()
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        if accion == "guardar_global":
+            form_global = ConfiguracionPlataformaSaaSForm(request.POST, instance=cfg_global)
+            if form_global.is_valid():
+                form_global.save()
+                messages.success(request, "Configuración global de la plataforma actualizada exitosamente.")
+                return redirect("superadmin_configuracion")
+            else:
+                messages.error(request, f"Error al actualizar configuración: {form_global.errors}")
+        elif accion == "agregar_segmentacion":
+            form_seg = ConfiguracionSaaSMunicipioForm(request.POST)
+            if form_seg.is_valid():
+                form_seg.save()
+                messages.success(request, f"Segmentación territorial para {form_seg.cleaned_data['municipio'].nombre} guardada exitosamente.")
+                return redirect("superadmin_configuracion")
+            else:
+                messages.error(request, f"Error al guardar segmentación: {form_seg.errors}")
+        elif accion == "eliminar_segmentacion":
+            seg_id = request.POST.get("segmentacion_id")
+            if seg_id:
+                ConfiguracionSaaSMunicipio.objects.filter(id=seg_id).delete()
+                messages.success(request, "Segmentación territorial eliminada correctamente.")
+                return redirect("superadmin_configuracion")
+
+    form_global = ConfiguracionPlataformaSaaSForm(instance=cfg_global)
+    form_segmentacion = ConfiguracionSaaSMunicipioForm()
+    form_prueba_smtp = ProbarSmtpForm()
+    segmentaciones = ConfiguracionSaaSMunicipio.objects.select_related("municipio").all()
+
+    return render(
+        request,
+        "superadmin/configuracion.html",
+        {
+            "form_global": form_global,
+            "form_segmentacion": form_segmentacion,
+            "form_prueba_smtp": form_prueba_smtp,
+            "segmentaciones": segmentaciones,
+            "cfg_global": cfg_global,
+        },
+    )
+
+
+@login_required
+def superadmin_probar_smtp(request):
+    """Envía un correo de prueba en vivo para verificar la conexión SMTP."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    if request.method == "POST":
+        form = ProbarSmtpForm(request.POST)
+        if form.is_valid():
+            dest = form.cleaned_data["destinatario"]
+            try:
+                enviar_correo_plataforma(
+                    asunto="✅ Prueba de Conexión Exitosa — DiarioComercial SaaS",
+                    mensaje="Hola!\n\nEste correo confirma que tu servidor SMTP está configurado y funcionando a la perfección en DiarioComercial.\n\nSaludos,\nEquipo Central de Operaciones.",
+                    destinatarios=[dest],
+                )
+                messages.success(request, f"✅ ¡Correo de prueba enviado con éxito a {dest}! Revisa tu bandeja de entrada.")
+            except Exception as e:
+                messages.error(request, f"❌ Error al enviar correo de prueba: {str(e)}")
+        else:
+            messages.error(request, "Dirección de correo de prueba inválida.")
+    return redirect("superadmin_configuracion")
+
+
+@login_required
+def superadmin_metricas_tiempo_real(request):
+    """API JSON que devuelve métricas transaccionales, líneas de tiempo y live feed para el dashboard."""
+    if not request.user.is_superuser:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    from datetime import timedelta
+    hoy = timezone.localdate()
+    hace_30_dias = hoy - timedelta(days=29)
+
+    municipio_id = request.GET.get("municipio")
+    ventas_qs = Venta.objects.all()
+    compras_qs = Compra.objects.all()
+    pagos_qs = PagoSuscripcion.objects.all()
+
+    if municipio_id:
+        ventas_qs = ventas_qs.filter(establecimiento__municipio_id=municipio_id)
+        compras_qs = compras_qs.filter(establecimiento__municipio_id=municipio_id)
+        pagos_qs = pagos_qs.filter(establecimiento__municipio_id=municipio_id)
+
+    # 1. Sumas Globales Consolidadas
+    total_ventas = ventas_qs.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    total_compras = compras_qs.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    total_recaudo_saas = pagos_qs.aggregate(t=Sum("monto"))["t"] or Decimal("0")
+    total_ica = ventas_qs.aggregate(t=Sum("ica_estimado"))["t"] or Decimal("0")
+    flujo_neto = total_ventas - total_compras
+
+    conteo_ventas = ventas_qs.count()
+    conteo_compras = compras_qs.count()
+    conteo_facturas_fe = ventas_qs.exclude(numero_factura_electronica="").count()
+    conteo_envios = EnvioReporte.objects.count()
+
+    # 2. Líneas de Tiempo (Últimos 30 días)
+    dias = [hace_30_dias + timedelta(days=i) for i in range(30)]
+    labels_timeline = [d.strftime("%d/%m") for d in dias]
+
+    ventas_por_dia_dict = {
+        row["fecha"]: row["total_dia"]
+        for row in ventas_qs.filter(fecha__gte=hace_30_dias)
+        .values("fecha")
+        .annotate(total_dia=Sum("valor"))
+    }
+    compras_por_dia_dict = {
+        row["fecha"]: row["total_dia"]
+        for row in compras_qs.filter(fecha__gte=hace_30_dias)
+        .values("fecha")
+        .annotate(total_dia=Sum("valor"))
+    }
+    pagos_por_dia_dict = {
+        row["fecha_pago"]: row["total_dia"]
+        for row in pagos_qs.filter(fecha_pago__gte=hace_30_dias)
+        .values("fecha_pago")
+        .annotate(total_dia=Sum("monto"))
+    }
+
+    serie_ventas = [float(ventas_por_dia_dict.get(d, Decimal("0"))) for d in dias]
+    serie_compras = [float(compras_por_dia_dict.get(d, Decimal("0"))) for d in dias]
+    serie_saas = [float(pagos_por_dia_dict.get(d, Decimal("0"))) for d in dias]
+
+    # 3. Distribución por Canal
+    ventas_bre_b = float(ventas_qs.filter(medio_pago="bre_b").aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+    ventas_efectivo = float(ventas_qs.filter(medio_pago="efectivo").aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+    ventas_otros = float(ventas_qs.exclude(medio_pago__in=["bre_b", "efectivo"]).aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+
+    # 4. Feed de Eventos en Tiempo Real
+    eventos = []
+    for v in ventas_qs.select_related("establecimiento").order_by("-id")[:8]:
+        canal = "⚡ Bre-B" if v.medio_pago == "bre_b" else "💵 Mostrador"
+        if v.numero_factura_electronica:
+            canal += f" • FE {v.numero_factura_electronica}"
+        eventos.append({
+            "tipo": "venta",
+            "icono": "💰",
+            "titulo": f"Venta en {v.establecimiento.nombre}",
+            "detalle": f"${v.valor:,.0f} COP • {canal}",
+            "fecha": v.fecha.strftime("%d/%m/%Y"),
+            "monto": float(v.valor),
+            "color": "#059669",
+        })
+    for p in pagos_qs.select_related("establecimiento").order_by("-id")[:5]:
+        eventos.append({
+            "tipo": "pago_saas",
+            "icono": "👑",
+            "titulo": f"Pago Suscripción: {p.establecimiento.nombre}",
+            "detalle": f"${p.monto:,.0f} COP • {p.get_metodo_display()} ({p.periodo_dias} días)",
+            "fecha": p.fecha_pago.strftime("%d/%m/%Y"),
+            "monto": float(p.monto),
+            "color": "#0284c7",
+        })
+    for c in compras_qs.select_related("establecimiento").order_by("-id")[:5]:
+        eventos.append({
+            "tipo": "compra",
+            "icono": "📦",
+            "titulo": f"Compra/Gasto: {c.establecimiento.nombre}",
+            "detalle": f"${c.valor:,.0f} COP • {c.proveedor or 'Gasto operativo'}",
+            "fecha": c.fecha.strftime("%d/%m/%Y"),
+            "monto": float(c.valor),
+            "color": "#dc2626",
+        })
+
+    return JsonResponse({
+        "status": "ok",
+        "timestamp": timezone.now().strftime("%H:%M:%S"),
+        "totales": {
+            "total_ventas": float(total_ventas),
+            "conteo_ventas": conteo_ventas,
+            "total_compras": float(total_compras),
+            "conteo_compras": conteo_compras,
+            "flujo_neto": float(flujo_neto),
+            "total_recaudo_saas": float(total_recaudo_saas),
+            "total_ica": float(total_ica),
+            "conteo_facturas_fe": conteo_facturas_fe,
+            "conteo_envios": conteo_envios,
+        },
+        "timeline": {
+            "labels": labels_timeline,
+            "ventas": serie_ventas,
+            "compras": serie_compras,
+            "saas": serie_saas,
+        },
+        "canales": {
+            "bre_b": ventas_bre_b,
+            "efectivo": ventas_efectivo,
+            "otros": ventas_otros,
+        },
+        "eventos": eventos[:20],
+    })
 
 
 # ============================================================================

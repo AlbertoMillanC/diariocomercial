@@ -18,6 +18,8 @@ from .models import (
     Cliente,
     Municipio,
     PagoSuscripcion,
+    ConfiguracionPlataformaSaaS,
+    ConfiguracionSaaSMunicipio,
 )
 
 
@@ -820,6 +822,83 @@ class RegistrarPagoSuscripcionForm(forms.Form):
         label="Notas u Observaciones del Cobro",
         widget=forms.TextInput(attrs={"placeholder": "Ej: Renovación oportuna mes de Octubre", "class": "form-control"}),
     )
+
+
+class ConfiguracionPlataformaSaaSForm(forms.ModelForm):
+    """Formulario para actualizar datos centrales de la plataforma SaaS (Bre-B, WhatsApp, SMTP)."""
+    class Meta:
+        model = ConfiguracionPlataformaSaaS
+        fields = [
+            "llave_bre_b_general",
+            "tipo_llave_bre_b",
+            "banco_receptor",
+            "whatsapp_soporte_general",
+            "tarifa_mensual_cop",
+            "correo_soporte",
+            "dias_gracia_mora",
+            "smtp_activo",
+            "smtp_host",
+            "smtp_port",
+            "smtp_user",
+            "smtp_password",
+            "smtp_use_tls",
+            "smtp_from_email",
+        ]
+        widgets = {
+            "llave_bre_b_general": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: 3028530041"}),
+            "tipo_llave_bre_b": forms.Select(
+                choices=(("celular", "Número de Celular"), ("nit", "NIT / Cédula"), ("alias", "Alias / Nombre Bre-B")),
+                attrs={"class": "form-control"}
+            ),
+            "banco_receptor": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Bancolombia / Nequi / Davivienda"}),
+            "whatsapp_soporte_general": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: 3146922087"}),
+            "tarifa_mensual_cop": forms.NumberInput(attrs={"class": "form-control", "step": "100"}),
+            "correo_soporte": forms.EmailInput(attrs={"class": "form-control", "placeholder": "soporte@diariocomercial.co"}),
+            "dias_gracia_mora": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "smtp_activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "smtp_host": forms.TextInput(attrs={"class": "form-control", "placeholder": "smtp-relay.brevo.com o smtp.gmail.com"}),
+            "smtp_port": forms.NumberInput(attrs={"class": "form-control"}),
+            "smtp_user": forms.TextInput(attrs={"class": "form-control", "placeholder": "tu-correo@dominio.com o API key"}),
+            "smtp_password": forms.PasswordInput(render_value=True, attrs={"class": "form-control", "placeholder": "Contraseña SMTP o Master Key"}),
+            "smtp_use_tls": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "smtp_from_email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "notificaciones@diariocomercial.co"}),
+        }
+
+
+class ConfiguracionSaaSMunicipioForm(forms.ModelForm):
+    """Formulario para segmentar llaves de cobro y teléfonos de soporte por ciudad."""
+    class Meta:
+        model = ConfiguracionSaaSMunicipio
+        fields = [
+            "municipio",
+            "llave_bre_b",
+            "tipo_llave_bre_b",
+            "banco_receptor",
+            "whatsapp_soporte",
+            "tarifa_mensual_cop",
+            "activo",
+        ]
+        widgets = {
+            "municipio": forms.Select(attrs={"class": "form-control"}),
+            "llave_bre_b": forms.TextInput(attrs={"class": "form-control", "placeholder": "Dejar en blanco para usar la general"}),
+            "tipo_llave_bre_b": forms.Select(
+                choices=(("celular", "Número de Celular"), ("nit", "NIT / Cédula"), ("alias", "Alias / Nombre Bre-B")),
+                attrs={"class": "form-control"}
+            ),
+            "banco_receptor": forms.TextInput(attrs={"class": "form-control", "placeholder": "Banco receptor local"}),
+            "whatsapp_soporte": forms.TextInput(attrs={"class": "form-control", "placeholder": "Dejar en blanco para usar el general"}),
+            "tarifa_mensual_cop": forms.NumberInput(attrs={"class": "form-control", "step": "100", "placeholder": "19900"}),
+            "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
+class ProbarSmtpForm(forms.Form):
+    """Formulario de prueba en vivo para despacho de correo SMTP."""
+    destinatario = forms.EmailField(
+        label="Correo de Prueba Destino",
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "tu-correo-personal@gmail.com"}),
+    )
+
 
 
 

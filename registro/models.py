@@ -740,3 +740,124 @@ class PagoSuscripcion(models.Model):
         return f"Pago {self.establecimiento.nombre} - ${self.monto} ({self.fecha_pago})"
 
 
+# ============================================================================
+# FASE 7: CONFIGURACIÓN CENTRAL SAAS & SEGMENTACIÓN POR CIUDAD / SMTP
+# ============================================================================
+
+class ConfiguracionPlataformaSaaS(models.Model):
+    """Configuración Maestra Global de la Plataforma SaaS (Bre-B, WhatsApp, SMTP, Tarifas)."""
+    llave_bre_b_general = models.CharField(
+        max_length=60, default="3028530041",
+        help_text="Llave Bre-B / BanRep / Nequi oficial para cobro de suscripciones a comercios"
+    )
+    tipo_llave_bre_b = models.CharField(max_length=20, default="celular")
+    banco_receptor = models.CharField(max_length=80, default="Bancolombia / Nequi", blank=True)
+    whatsapp_soporte_general = models.CharField(
+        max_length=40, default="3146922087",
+        help_text="WhatsApp técnico y de contacto soporte de la plataforma"
+    )
+    tarifa_mensual_cop = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("19900"),
+        help_text="Tarifa plana de suscripción mensual estándar ($19.900 COP)"
+    )
+    correo_soporte = models.EmailField(
+        default="soporte@diariocomercial.co", blank=True
+    )
+    
+    # Parámetros de Conexión de Correo Electrónico (SMTP)
+    smtp_activo = models.BooleanField(
+        default=False,
+        help_text="Activar envío de correos vía SMTP real (si está inactivo, usa backend de consola)"
+    )
+    smtp_host = models.CharField(max_length=120, blank=True, default="smtp-relay.brevo.com")
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_user = models.CharField(max_length=120, blank=True, default="")
+    smtp_password = models.CharField(max_length=120, blank=True, default="")
+    smtp_use_tls = models.BooleanField(default=True)
+    smtp_from_email = models.EmailField(blank=True, default="soporte@diariocomercial.co")
+
+    dias_gracia_mora = models.PositiveIntegerField(default=5, help_text="Días de gracia antes de suspender comercio tras vencimiento")
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuración Global SaaS"
+        verbose_name_plural = "Configuración Global SaaS"
+
+    def __str__(self):
+        return f"Configuración Global SaaS (Llave: {self.llave_bre_b_general}, WA: {self.whatsapp_soporte_general})"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(id=1)
+        return obj
+
+
+class ConfiguracionSaaSMunicipio(models.Model):
+    """Segmentación de cobros y números de atención por ciudad/municipio."""
+    municipio = models.OneToOneField(
+        Municipio, on_delete=models.CASCADE, related_name="config_saas_segmentada"
+    )
+    llave_bre_b = models.CharField(
+        max_length=60, blank=True,
+        help_text="Llave Bre-B exclusiva para recaudos en este municipio (dejar en blanco para usar la general)"
+    )
+    tipo_llave_bre_b = models.CharField(max_length=20, default="celular")
+    banco_receptor = models.CharField(max_length=80, blank=True)
+    whatsapp_soporte = models.CharField(
+        max_length=40, blank=True,
+        help_text="WhatsApp de contacto/soporte exclusivo para este municipio (dejar en blanco para usar el general)"
+    )
+    tarifa_mensual_cop = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Tarifa mensual diferenciada para este municipio (dejar en blanco para estándar $19.900)"
+    )
+    activo = models.BooleanField(default=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["municipio__nombre"]
+        verbose_name = "Segmentación SaaS por Municipio"
+        verbose_name_plural = "Segmentaciones SaaS por Municipio"
+
+    def __str__(self):
+        return f"Segmentación {self.municipio.nombre} (WA: {self.whatsapp_soporte or 'General'}, Bre-B: {self.llave_bre_b or 'General'})"
+
+
+def obtener_configuracion_saas(municipio=None):
+    """Retorna la configuración SaaS aplicable (general o segmentada por municipio)."""
+    cfg_global = ConfiguracionPlataformaSaaS.get_solo()
+    if not municipio:
+        return {
+            "llave_bre_b": cfg_global.llave_bre_b_general,
+            "tipo_llave_bre_b": cfg_global.tipo_llave_bre_b,
+            "banco_receptor": cfg_global.banco_receptor,
+            "whatsapp_soporte": cfg_global.whatsapp_soporte_general,
+            "tarifa_mensual_cop": cfg_global.tarifa_mensual_cop,
+            "correo_soporte": cfg_global.correo_soporte,
+            "segmentado": False,
+            "municipio_nombre": None,
+        }
+    
+    seg = getattr(municipio, "config_saas_segmentada", None)
+    if not seg and hasattr(municipio, "id"):
+        seg = ConfiguracionSaaSMunicipio.objects.filter(municipio=municipio, activo=True).first()
+
+    llave = (seg.llave_bre_b if seg and seg.llave_bre_b.strip() else cfg_global.llave_bre_b_general)
+    tipo_llave = (seg.tipo_llave_bre_b if seg and seg.tipo_llave_bre_b else cfg_global.tipo_llave_bre_b)
+    banco = (seg.banco_receptor if seg and seg.banco_receptor.strip() else cfg_global.banco_receptor)
+    wa = (seg.whatsapp_soporte if seg and seg.whatsapp_soporte.strip() else cfg_global.whatsapp_soporte_general)
+    tarifa = (seg.tarifa_mensual_cop if seg and seg.tarifa_mensual_cop is not None else cfg_global.tarifa_mensual_cop)
+
+    return {
+        "llave_bre_b": llave,
+        "tipo_llave_bre_b": tipo_llave,
+        "banco_receptor": banco,
+        "whatsapp_soporte": wa,
+        "tarifa_mensual_cop": tarifa,
+        "correo_soporte": cfg_global.correo_soporte,
+        "segmentado": bool(seg and (seg.llave_bre_b or seg.whatsapp_soporte or seg.tarifa_mensual_cop)),
+        "municipio_nombre": municipio.nombre if municipio else None,
+    }
+
+
+

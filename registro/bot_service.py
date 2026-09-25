@@ -25,6 +25,7 @@ from .models import (
     TokenVinculacion,
     MensajeProcesado,
     Cliente,
+    obtener_configuracion_saas,
 )
 from .inventario_service import (
     normalizar_texto,
@@ -153,6 +154,20 @@ def despachar_mensaje(
     usuario = vinculo.usuario
     perfil = Perfil.objects.filter(user=usuario, establecimiento=establecimiento).first()
     es_propietario = perfil.es_propietario() if perfil else False
+
+    # 3.1 Verificación de Suspensión del Comercio
+    if establecimiento.estado == "suspendido":
+        cfg = obtener_configuracion_saas(establecimiento.municipio)
+        resp = (
+            f"⚠️ *Servicio Temporalmente Inactivo*\n\n"
+            f"El comercio *{establecimiento.nombre}* se encuentra en pausa por pago de suscripción pendiente.\n\n"
+            f"🛡️ *Tus ventas anteriores e inventario están 100% seguros y respaldados.*\n\n"
+            f"⚡ Para reactivar tu servicio al instante:\n"
+            f"• Realiza tu pago de ${cfg['tarifa_mensual_cop']:,.0f} COP a la llave Bre-B: `{cfg['llave_bre_b']}`\n"
+            f"• O contacta a soporte al WhatsApp: +57 {cfg['whatsapp_soporte']}"
+        )
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
 
     # 4. Enrutamiento del Comando
     t_norm = normalizar_texto(texto)

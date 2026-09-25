@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Configuración de Plataforma SaaS y Segmentación{% endblock %}
+{% block content %}
+<div style="max-width:980px; margin:0 auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+    <div>
+      <h2>⚙️ Configuración Central SaaS & Segmentación Territorial</h2>
+      <p class="lead" style="margin:0;">Administre llaves de recaudo Bre-B, canales de WhatsApp oficiales, servidor SMTP de correos y segmentación por ciudades.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-secondary">← Volver al Dashboard</a>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}" style="margin-bottom:16px;">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:20px; margin-bottom:24px;">
+    <!-- COLUMNA 1: CONFIGURACIÓN MAESTRA SAAS -->
+    <div class="panel" style="padding:24px; border-top:4px solid #0284c7;">
+      <h3 style="margin-top:0; color:#0369a1; font-size:17px; display:flex; align-items:center; gap:8px;">
+        🏢 1. Parámetros Globales de la Plataforma
+      </h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:16px;">
+        Estos datos se aplican por defecto a todas las tiendas de Colombia a menos que la ciudad tenga una regla de segmentación activa.
+      </p>
+
+      <form method="post" action="{% url 'superadmin_configuracion' %}">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="guardar_global">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Llave Bre-B Central (Recaudos) *</label>
+            {{ form_global.llave_bre_b_general }}
+            <small style="color:#64748b; font-size:11px;">Ej: 3028530041 para todos los pagos</small>
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Tipo de Llave *</label>
+            {{ form_global.tipo_llave_bre_b }}
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Banco Receptor Bre-B</label>
+            {{ form_global.banco_receptor }}
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">WhatsApp Central Soporte *</label>
+            {{ form_global.whatsapp_soporte_general }}
+            <small style="color:#64748b; font-size:11px;">Ej: 3146922087 recepción y envío</small>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Tarifa Mensual Estándar ($ COP) *</label>
+            {{ form_global.tarifa_mensual_cop }}
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Días de Gracia tras Vencimiento</label>
+            {{ form_global.dias_gracia_mora }}
+          </div>
+        </div>
+
+        <!-- SECCIÓN SMTP INTEGRADA -->
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:16px; margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="margin:0; font-size:14px; color:var(--navy);">📨 Conexión de Correo Electrónico (SMTP)</h4>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:bold; font-size:12px; cursor:pointer; color:#0369a1;">
+              {{ form_global.smtp_activo }} Activar Envío SMTP Real
+            </label>
+          </div>
+          <p style="font-size:12px; color:#64748b; margin-bottom:12px;">
+            Recomendado: <strong>Brevo SMTP</strong> (300 correos/día 100% gratis) o <strong>Gmail</strong> con App Password.
+          </p>
+
+          <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:2px;">Servidor Host SMTP</label>
+              {{ form_global.smtp_host }}
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:2px;">Puerto</label>
+              {{ form_global.smtp_port }}
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:2px;">Usuario / API Key</label>
+              {{ form_global.smtp_user }}
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:2px;">Contraseña SMTP</label>
+              {{ form_global.smtp_password }}
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:center;">
+            <div>
+              <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:2px;">Correo Remitente (FROM)</label>
+              {{ form_global.smtp_from_email }}
+            </div>
+            <div style="margin-top:16px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:bold; cursor:pointer;">
+                {{ form_global.smtp_use_tls }} Usar Cifrado TLS (Recomendado)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:10px; font-weight:bold; background:#0284c7;">
+          💾 Guardar Configuración Central de Plataforma
+        </button>
+      </form>
+    </div>
+
+    <!-- COLUMNA 2: PRUEBA SMTP Y SEGMENTACIÓN POR CIUDAD -->
+    <div>
+      <!-- TARJETA PRUEBA DE CORREO EN VIVO -->
+      <div class="panel" style="padding:20px; border-top:4px solid #10b981; margin-bottom:20px;">
+        <h3 style="margin-top:0; color:#065f46; font-size:16px; display:flex; align-items:center; gap:8px;">
+          🧪 Probar Conexión de Correo Electrónico
+        </h3>
+        <p style="font-size:12px; color:#64748b; margin-bottom:12px;">
+          Envíe un correo de prueba instantáneo para comprobar que su servidor SMTP (Brevo/Gmail/Resend) está respondiendo correctamente sin errores de red.
+        </p>
+
+        <form method="post" action="{% url 'superadmin_probar_smtp' %}">
+          {% csrf_token %}
+          <div style="margin-bottom:12px;">
+            <label style="font-weight:bold; font-size:12px; display:block; margin-bottom:4px;">Enviar Prueba a este Correo:</label>
+            {{ form_prueba_smtp.destinatario }}
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary" style="background:#059669; font-weight:bold; width:100%;">
+            🚀 Enviar Correo de Prueba Ahora
+          </button>
+        </form>
+      </div>
+
+      <!-- NUEVA SEGMENTACIÓN POR MUNICIPIO -->
+      <div class="panel" style="padding:20px; border-top:4px solid #8b5cf6;">
+        <h3 style="margin-top:0; color:#6d28d9; font-size:16px; display:flex; align-items:center; gap:8px;">
+          📍 Nueva Segmentación por Ciudad
+        </h3>
+        <p style="font-size:12px; color:#64748b; margin-bottom:12px;">
+          Asigne números de WhatsApp y llaves Bre-B diferenciadas por municipio (ej. Tunja, Duitama, Sogamoso, Bogotá) para repartir cobros y soporte.
+        </p>
+
+        <form method="post" action="{% url 'superadmin_configuracion' %}">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="agregar_segmentacion">
+
+          <div style="margin-bottom:10px;">
+            <label style="font-weight:bold; font-size:12px; display:block; margin-bottom:2px;">Municipio *</label>
+            {{ form_segmentacion.municipio }}
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-weight:bold; font-size:12px; display:block; margin-bottom:2px;">Llave Bre-B Local</label>
+              {{ form_segmentacion.llave_bre_b }}
+            </div>
+            <div>
+              <label style="font-weight:bold; font-size:12px; display:block; margin-bottom:2px;">WhatsApp Local</label>
+              {{ form_segmentacion.whatsapp_soporte }}
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; align-items:center;">
+            <div>
+              <label style="font-weight:bold; font-size:12px; display:block; margin-bottom:2px;">Tarifa ($ COP)</label>
+              {{ form_segmentacion.tarifa_mensual_cop }}
+            </div>
+            <div style="margin-top:14px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:bold; cursor:pointer;">
+                {{ form_segmentacion.activo }} Activa
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-sm btn-primary" style="background:#7c3aed; font-weight:bold; width:100%;">
+            ➕ Guardar Segmentación Territorial
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA DE SEGMENTACIONES ACTIVAS -->
+  <div class="panel" style="padding:20px;">
+    <h3 style="margin-top:0; color:var(--navy); font-size:16px;">
+      🗺️ Ciudades con Segmentación Territorial Registrada ({{ segmentaciones.count }})
+    </h3>
+    <p style="font-size:13px; color:#64748b; margin-bottom:14px;">
+      Los comercios creados en estas ciudades utilizarán automáticamente estas llaves de cobro y teléfonos de contacto en lugar de los globales.
+    </p>
+
+    {% if segmentaciones %}
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Municipio / Depto</th>
+            <th>Código DANE</th>
+            <th>Llave Bre-B Local</th>
+            <th>WhatsApp Soporte Local</th>
+            <th>Tarifa Mensual</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in segmentaciones %}
+          <tr>
+            <td><strong>{{ s.municipio.nombre }}</strong> ({{ s.municipio.departamento }})</td>
+            <td><code>{{ s.municipio.codigo_dane }}</code></td>
+            <td><strong style="color:#059669;">{{ s.llave_bre_b|default:"(Usa General 3028530041)" }}</strong></td>
+            <td><strong style="color:#0284c7;">{{ s.whatsapp_soporte|default:"(Usa General 3146922087)" }}</strong></td>
+            <td>${{ s.tarifa_mensual_cop|default:"19900"|floatformat:0 }} COP</td>
+            <td>
+              {% if s.activo %}
+                <span class="badge" style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:6px; font-weight:bold;">🟢 Activa</span>
+              {% else %}
+                <span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:6px;">Inactiva</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'superadmin_configuracion' %}" style="display:inline;" onsubmit="return confirm('¿Eliminar segmentación para {{ s.municipio.nombre }}?');">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="eliminar_segmentacion">
+                <input type="hidden" name="segmentacion_id" value="{{ s.id }}">
+                <button type="submit" class="btn btn-sm btn-danger" style="padding:4px 8px; font-size:12px;">🗑️ Eliminar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:30px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; color:#64748b;">
+      <span style="font-size:32px;">🌐</span>
+      <p style="margin:8px 0 0 0; font-size:14px;">No hay ciudades segmentadas aún. Todas las ciudades de Colombia operan con la Llave Central <strong>3028530041</strong> y el WhatsApp Soporte <strong>3146922087</strong>.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

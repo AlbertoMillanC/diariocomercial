@@ -1,0 +1,6734 @@
+[
+  {
+    "codigo_dane": "91263",
+    "nombre": "El Encanto",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91405",
+    "nombre": "La Chorrera",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91407",
+    "nombre": "La Pedrera",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91430",
+    "nombre": "La Victoria",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91001",
+    "nombre": "Leticia",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91460",
+    "nombre": "Mirití - Paraná",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91530",
+    "nombre": "Puerto Alegría",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91536",
+    "nombre": "Puerto Arica",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91540",
+    "nombre": "Puerto Nariño",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91669",
+    "nombre": "Puerto Santander",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "91798",
+    "nombre": "Tarapacá",
+    "departamento": "Amazonas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05002",
+    "nombre": "Abejorral",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05004",
+    "nombre": "Abriaquí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05021",
+    "nombre": "Alejandría",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05030",
+    "nombre": "Amagá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05031",
+    "nombre": "Amalfi",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05034",
+    "nombre": "Andes",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05036",
+    "nombre": "Angelópolis",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05038",
+    "nombre": "Angostura",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05040",
+    "nombre": "Anorí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05044",
+    "nombre": "Anzá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05045",
+    "nombre": "Apartadó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05051",
+    "nombre": "Arboletes",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05055",
+    "nombre": "Argelia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05059",
+    "nombre": "Armenia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05079",
+    "nombre": "Barbosa",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05088",
+    "nombre": "Bello",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05086",
+    "nombre": "Belmira",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05091",
+    "nombre": "Betania",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05093",
+    "nombre": "Betulia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05107",
+    "nombre": "Briceño",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05113",
+    "nombre": "Buriticá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05125",
+    "nombre": "Caicedo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05129",
+    "nombre": "Caldas",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05134",
+    "nombre": "Campamento",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05142",
+    "nombre": "Caracolí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05145",
+    "nombre": "Caramanta",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05147",
+    "nombre": "Carepa",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05150",
+    "nombre": "Carolina",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05154",
+    "nombre": "Caucasia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05138",
+    "nombre": "Cañasgordas",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05172",
+    "nombre": "Chigorodó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05190",
+    "nombre": "Cisneros",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05101",
+    "nombre": "Ciudad Bolívar",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05197",
+    "nombre": "Cocorná",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05206",
+    "nombre": "Concepción",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05209",
+    "nombre": "Concordia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05212",
+    "nombre": "Copacabana",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05120",
+    "nombre": "Cáceres",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05234",
+    "nombre": "Dabeiba",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05237",
+    "nombre": "Donmatías",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05240",
+    "nombre": "Ebéjico",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05250",
+    "nombre": "El Bagre",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05148",
+    "nombre": "El Carmen De Viboral",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05697",
+    "nombre": "El Santuario",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05264",
+    "nombre": "Entrerríos",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05266",
+    "nombre": "Envigado",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05282",
+    "nombre": "Fredonia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05284",
+    "nombre": "Frontino",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05306",
+    "nombre": "Giraldo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05308",
+    "nombre": "Girardota",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05313",
+    "nombre": "Granada",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05315",
+    "nombre": "Guadalupe",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05318",
+    "nombre": "Guarne",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05321",
+    "nombre": "Guatapé",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05310",
+    "nombre": "Gómez Plata",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05347",
+    "nombre": "Heliconia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05353",
+    "nombre": "Hispania",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05360",
+    "nombre": "Itagüí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05361",
+    "nombre": "Ituango",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05364",
+    "nombre": "Jardín",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05368",
+    "nombre": "Jericó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05376",
+    "nombre": "La Ceja",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05380",
+    "nombre": "La Estrella",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05390",
+    "nombre": "La Pintada",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05400",
+    "nombre": "La Unión",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05411",
+    "nombre": "Liborina",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05425",
+    "nombre": "Maceo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05440",
+    "nombre": "Marinilla",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05001",
+    "nombre": "Medellín",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05467",
+    "nombre": "Montebello",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05475",
+    "nombre": "Murindó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05480",
+    "nombre": "Mutatá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05483",
+    "nombre": "Nariño",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05495",
+    "nombre": "Nechí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05490",
+    "nombre": "Necoclí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05501",
+    "nombre": "Olaya",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05543",
+    "nombre": "Peque",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05541",
+    "nombre": "Peñol",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05576",
+    "nombre": "Pueblorrico",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05579",
+    "nombre": "Puerto Berrío",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05585",
+    "nombre": "Puerto Nare",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05591",
+    "nombre": "Puerto Triunfo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05604",
+    "nombre": "Remedios",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05607",
+    "nombre": "Retiro",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05615",
+    "nombre": "Rionegro",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05628",
+    "nombre": "Sabanalarga",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05631",
+    "nombre": "Sabaneta",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05642",
+    "nombre": "Salgar",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05647",
+    "nombre": "San Andrés De Cuerquía",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05649",
+    "nombre": "San Carlos",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05652",
+    "nombre": "San Francisco",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05656",
+    "nombre": "San Jerónimo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05658",
+    "nombre": "San José De La Montaña",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05659",
+    "nombre": "San Juan De Urabá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05660",
+    "nombre": "San Luis",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05664",
+    "nombre": "San Pedro De Los Milagros",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05665",
+    "nombre": "San Pedro De Urabá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05667",
+    "nombre": "San Rafael",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05670",
+    "nombre": "San Roque",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05674",
+    "nombre": "San Vicente Ferrer",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05679",
+    "nombre": "Santa Bárbara",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05042",
+    "nombre": "Santa Fé De Antioquia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05686",
+    "nombre": "Santa Rosa De Osos",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05690",
+    "nombre": "Santo Domingo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05736",
+    "nombre": "Segovia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05756",
+    "nombre": "Sonsón",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05761",
+    "nombre": "Sopetrán",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05790",
+    "nombre": "Tarazá",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05792",
+    "nombre": "Tarso",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05809",
+    "nombre": "Titiribí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05819",
+    "nombre": "Toledo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05837",
+    "nombre": "Turbo",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05789",
+    "nombre": "Támesis",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05842",
+    "nombre": "Uramita",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05847",
+    "nombre": "Urrao",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05854",
+    "nombre": "Valdivia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05856",
+    "nombre": "Valparaíso",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05858",
+    "nombre": "Vegachí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05861",
+    "nombre": "Venecia",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05873",
+    "nombre": "Vigía Del Fuerte",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05885",
+    "nombre": "Yalí",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05887",
+    "nombre": "Yarumal",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05890",
+    "nombre": "Yolombó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05893",
+    "nombre": "Yondó",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "05895",
+    "nombre": "Zaragoza",
+    "departamento": "Antioquia",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81001",
+    "nombre": "Arauca",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81065",
+    "nombre": "Arauquita",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81220",
+    "nombre": "Cravo Norte",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81300",
+    "nombre": "Fortul",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81591",
+    "nombre": "Puerto Rondón",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81736",
+    "nombre": "Saravena",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "81794",
+    "nombre": "Tame",
+    "departamento": "Arauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "88564",
+    "nombre": "Providencia",
+    "departamento": "Archipiélago De San Andrés, Providencia Y Santa Catalina",
+    "activo": true
+  },
+  {
+    "codigo_dane": "88001",
+    "nombre": "San Andrés",
+    "departamento": "Archipiélago De San Andrés, Providencia Y Santa Catalina",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08078",
+    "nombre": "Baranoa",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08001",
+    "nombre": "Barranquilla",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08137",
+    "nombre": "Campo De La Cruz",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08141",
+    "nombre": "Candelaria",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08296",
+    "nombre": "Galapa",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08372",
+    "nombre": "Juan De Acosta",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08421",
+    "nombre": "Luruaco",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08433",
+    "nombre": "Malambo",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08436",
+    "nombre": "Manatí",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08520",
+    "nombre": "Palmar De Varela",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08549",
+    "nombre": "Piojó",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08558",
+    "nombre": "Polonuevo",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08560",
+    "nombre": "Ponedera",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08573",
+    "nombre": "Puerto Colombia",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08606",
+    "nombre": "Repelón",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08634",
+    "nombre": "Sabanagrande",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08638",
+    "nombre": "Sabanalarga",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08675",
+    "nombre": "Santa Lucía",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08685",
+    "nombre": "Santo Tomás",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08758",
+    "nombre": "Soledad",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08770",
+    "nombre": "Suan",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08832",
+    "nombre": "Tubará",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "08849",
+    "nombre": "Usiacurí",
+    "departamento": "Atlántico",
+    "activo": true
+  },
+  {
+    "codigo_dane": "11001",
+    "nombre": "Bogotá, D.C.",
+    "departamento": "Bogotá, D.C.",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13006",
+    "nombre": "Achí",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13030",
+    "nombre": "Altos Del Rosario",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13042",
+    "nombre": "Arenal",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13052",
+    "nombre": "Arjona",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13062",
+    "nombre": "Arroyohondo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13074",
+    "nombre": "Barranco De Loba",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13140",
+    "nombre": "Calamar",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13160",
+    "nombre": "Cantagallo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13001",
+    "nombre": "Cartagena De Indias",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13188",
+    "nombre": "Cicuco",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13222",
+    "nombre": "Clemencia",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13212",
+    "nombre": "Córdoba",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13244",
+    "nombre": "El Carmen De Bolívar",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13248",
+    "nombre": "El Guamo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13268",
+    "nombre": "El Peñón",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13300",
+    "nombre": "Hatillo De Loba",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13430",
+    "nombre": "Magangué",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13433",
+    "nombre": "Mahates",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13440",
+    "nombre": "Margarita",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13442",
+    "nombre": "María La Baja",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13458",
+    "nombre": "Montecristo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13473",
+    "nombre": "Morales",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13490",
+    "nombre": "Norosí",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13549",
+    "nombre": "Pinillos",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13580",
+    "nombre": "Regidor",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13600",
+    "nombre": "Río Viejo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13620",
+    "nombre": "San Cristóbal",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13647",
+    "nombre": "San Estanislao",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13650",
+    "nombre": "San Fernando",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13654",
+    "nombre": "San Jacinto",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13655",
+    "nombre": "San Jacinto Del Cauca",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13657",
+    "nombre": "San Juan Nepomuceno",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13667",
+    "nombre": "San Martín De Loba",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13670",
+    "nombre": "San Pablo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13673",
+    "nombre": "Santa Catalina",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13468",
+    "nombre": "Santa Cruz De Mompox",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13683",
+    "nombre": "Santa Rosa",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13688",
+    "nombre": "Santa Rosa Del Sur",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13744",
+    "nombre": "Simití",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13760",
+    "nombre": "Soplaviento",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13780",
+    "nombre": "Talaigua Nuevo",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13810",
+    "nombre": "Tiquisio",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13836",
+    "nombre": "Turbaco",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13838",
+    "nombre": "Turbaná",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13873",
+    "nombre": "Villanueva",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "13894",
+    "nombre": "Zambrano",
+    "departamento": "Bolívar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15022",
+    "nombre": "Almeida",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15047",
+    "nombre": "Aquitania",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15051",
+    "nombre": "Arcabuco",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15087",
+    "nombre": "Belén",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15090",
+    "nombre": "Berbeo",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15092",
+    "nombre": "Betéitiva",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15097",
+    "nombre": "Boavita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15104",
+    "nombre": "Boyacá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15106",
+    "nombre": "Briceño",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15109",
+    "nombre": "Buenavista",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15114",
+    "nombre": "Busbanzá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15131",
+    "nombre": "Caldas",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15135",
+    "nombre": "Campohermoso",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15162",
+    "nombre": "Cerinza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15172",
+    "nombre": "Chinavita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15176",
+    "nombre": "Chiquinquirá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15180",
+    "nombre": "Chiscas",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15183",
+    "nombre": "Chita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15185",
+    "nombre": "Chitaraque",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15187",
+    "nombre": "Chivatá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15236",
+    "nombre": "Chivor",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15232",
+    "nombre": "Chíquiza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15189",
+    "nombre": "Ciénega",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15212",
+    "nombre": "Coper",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15215",
+    "nombre": "Corrales",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15218",
+    "nombre": "Covarachía",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15223",
+    "nombre": "Cubará",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15224",
+    "nombre": "Cucaita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15226",
+    "nombre": "Cuítiva",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15204",
+    "nombre": "Cómbita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15238",
+    "nombre": "Duitama",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15244",
+    "nombre": "El Cocuy",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15248",
+    "nombre": "El Espino",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15272",
+    "nombre": "Firavitoba",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15276",
+    "nombre": "Floresta",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15293",
+    "nombre": "Gachantivá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15299",
+    "nombre": "Garagoa",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15317",
+    "nombre": "Guacamayas",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15322",
+    "nombre": "Guateque",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15325",
+    "nombre": "Guayatá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15296",
+    "nombre": "Gámeza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15332",
+    "nombre": "Güicán De La Sierra",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15362",
+    "nombre": "Iza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15367",
+    "nombre": "Jenesano",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15368",
+    "nombre": "Jericó",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15380",
+    "nombre": "La Capilla",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15403",
+    "nombre": "La Uvita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15401",
+    "nombre": "La Victoria",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15377",
+    "nombre": "Labranzagrande",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15425",
+    "nombre": "Macanal",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15442",
+    "nombre": "Maripí",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15455",
+    "nombre": "Miraflores",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15464",
+    "nombre": "Mongua",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15466",
+    "nombre": "Monguí",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15469",
+    "nombre": "Moniquirá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15476",
+    "nombre": "Motavita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15480",
+    "nombre": "Muzo",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15491",
+    "nombre": "Nobsa",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15494",
+    "nombre": "Nuevo Colón",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15500",
+    "nombre": "Oicatá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15507",
+    "nombre": "Otanche",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15511",
+    "nombre": "Pachavita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15516",
+    "nombre": "Paipa",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15518",
+    "nombre": "Pajarito",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15522",
+    "nombre": "Panqueba",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15531",
+    "nombre": "Pauna",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15533",
+    "nombre": "Paya",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15537",
+    "nombre": "Paz De Río",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15542",
+    "nombre": "Pesca",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15550",
+    "nombre": "Pisba",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15572",
+    "nombre": "Puerto Boyacá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15514",
+    "nombre": "Páez",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15580",
+    "nombre": "Quípama",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15599",
+    "nombre": "Ramiriquí",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15621",
+    "nombre": "Rondón",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15600",
+    "nombre": "Ráquira",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15632",
+    "nombre": "Saboyá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15646",
+    "nombre": "Samacá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15660",
+    "nombre": "San Eduardo",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15664",
+    "nombre": "San José De Pare",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15667",
+    "nombre": "San Luis De Gaceno",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15673",
+    "nombre": "San Mateo",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15676",
+    "nombre": "San Miguel De Sema",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15681",
+    "nombre": "San Pablo De Borbur",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15690",
+    "nombre": "Santa María",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15693",
+    "nombre": "Santa Rosa De Viterbo",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15696",
+    "nombre": "Santa Sofía",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15686",
+    "nombre": "Santana",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15720",
+    "nombre": "Sativanorte",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15723",
+    "nombre": "Sativasur",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15740",
+    "nombre": "Siachoque",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15753",
+    "nombre": "Soatá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15757",
+    "nombre": "Socha",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15755",
+    "nombre": "Socotá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15759",
+    "nombre": "Sogamoso",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15761",
+    "nombre": "Somondoco",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15762",
+    "nombre": "Sora",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15764",
+    "nombre": "Soracá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15763",
+    "nombre": "Sotaquirá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15774",
+    "nombre": "Susacón",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15776",
+    "nombre": "Sutamarchán",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15778",
+    "nombre": "Sutatenza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15638",
+    "nombre": "Sáchica",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15790",
+    "nombre": "Tasco",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15798",
+    "nombre": "Tenza",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15804",
+    "nombre": "Tibaná",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15806",
+    "nombre": "Tibasosa",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15808",
+    "nombre": "Tinjacá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15810",
+    "nombre": "Tipacoque",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15814",
+    "nombre": "Toca",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15816",
+    "nombre": "Togüí",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15822",
+    "nombre": "Tota",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15001",
+    "nombre": "Tunja",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15832",
+    "nombre": "Tununguá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15835",
+    "nombre": "Turmequé",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15837",
+    "nombre": "Tuta",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15839",
+    "nombre": "Tutazá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15820",
+    "nombre": "Tópaga",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15861",
+    "nombre": "Ventaquemada",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15407",
+    "nombre": "Villa De Leyva",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15879",
+    "nombre": "Viracachá",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15897",
+    "nombre": "Zetaquira",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "15842",
+    "nombre": "Úmbita",
+    "departamento": "Boyacá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17013",
+    "nombre": "Aguadas",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17042",
+    "nombre": "Anserma",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17050",
+    "nombre": "Aranzazu",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17088",
+    "nombre": "Belalcázar",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17174",
+    "nombre": "Chinchiná",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17272",
+    "nombre": "Filadelfia",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17380",
+    "nombre": "La Dorada",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17388",
+    "nombre": "La Merced",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17001",
+    "nombre": "Manizales",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17433",
+    "nombre": "Manzanares",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17442",
+    "nombre": "Marmato",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17444",
+    "nombre": "Marquetalia",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17446",
+    "nombre": "Marulanda",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17486",
+    "nombre": "Neira",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17495",
+    "nombre": "Norcasia",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17524",
+    "nombre": "Palestina",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17541",
+    "nombre": "Pensilvania",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17513",
+    "nombre": "Pácora",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17614",
+    "nombre": "Riosucio",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17616",
+    "nombre": "Risaralda",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17653",
+    "nombre": "Salamina",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17662",
+    "nombre": "Samaná",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17665",
+    "nombre": "San José",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17777",
+    "nombre": "Supía",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17867",
+    "nombre": "Victoria",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17873",
+    "nombre": "Villamaría",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "17877",
+    "nombre": "Viterbo",
+    "departamento": "Caldas",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18029",
+    "nombre": "Albania",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18094",
+    "nombre": "Belén De Los Andaquíes",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18150",
+    "nombre": "Cartagena Del Chairá",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18205",
+    "nombre": "Curillo",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18247",
+    "nombre": "El Doncello",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18256",
+    "nombre": "El Paujíl",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18001",
+    "nombre": "Florencia",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18410",
+    "nombre": "La Montañita",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18460",
+    "nombre": "Milán",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18479",
+    "nombre": "Morelia",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18592",
+    "nombre": "Puerto Rico",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18610",
+    "nombre": "San José Del Fragua",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18753",
+    "nombre": "San Vicente Del Caguán",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18756",
+    "nombre": "Solano",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18785",
+    "nombre": "Solita",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "18860",
+    "nombre": "Valparaíso",
+    "departamento": "Caquetá",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85010",
+    "nombre": "Aguazul",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85015",
+    "nombre": "Chámeza",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85125",
+    "nombre": "Hato Corozal",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85136",
+    "nombre": "La Salina",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85139",
+    "nombre": "Maní",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85162",
+    "nombre": "Monterrey",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85225",
+    "nombre": "Nunchía",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85230",
+    "nombre": "Orocué",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85250",
+    "nombre": "Paz De Ariporo",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85263",
+    "nombre": "Pore",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85279",
+    "nombre": "Recetor",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85300",
+    "nombre": "Sabanalarga",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85325",
+    "nombre": "San Luis De Palenque",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85315",
+    "nombre": "Sácama",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85410",
+    "nombre": "Tauramena",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85430",
+    "nombre": "Trinidad",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85400",
+    "nombre": "Támara",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85440",
+    "nombre": "Villanueva",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "85001",
+    "nombre": "Yopal",
+    "departamento": "Casanare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19022",
+    "nombre": "Almaguer",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19050",
+    "nombre": "Argelia",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19075",
+    "nombre": "Balboa",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19100",
+    "nombre": "Bolívar",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19110",
+    "nombre": "Buenos Aires",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19130",
+    "nombre": "Cajibío",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19137",
+    "nombre": "Caldono",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19142",
+    "nombre": "Caloto",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19212",
+    "nombre": "Corinto",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19256",
+    "nombre": "El Tambo",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19290",
+    "nombre": "Florencia",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19300",
+    "nombre": "Guachené",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19318",
+    "nombre": "Guapi",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19355",
+    "nombre": "Inzá",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19364",
+    "nombre": "Jambaló",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19392",
+    "nombre": "La Sierra",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19397",
+    "nombre": "La Vega",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19418",
+    "nombre": "López De Micay",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19450",
+    "nombre": "Mercaderes",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19455",
+    "nombre": "Miranda",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19473",
+    "nombre": "Morales",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19513",
+    "nombre": "Padilla",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19532",
+    "nombre": "Patía",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19533",
+    "nombre": "Piamonte",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19548",
+    "nombre": "Piendamó - Tunía",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19001",
+    "nombre": "Popayán",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19573",
+    "nombre": "Puerto Tejada",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19585",
+    "nombre": "Puracé",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19517",
+    "nombre": "Páez",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19622",
+    "nombre": "Rosas",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19693",
+    "nombre": "San Sebastián",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19701",
+    "nombre": "Santa Rosa",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19698",
+    "nombre": "Santander De Quilichao",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19743",
+    "nombre": "Silvia",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19760",
+    "nombre": "Sotará - Paispamba",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19785",
+    "nombre": "Sucre",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19780",
+    "nombre": "Suárez",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19809",
+    "nombre": "Timbiquí",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19807",
+    "nombre": "Timbío",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19821",
+    "nombre": "Toribío",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19824",
+    "nombre": "Totoró",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "19845",
+    "nombre": "Villa Rica",
+    "departamento": "Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20011",
+    "nombre": "Aguachica",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20013",
+    "nombre": "Agustín Codazzi",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20032",
+    "nombre": "Astrea",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20045",
+    "nombre": "Becerril",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20060",
+    "nombre": "Bosconia",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20175",
+    "nombre": "Chimichagua",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20178",
+    "nombre": "Chiriguaná",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20228",
+    "nombre": "Curumaní",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20238",
+    "nombre": "El Copey",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20250",
+    "nombre": "El Paso",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20295",
+    "nombre": "Gamarra",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20310",
+    "nombre": "González",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20383",
+    "nombre": "La Gloria",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20400",
+    "nombre": "La Jagua De Ibirico",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20621",
+    "nombre": "La Paz",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20443",
+    "nombre": "Manaure Balcón Del Cesar",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20517",
+    "nombre": "Pailitas",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20550",
+    "nombre": "Pelaya",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20570",
+    "nombre": "Pueblo Bello",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20614",
+    "nombre": "Río De Oro",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20710",
+    "nombre": "San Alberto",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20750",
+    "nombre": "San Diego",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20770",
+    "nombre": "San Martín",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20787",
+    "nombre": "Tamalameque",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "20001",
+    "nombre": "Valledupar",
+    "departamento": "Cesar",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27006",
+    "nombre": "Acandí",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27025",
+    "nombre": "Alto Baudó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27050",
+    "nombre": "Atrato",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27073",
+    "nombre": "Bagadó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27075",
+    "nombre": "Bahía Solano",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27077",
+    "nombre": "Bajo Baudó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27099",
+    "nombre": "Bojayá",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27150",
+    "nombre": "Carmen Del Darién",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27205",
+    "nombre": "Condoto",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27160",
+    "nombre": "Cértegui",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27135",
+    "nombre": "El Cantón Del San Pablo",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27245",
+    "nombre": "El Carmen De Atrato",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27250",
+    "nombre": "El Litoral Del San Juan",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27361",
+    "nombre": "Istmina",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27372",
+    "nombre": "Juradó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27413",
+    "nombre": "Lloró",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27425",
+    "nombre": "Medio Atrato",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27430",
+    "nombre": "Medio Baudó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27450",
+    "nombre": "Medio San Juan",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27493",
+    "nombre": "Nuevo Belén De Bajirá",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27495",
+    "nombre": "Nuquí",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27491",
+    "nombre": "Nóvita",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27001",
+    "nombre": "Quibdó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27615",
+    "nombre": "Riosucio",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27580",
+    "nombre": "Río Iró",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27600",
+    "nombre": "Río Quito",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27660",
+    "nombre": "San José Del Palmar",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27745",
+    "nombre": "Sipí",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27787",
+    "nombre": "Tadó",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27800",
+    "nombre": "Unguía",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "27810",
+    "nombre": "Unión Panamericana",
+    "departamento": "Chocó",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25001",
+    "nombre": "Agua De Dios",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25019",
+    "nombre": "Albán",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25035",
+    "nombre": "Anapoima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25040",
+    "nombre": "Anolaima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25599",
+    "nombre": "Apulo",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25053",
+    "nombre": "Arbeláez",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25086",
+    "nombre": "Beltrán",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25095",
+    "nombre": "Bituima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25099",
+    "nombre": "Bojacá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25120",
+    "nombre": "Cabrera",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25123",
+    "nombre": "Cachipay",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25126",
+    "nombre": "Cajicá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25148",
+    "nombre": "Caparrapí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25154",
+    "nombre": "Carmen De Carupa",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25168",
+    "nombre": "Chaguaní",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25178",
+    "nombre": "Chipaque",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25181",
+    "nombre": "Choachí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25183",
+    "nombre": "Chocontá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25175",
+    "nombre": "Chía",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25200",
+    "nombre": "Cogua",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25214",
+    "nombre": "Cota",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25224",
+    "nombre": "Cucunubá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25151",
+    "nombre": "Cáqueza",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25245",
+    "nombre": "El Colegio",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25258",
+    "nombre": "El Peñón",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25260",
+    "nombre": "El Rosal",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25269",
+    "nombre": "Facatativá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25281",
+    "nombre": "Fosca",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25286",
+    "nombre": "Funza",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25290",
+    "nombre": "Fusagasugá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25279",
+    "nombre": "Fómeque",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25288",
+    "nombre": "Fúquene",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25293",
+    "nombre": "Gachalá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25295",
+    "nombre": "Gachancipá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25297",
+    "nombre": "Gachetá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25299",
+    "nombre": "Gama",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25307",
+    "nombre": "Girardot",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25312",
+    "nombre": "Granada",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25317",
+    "nombre": "Guachetá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25320",
+    "nombre": "Guaduas",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25322",
+    "nombre": "Guasca",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25324",
+    "nombre": "Guataquí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25326",
+    "nombre": "Guatavita",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25328",
+    "nombre": "Guayabal De Síquima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25335",
+    "nombre": "Guayabetal",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25339",
+    "nombre": "Gutiérrez",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25368",
+    "nombre": "Jerusalén",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25372",
+    "nombre": "Junín",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25377",
+    "nombre": "La Calera",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25386",
+    "nombre": "La Mesa",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25394",
+    "nombre": "La Palma",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25398",
+    "nombre": "La Peña",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25402",
+    "nombre": "La Vega",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25407",
+    "nombre": "Lenguazaque",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25426",
+    "nombre": "Machetá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25430",
+    "nombre": "Madrid",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25436",
+    "nombre": "Manta",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25438",
+    "nombre": "Medina",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25473",
+    "nombre": "Mosquera",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25483",
+    "nombre": "Nariño",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25486",
+    "nombre": "Nemocón",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25488",
+    "nombre": "Nilo",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25489",
+    "nombre": "Nimaima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25491",
+    "nombre": "Nocaima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25513",
+    "nombre": "Pacho",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25518",
+    "nombre": "Paime",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25524",
+    "nombre": "Pandi",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25530",
+    "nombre": "Paratebueno",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25535",
+    "nombre": "Pasca",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25572",
+    "nombre": "Puerto Salgar",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25580",
+    "nombre": "Pulí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25592",
+    "nombre": "Quebradanegra",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25594",
+    "nombre": "Quetame",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25596",
+    "nombre": "Quipile",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25612",
+    "nombre": "Ricaurte",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25645",
+    "nombre": "San Antonio Del Tequendama",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25649",
+    "nombre": "San Bernardo",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25653",
+    "nombre": "San Cayetano",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25658",
+    "nombre": "San Francisco",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25662",
+    "nombre": "San Juan De Rioseco",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25718",
+    "nombre": "Sasaima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25736",
+    "nombre": "Sesquilé",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25740",
+    "nombre": "Sibaté",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25743",
+    "nombre": "Silvania",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25745",
+    "nombre": "Simijaca",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25754",
+    "nombre": "Soacha",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25758",
+    "nombre": "Sopó",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25769",
+    "nombre": "Subachoque",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25772",
+    "nombre": "Suesca",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25777",
+    "nombre": "Supatá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25779",
+    "nombre": "Susa",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25781",
+    "nombre": "Sutatausa",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25785",
+    "nombre": "Tabio",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25793",
+    "nombre": "Tausa",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25797",
+    "nombre": "Tena",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25799",
+    "nombre": "Tenjo",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25805",
+    "nombre": "Tibacuy",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25807",
+    "nombre": "Tibirita",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25815",
+    "nombre": "Tocaima",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25817",
+    "nombre": "Tocancipá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25823",
+    "nombre": "Topaipí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25839",
+    "nombre": "Ubalá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25841",
+    "nombre": "Ubaque",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25845",
+    "nombre": "Une",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25506",
+    "nombre": "Venecia",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25862",
+    "nombre": "Vergara",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25867",
+    "nombre": "Vianí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25843",
+    "nombre": "Villa De San Diego De Ubaté",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25871",
+    "nombre": "Villagómez",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25873",
+    "nombre": "Villapinzón",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25875",
+    "nombre": "Villeta",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25878",
+    "nombre": "Viotá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25885",
+    "nombre": "Yacopí",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25898",
+    "nombre": "Zipacón",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25899",
+    "nombre": "Zipaquirá",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "25851",
+    "nombre": "Útica",
+    "departamento": "Cundinamarca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23068",
+    "nombre": "Ayapel",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23079",
+    "nombre": "Buenavista",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23090",
+    "nombre": "Canalete",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23162",
+    "nombre": "Cereté",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23168",
+    "nombre": "Chimá",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23182",
+    "nombre": "Chinú",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23189",
+    "nombre": "Ciénaga De Oro",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23300",
+    "nombre": "Cotorra",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23350",
+    "nombre": "La Apartada",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23417",
+    "nombre": "Lorica",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23419",
+    "nombre": "Los Córdobas",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23464",
+    "nombre": "Momil",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23466",
+    "nombre": "Montelíbano",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23001",
+    "nombre": "Montería",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23500",
+    "nombre": "Moñitos",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23555",
+    "nombre": "Planeta Rica",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23570",
+    "nombre": "Pueblo Nuevo",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23574",
+    "nombre": "Puerto Escondido",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23580",
+    "nombre": "Puerto Libertador",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23586",
+    "nombre": "Purísima De La Concepción",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23660",
+    "nombre": "Sahagún",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23670",
+    "nombre": "San Andrés De Sotavento",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23672",
+    "nombre": "San Antero",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23675",
+    "nombre": "San Bernardo Del Viento",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23678",
+    "nombre": "San Carlos",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23682",
+    "nombre": "San José De Uré",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23686",
+    "nombre": "San Pelayo",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23807",
+    "nombre": "Tierralta",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23815",
+    "nombre": "Tuchín",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "23855",
+    "nombre": "Valencia",
+    "departamento": "Córdoba",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94343",
+    "nombre": "Barrancominas",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94886",
+    "nombre": "Cacahual",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94001",
+    "nombre": "Inírida",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94885",
+    "nombre": "La Guadalupe",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94888",
+    "nombre": "Morichal",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94887",
+    "nombre": "Pana Pana",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94884",
+    "nombre": "Puerto Colombia",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "94883",
+    "nombre": "San Felipe",
+    "departamento": "Guainía",
+    "activo": true
+  },
+  {
+    "codigo_dane": "95015",
+    "nombre": "Calamar",
+    "departamento": "Guaviare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "95025",
+    "nombre": "El Retorno",
+    "departamento": "Guaviare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "95200",
+    "nombre": "Miraflores",
+    "departamento": "Guaviare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "95001",
+    "nombre": "San José Del Guaviare",
+    "departamento": "Guaviare",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41006",
+    "nombre": "Acevedo",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41013",
+    "nombre": "Agrado",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41016",
+    "nombre": "Aipe",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41020",
+    "nombre": "Algeciras",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41026",
+    "nombre": "Altamira",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41078",
+    "nombre": "Baraya",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41132",
+    "nombre": "Campoalegre",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41206",
+    "nombre": "Colombia",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41244",
+    "nombre": "Elías",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41298",
+    "nombre": "Garzón",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41306",
+    "nombre": "Gigante",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41319",
+    "nombre": "Guadalupe",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41349",
+    "nombre": "Hobo",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41359",
+    "nombre": "Isnos",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41378",
+    "nombre": "La Argentina",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41396",
+    "nombre": "La Plata",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41001",
+    "nombre": "Neiva",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41483",
+    "nombre": "Nátaga",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41503",
+    "nombre": "Oporapa",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41518",
+    "nombre": "Paicol",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41524",
+    "nombre": "Palermo",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41530",
+    "nombre": "Palestina",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41548",
+    "nombre": "Pital",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41551",
+    "nombre": "Pitalito",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41615",
+    "nombre": "Rivera",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41660",
+    "nombre": "Saladoblanco",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41668",
+    "nombre": "San Agustín",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41676",
+    "nombre": "Santa María",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41770",
+    "nombre": "Suaza",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41791",
+    "nombre": "Tarqui",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41799",
+    "nombre": "Tello",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41801",
+    "nombre": "Teruel",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41797",
+    "nombre": "Tesalia",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41807",
+    "nombre": "Timaná",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41872",
+    "nombre": "Villavieja",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41885",
+    "nombre": "Yaguará",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "41357",
+    "nombre": "Íquira",
+    "departamento": "Huila",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44035",
+    "nombre": "Albania",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44078",
+    "nombre": "Barrancas",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44090",
+    "nombre": "Dibulla",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44098",
+    "nombre": "Distracción",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44110",
+    "nombre": "El Molino",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44279",
+    "nombre": "Fonseca",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44378",
+    "nombre": "Hatonuevo",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44420",
+    "nombre": "La Jagua Del Pilar",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44430",
+    "nombre": "Maicao",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44560",
+    "nombre": "Manaure",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44001",
+    "nombre": "Riohacha",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44650",
+    "nombre": "San Juan Del Cesar",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44847",
+    "nombre": "Uribia",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44855",
+    "nombre": "Urumita",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "44874",
+    "nombre": "Villanueva",
+    "departamento": "La Guajira",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47030",
+    "nombre": "Algarrobo",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47053",
+    "nombre": "Aracataca",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47058",
+    "nombre": "Ariguaní",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47161",
+    "nombre": "Cerro De San Antonio",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47170",
+    "nombre": "Chivolo",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47189",
+    "nombre": "Ciénaga",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47205",
+    "nombre": "Concordia",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47245",
+    "nombre": "El Banco",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47258",
+    "nombre": "El Piñón",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47268",
+    "nombre": "El Retén",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47288",
+    "nombre": "Fundación",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47318",
+    "nombre": "Guamal",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47460",
+    "nombre": "Nueva Granada",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47541",
+    "nombre": "Pedraza",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47545",
+    "nombre": "Pijiño Del Carmen",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47551",
+    "nombre": "Pivijay",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47555",
+    "nombre": "Plato",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47570",
+    "nombre": "Puebloviejo",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47605",
+    "nombre": "Remolino",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47660",
+    "nombre": "Sabanas De San Ángel",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47675",
+    "nombre": "Salamina",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47692",
+    "nombre": "San Sebastián De Buenavista",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47703",
+    "nombre": "San Zenón",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47707",
+    "nombre": "Santa Ana",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47720",
+    "nombre": "Santa Bárbara De Pinto",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47001",
+    "nombre": "Santa Marta",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47745",
+    "nombre": "Sitionuevo",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47798",
+    "nombre": "Tenerife",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47960",
+    "nombre": "Zapayán",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "47980",
+    "nombre": "Zona Bananera",
+    "departamento": "Magdalena",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50006",
+    "nombre": "Acacías",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50110",
+    "nombre": "Barranca De Upía",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50124",
+    "nombre": "Cabuyaro",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50150",
+    "nombre": "Castilla La Nueva",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50223",
+    "nombre": "Cubarral",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50226",
+    "nombre": "Cumaral",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50245",
+    "nombre": "El Calvario",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50251",
+    "nombre": "El Castillo",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50270",
+    "nombre": "El Dorado",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50287",
+    "nombre": "Fuente De Oro",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50313",
+    "nombre": "Granada",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50318",
+    "nombre": "Guamal",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50350",
+    "nombre": "La Macarena",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50400",
+    "nombre": "Lejanías",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50325",
+    "nombre": "Mapiripán",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50330",
+    "nombre": "Mesetas",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50450",
+    "nombre": "Puerto Concordia",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50568",
+    "nombre": "Puerto Gaitán",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50577",
+    "nombre": "Puerto Lleras",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50573",
+    "nombre": "Puerto López",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50590",
+    "nombre": "Puerto Rico",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50606",
+    "nombre": "Restrepo",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50680",
+    "nombre": "San Carlos De Guaroa",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50683",
+    "nombre": "San Juan De Arama",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50686",
+    "nombre": "San Juanito",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50689",
+    "nombre": "San Martín",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50370",
+    "nombre": "Uribe",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50001",
+    "nombre": "Villavicencio",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "50711",
+    "nombre": "Vistahermosa",
+    "departamento": "Meta",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52019",
+    "nombre": "Albán",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52022",
+    "nombre": "Aldana",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52036",
+    "nombre": "Ancuya",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52051",
+    "nombre": "Arboleda",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52079",
+    "nombre": "Barbacoas",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52083",
+    "nombre": "Belén",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52110",
+    "nombre": "Buesaco",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52240",
+    "nombre": "Chachagüí",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52203",
+    "nombre": "Colón",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52207",
+    "nombre": "Consacá",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52210",
+    "nombre": "Contadero",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52224",
+    "nombre": "Cuaspud Carlosama",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52227",
+    "nombre": "Cumbal",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52233",
+    "nombre": "Cumbitara",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52215",
+    "nombre": "Córdoba",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52250",
+    "nombre": "El Charco",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52254",
+    "nombre": "El Peñol",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52256",
+    "nombre": "El Rosario",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52258",
+    "nombre": "El Tablón De Gómez",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52260",
+    "nombre": "El Tambo",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52520",
+    "nombre": "Francisco Pizarro",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52287",
+    "nombre": "Funes",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52317",
+    "nombre": "Guachucal",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52320",
+    "nombre": "Guaitarilla",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52323",
+    "nombre": "Gualmatán",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52352",
+    "nombre": "Iles",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52354",
+    "nombre": "Imués",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52356",
+    "nombre": "Ipiales",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52378",
+    "nombre": "La Cruz",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52381",
+    "nombre": "La Florida",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52385",
+    "nombre": "La Llanada",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52390",
+    "nombre": "La Tola",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52399",
+    "nombre": "La Unión",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52405",
+    "nombre": "Leiva",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52411",
+    "nombre": "Linares",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52418",
+    "nombre": "Los Andes",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52427",
+    "nombre": "Magüí",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52435",
+    "nombre": "Mallama",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52473",
+    "nombre": "Mosquera",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52480",
+    "nombre": "Nariño",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52490",
+    "nombre": "Olaya Herrera",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52506",
+    "nombre": "Ospina",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52001",
+    "nombre": "Pasto",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52540",
+    "nombre": "Policarpa",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52560",
+    "nombre": "Potosí",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52565",
+    "nombre": "Providencia",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52573",
+    "nombre": "Puerres",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52585",
+    "nombre": "Pupiales",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52612",
+    "nombre": "Ricaurte",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52621",
+    "nombre": "Roberto Payán",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52678",
+    "nombre": "Samaniego",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52835",
+    "nombre": "San Andrés De Tumaco",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52685",
+    "nombre": "San Bernardo",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52687",
+    "nombre": "San Lorenzo",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52693",
+    "nombre": "San Pablo",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52694",
+    "nombre": "San Pedro De Cartago",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52683",
+    "nombre": "Sandoná",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52696",
+    "nombre": "Santa Bárbara",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52699",
+    "nombre": "Santacruz",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52720",
+    "nombre": "Sapuyes",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52786",
+    "nombre": "Taminango",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52788",
+    "nombre": "Tangua",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52838",
+    "nombre": "Túquerres",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "52885",
+    "nombre": "Yacuanquer",
+    "departamento": "Nariño",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54051",
+    "nombre": "Arboledas",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54099",
+    "nombre": "Bochalema",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54109",
+    "nombre": "Bucarasica",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54670",
+    "nombre": "Cali (Santiago de Cali)",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54172",
+    "nombre": "Chinácota",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54174",
+    "nombre": "Chitagá",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54206",
+    "nombre": "Convención",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54223",
+    "nombre": "Cucutilla",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54128",
+    "nombre": "Cáchira",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54125",
+    "nombre": "Cácota",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54239",
+    "nombre": "Durania",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54245",
+    "nombre": "El Carmen",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54250",
+    "nombre": "El Tarra",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54261",
+    "nombre": "El Zulia",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54313",
+    "nombre": "Gramalote",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54344",
+    "nombre": "Hacarí",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54347",
+    "nombre": "Herrán",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54385",
+    "nombre": "La Esperanza",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54398",
+    "nombre": "La Playa",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54377",
+    "nombre": "Labateca",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54405",
+    "nombre": "Los Patios",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54418",
+    "nombre": "Lourdes",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54480",
+    "nombre": "Mutiscua",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54498",
+    "nombre": "Ocaña",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54518",
+    "nombre": "Pamplona",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54520",
+    "nombre": "Pamplonita",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54553",
+    "nombre": "Puerto Santander",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54599",
+    "nombre": "Ragonvalia",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54660",
+    "nombre": "Salazar",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54673",
+    "nombre": "San Cayetano",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54001",
+    "nombre": "San José De Cúcuta",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54680",
+    "nombre": "Santiago",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54720",
+    "nombre": "Sardinata",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54743",
+    "nombre": "Silos",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54800",
+    "nombre": "Teorama",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54810",
+    "nombre": "Tibú",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54820",
+    "nombre": "Toledo",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54871",
+    "nombre": "Villa Caro",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54874",
+    "nombre": "Villa Del Rosario",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "54003",
+    "nombre": "Ábrego",
+    "departamento": "Norte De Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86219",
+    "nombre": "Colón",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86001",
+    "nombre": "Mocoa",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86320",
+    "nombre": "Orito",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86568",
+    "nombre": "Puerto Asís",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86569",
+    "nombre": "Puerto Caicedo",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86571",
+    "nombre": "Puerto Guzmán",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86573",
+    "nombre": "Puerto Leguízamo",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86755",
+    "nombre": "San Francisco",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86757",
+    "nombre": "San Miguel",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86760",
+    "nombre": "Santiago",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86749",
+    "nombre": "Sibundoy",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86865",
+    "nombre": "Valle Del Guamuez",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "86885",
+    "nombre": "Villagarzón",
+    "departamento": "Putumayo",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63001",
+    "nombre": "Armenia",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63111",
+    "nombre": "Buenavista",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63130",
+    "nombre": "Calarcá",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63190",
+    "nombre": "Circasia",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63212",
+    "nombre": "Córdoba",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63272",
+    "nombre": "Filandia",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63302",
+    "nombre": "Génova",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63401",
+    "nombre": "La Tebaida",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63470",
+    "nombre": "Montenegro",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63548",
+    "nombre": "Pijao",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63594",
+    "nombre": "Quimbaya",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "63690",
+    "nombre": "Salento",
+    "departamento": "Quindío",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66045",
+    "nombre": "Apía",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66075",
+    "nombre": "Balboa",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66088",
+    "nombre": "Belén De Umbría",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66170",
+    "nombre": "Dosquebradas",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66318",
+    "nombre": "Guática",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66383",
+    "nombre": "La Celia",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66400",
+    "nombre": "La Virginia",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66440",
+    "nombre": "Marsella",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66456",
+    "nombre": "Mistrató",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66001",
+    "nombre": "Pereira",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66572",
+    "nombre": "Pueblo Rico",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66594",
+    "nombre": "Quinchía",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66682",
+    "nombre": "Santa Rosa De Cabal",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "66687",
+    "nombre": "Santuario",
+    "departamento": "Risaralda",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68013",
+    "nombre": "Aguada",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68020",
+    "nombre": "Albania",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68051",
+    "nombre": "Aratoca",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68077",
+    "nombre": "Barbosa",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68079",
+    "nombre": "Barichara",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68081",
+    "nombre": "Barrancabermeja",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68092",
+    "nombre": "Betulia",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68101",
+    "nombre": "Bolívar",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68001",
+    "nombre": "Bucaramanga",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68121",
+    "nombre": "Cabrera",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68132",
+    "nombre": "Cali (Santiago de Cali)",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68147",
+    "nombre": "Capitanejo",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68152",
+    "nombre": "Carcasí",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68160",
+    "nombre": "Cepitá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68162",
+    "nombre": "Cerrito",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68167",
+    "nombre": "Charalá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68169",
+    "nombre": "Charta",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68176",
+    "nombre": "Chima",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68179",
+    "nombre": "Chipatá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68190",
+    "nombre": "Cimitarra",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68207",
+    "nombre": "Concepción",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68209",
+    "nombre": "Confines",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68211",
+    "nombre": "Contratación",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68217",
+    "nombre": "Coromoro",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68229",
+    "nombre": "Curití",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68235",
+    "nombre": "El Carmen De Chucurí",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68245",
+    "nombre": "El Guacamayo",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68250",
+    "nombre": "El Peñón",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68255",
+    "nombre": "El Playón",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68264",
+    "nombre": "Encino",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68266",
+    "nombre": "Enciso",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68276",
+    "nombre": "Floridablanca",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68271",
+    "nombre": "Florián",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68296",
+    "nombre": "Galán",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68307",
+    "nombre": "Girón",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68318",
+    "nombre": "Guaca",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68320",
+    "nombre": "Guadalupe",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68322",
+    "nombre": "Guapotá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68324",
+    "nombre": "Guavatá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68298",
+    "nombre": "Gámbita",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68327",
+    "nombre": "Güepsa",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68344",
+    "nombre": "Hato",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68368",
+    "nombre": "Jesús María",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68370",
+    "nombre": "Jordán",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68377",
+    "nombre": "La Belleza",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68397",
+    "nombre": "La Paz",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68385",
+    "nombre": "Landázuri",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68406",
+    "nombre": "Lebrija",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68418",
+    "nombre": "Los Santos",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68425",
+    "nombre": "Macaravita",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68444",
+    "nombre": "Matanza",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68464",
+    "nombre": "Mogotes",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68468",
+    "nombre": "Molagavita",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68432",
+    "nombre": "Málaga",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68498",
+    "nombre": "Ocamonte",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68500",
+    "nombre": "Oiba",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68502",
+    "nombre": "Onzaga",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68522",
+    "nombre": "Palmar",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68524",
+    "nombre": "Palmas Del Socorro",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68547",
+    "nombre": "Piedecuesta",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68549",
+    "nombre": "Pinchote",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68572",
+    "nombre": "Puente Nacional",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68573",
+    "nombre": "Puerto Parra",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68575",
+    "nombre": "Puerto Wilches",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68533",
+    "nombre": "Páramo",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68615",
+    "nombre": "Rionegro",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68655",
+    "nombre": "Sabana De Torres",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68669",
+    "nombre": "San Andrés",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68673",
+    "nombre": "San Benito",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68679",
+    "nombre": "San Gil",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68682",
+    "nombre": "San Joaquín",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68684",
+    "nombre": "San José De Miranda",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68686",
+    "nombre": "San Miguel",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68689",
+    "nombre": "San Vicente De Chucurí",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68705",
+    "nombre": "Santa Bárbara",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68720",
+    "nombre": "Santa Helena Del Opón",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68745",
+    "nombre": "Simacota",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68755",
+    "nombre": "Socorro",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68770",
+    "nombre": "Suaita",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68773",
+    "nombre": "Sucre",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68780",
+    "nombre": "Suratá",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68820",
+    "nombre": "Tona",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68855",
+    "nombre": "Valle De San José",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68867",
+    "nombre": "Vetas",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68872",
+    "nombre": "Villanueva",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68861",
+    "nombre": "Vélez",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "68895",
+    "nombre": "Zapatoca",
+    "departamento": "Santander",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70110",
+    "nombre": "Buenavista",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70124",
+    "nombre": "Caimito",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70230",
+    "nombre": "Chalán",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70204",
+    "nombre": "Colosó",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70215",
+    "nombre": "Corozal",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70221",
+    "nombre": "Coveñas",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70233",
+    "nombre": "El Roble",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70235",
+    "nombre": "Galeras",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70265",
+    "nombre": "Guaranda",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70400",
+    "nombre": "La Unión",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70418",
+    "nombre": "Los Palmitos",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70429",
+    "nombre": "Majagual",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70473",
+    "nombre": "Morroa",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70508",
+    "nombre": "Ovejas",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70523",
+    "nombre": "Palmito",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70670",
+    "nombre": "Sampués",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70678",
+    "nombre": "San Benito Abad",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70823",
+    "nombre": "San José De Toluviejo",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70702",
+    "nombre": "San Juan De Betulia",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70742",
+    "nombre": "San Luis De Sincé",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70708",
+    "nombre": "San Marcos",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70713",
+    "nombre": "San Onofre",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70717",
+    "nombre": "San Pedro",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70820",
+    "nombre": "Santiago De Tolú",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70001",
+    "nombre": "Sincelejo",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "70771",
+    "nombre": "Sucre",
+    "departamento": "Sucre",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73024",
+    "nombre": "Alpujarra",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73026",
+    "nombre": "Alvarado",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73030",
+    "nombre": "Ambalema",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73043",
+    "nombre": "Anzoátegui",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73055",
+    "nombre": "Armero",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73067",
+    "nombre": "Ataco",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73124",
+    "nombre": "Cajamarca",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73148",
+    "nombre": "Carmen De Apicalá",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73152",
+    "nombre": "Casabianca",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73168",
+    "nombre": "Chaparral",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73200",
+    "nombre": "Coello",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73217",
+    "nombre": "Coyaima",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73226",
+    "nombre": "Cunday",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73236",
+    "nombre": "Dolores",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73268",
+    "nombre": "Espinal",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73270",
+    "nombre": "Falan",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73275",
+    "nombre": "Flandes",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73283",
+    "nombre": "Fresno",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73319",
+    "nombre": "Guamo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73347",
+    "nombre": "Herveo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73349",
+    "nombre": "Honda",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73001",
+    "nombre": "Ibagué",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73352",
+    "nombre": "Icononzo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73408",
+    "nombre": "Lérida",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73411",
+    "nombre": "Líbano",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73449",
+    "nombre": "Melgar",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73461",
+    "nombre": "Murillo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73483",
+    "nombre": "Natagaima",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73504",
+    "nombre": "Ortega",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73520",
+    "nombre": "Palocabildo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73547",
+    "nombre": "Piedras",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73555",
+    "nombre": "Planadas",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73563",
+    "nombre": "Prado",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73585",
+    "nombre": "Purificación",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73616",
+    "nombre": "Rioblanco",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73622",
+    "nombre": "Roncesvalles",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73624",
+    "nombre": "Rovira",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73671",
+    "nombre": "Saldaña",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73675",
+    "nombre": "San Antonio",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73678",
+    "nombre": "San Luis",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73443",
+    "nombre": "San Sebastián De Mariquita",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73686",
+    "nombre": "Santa Isabel",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73770",
+    "nombre": "Suárez",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73854",
+    "nombre": "Valle De San Juan",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73861",
+    "nombre": "Venadillo",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73870",
+    "nombre": "Villahermosa",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "73873",
+    "nombre": "Villarrica",
+    "departamento": "Tolima",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76020",
+    "nombre": "Alcalá",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76036",
+    "nombre": "Andalucía",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76041",
+    "nombre": "Ansermanuevo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76054",
+    "nombre": "Argelia",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76100",
+    "nombre": "Bolívar",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76109",
+    "nombre": "Buenaventura",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76113",
+    "nombre": "Bugalagrande",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76122",
+    "nombre": "Caicedonia",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76001",
+    "nombre": "Cali (Santiago de Cali)",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76126",
+    "nombre": "Cali (Santiago de Cali)",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76130",
+    "nombre": "Candelaria",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76147",
+    "nombre": "Cartago",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76233",
+    "nombre": "Dagua",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76246",
+    "nombre": "El Cairo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76248",
+    "nombre": "El Cerrito",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76250",
+    "nombre": "El Dovio",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76243",
+    "nombre": "El Águila",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76275",
+    "nombre": "Florida",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76306",
+    "nombre": "Ginebra",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76318",
+    "nombre": "Guacarí",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76111",
+    "nombre": "Guadalajara De Buga",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76364",
+    "nombre": "Jamundí",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76377",
+    "nombre": "La Cumbre",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76400",
+    "nombre": "La Unión",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76403",
+    "nombre": "La Victoria",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76497",
+    "nombre": "Obando",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76520",
+    "nombre": "Palmira",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76563",
+    "nombre": "Pradera",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76606",
+    "nombre": "Restrepo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76616",
+    "nombre": "Riofrío",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76622",
+    "nombre": "Roldanillo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76670",
+    "nombre": "San Pedro",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76736",
+    "nombre": "Sevilla",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76823",
+    "nombre": "Toro",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76828",
+    "nombre": "Trujillo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76834",
+    "nombre": "Tuluá",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76845",
+    "nombre": "Ulloa",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76863",
+    "nombre": "Versalles",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76869",
+    "nombre": "Vijes",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76890",
+    "nombre": "Yotoco",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76892",
+    "nombre": "Yumbo",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "76895",
+    "nombre": "Zarzal",
+    "departamento": "Valle Del Cauca",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97161",
+    "nombre": "Carurú",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97001",
+    "nombre": "Mitú",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97511",
+    "nombre": "Pacoa",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97777",
+    "nombre": "Papunahua",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97666",
+    "nombre": "Taraira",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "97889",
+    "nombre": "Yavaraté",
+    "departamento": "Vaupés",
+    "activo": true
+  },
+  {
+    "codigo_dane": "99773",
+    "nombre": "Cumaribo",
+    "departamento": "Vichada",
+    "activo": true
+  },
+  {
+    "codigo_dane": "99524",
+    "nombre": "La Primavera",
+    "departamento": "Vichada",
+    "activo": true
+  },
+  {
+    "codigo_dane": "99001",
+    "nombre": "Puerto Carreño",
+    "departamento": "Vichada",
+    "activo": true
+  },
+  {
+    "codigo_dane": "99624",
+    "nombre": "Santa Rosalía",
+    "departamento": "Vichada",
+    "activo": true
+  }
+]

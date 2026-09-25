@@ -1,31 +1,165 @@
 {% extends "base.html" %}
 {% block title %}Panel de Control del Sistema — Super-Administrador SaaS{% endblock %}
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
   <div>
     <h2>👑 Panel de Super-Administrador SaaS</h2>
-    <p class="lead" style="margin:0;">Control centralizado de infraestructura, alta y baja de comercios, cobranza de suscripciones y facturación de la plataforma.</p>
+    <p class="lead" style="margin:0;">Monitoreo en tiempo real, consolidado transaccional global, control multi-tenant y cobranza de la plataforma.</p>
   </div>
-  <div style="display:flex; gap:10px; align-items:center;">
-    <a href="{% url 'superadmin_comercio_crear' %}" class="btn btn-primary" style="background:#059669; font-weight:bold; font-size:14px; padding:8px 16px; border-radius:8px;">
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <a href="{% url 'superadmin_configuracion' %}" class="btn btn-secondary" style="font-weight:bold; font-size:13px; padding:8px 14px; border-radius:8px;">
+      ⚙️ Configuración SaaS & Segmentación
+    </a>
+    <a href="{% url 'superadmin_comercio_crear' %}" class="btn btn-primary" style="background:#059669; font-weight:bold; font-size:13px; padding:8px 14px; border-radius:8px;">
       ➕ Registrar Nuevo Comercio
     </a>
-    <span class="tag" style="background:#0f172a; color:#4ade80; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:8px;">
-      MODO OPERADOR CENTRAL • {{ hoy|date:"d/m/Y" }}
-    </span>
+    <div style="display:flex; align-items:center; gap:6px; background:#0f172a; color:#4ade80; font-weight:bold; font-size:12px; padding:6px 12px; border-radius:8px;">
+      <span class="live-pulse" style="display:inline-block; width:8px; height:8px; background:#4ade80; border-radius:50%;"></span>
+      <span>EN TIEMPO REAL • {{ hoy|date:"d/m/Y" }}</span>
+    </div>
   </div>
 </div>
 
-<!-- ESTADO OPERACIONAL DE SERVICIOS DEL SISTEMA -->
+<!-- BARRA DE FILTRO POR MUNICIPIO / CONSOLIDADO NACIONAL -->
+<div class="panel" style="padding:12px 18px; margin-bottom:16px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span style="font-size:18px;">📍</span>
+    <strong style="font-size:13px; color:var(--navy);">Filtrar Consolidado por Ciudad:</strong>
+    <form method="get" id="form-filtro-municipio" style="margin:0; display:inline-block;">
+      <select name="municipio" onchange="this.form.submit()" style="padding:5px 12px; font-size:13px; border-radius:6px; border:1px solid #94a3b8; font-weight:bold; color:#0f172a;">
+        <option value="">🇨🇴 Todo Colombia (Consolidado Nacional)</option>
+        {% for m in municipios_filtro %}
+          <option value="{{ m.id }}" {% if municipio_seleccionado and municipio_seleccionado.id == m.id %}selected{% endif %}>
+            {{ m.nombre }} ({{ m.departamento }})
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  <div style="font-size:12px; color:#64748b;">
+    {% if municipio_seleccionado %}
+      Mostrando datos exclusivos para <strong>{{ municipio_seleccionado.nombre }}</strong>. <a href="{% url 'superadmin_dashboard' %}" style="color:#0284c7; font-weight:bold;">Ver consolidado nacional</a>
+    {% else %}
+      Consolidando transacciones de todas las sedes activas en Colombia.
+    {% endif %}
+  </div>
+</div>
+
+<!-- FILA 1: CONSOLIDADO TRANSACCIONAL GLOBAL (TODO LO QUE SE PUEDE MEDIR) -->
+<div style="margin-bottom:20px;">
+  <h3 style="font-size:15px; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 10px 0; font-weight:bold;">
+    📊 Consolidado de Transacciones Globales del Sistema
+  </h3>
+  <div class="cards cards-5" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+    <div class="card" style="border-left:4px solid #059669; padding:14px;">
+      <span style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b;">Suma Total Ventas</span>
+      <strong id="kpi-ventas" style="font-size:19px; color:#059669; display:block; margin-top:2px;">$ {{ total_ventas_global|floatformat:0 }} COP</strong>
+      <small style="color:#64748b; font-size:11px;">{{ conteo_ventas_global }} transacciones registradas</small>
+    </div>
+
+    <div class="card" style="border-left:4px solid #dc2626; padding:14px;">
+      <span style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b;">Suma Total Compras / Gastos</span>
+      <strong id="kpi-compras" style="font-size:19px; color:#dc2626; display:block; margin-top:2px;">$ {{ total_compras_global|floatformat:0 }} COP</strong>
+      <small style="color:#64748b; font-size:11px;">{{ conteo_compras_global }} compras asentadas</small>
+    </div>
+
+    <div class="card" style="border-left:4px solid #0284c7; padding:14px;">
+      <span style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b;">Flujo Neto Comercial</span>
+      <strong id="kpi-flujo" style="font-size:19px; color:{% if flujo_neto_global >= 0 %}#0284c7{% else %}#dc2626{% endif %}; display:block; margin-top:2px;">$ {{ flujo_neto_global|floatformat:0 }} COP</strong>
+      <small style="color:#64748b; font-size:11px;">Margen bruto consolidado</small>
+    </div>
+
+    <div class="card" style="border-left:4px solid #d97706; padding:14px;">
+      <span style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b;">Impuestos Liquidados (ICA)</span>
+      <strong id="kpi-ica" style="font-size:19px; color:#d97706; display:block; margin-top:2px;">$ {{ total_ica_global|floatformat:0 }} COP</strong>
+      <small style="color:#64748b; font-size:11px;">Retención municipal estimada</small>
+    </div>
+
+    <div class="card" style="border-left:4px solid #7c3aed; padding:14px;">
+      <span style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b;">Recaudos SaaS Cobrados</span>
+      <strong id="kpi-saas" style="font-size:19px; color:#7c3aed; display:block; margin-top:2px;">$ {{ total_recaudo_saas|floatformat:0 }} COP</strong>
+      <small style="color:#64748b; font-size:11px;">Mensualidades recolectadas</small>
+    </div>
+  </div>
+</div>
+
+<!-- FILA 2: GRÁFICOS INTERACTIVOS EN TIEMPO REAL CON CHART.JS Y FEED DE EVENTOS -->
+<div style="display:grid; grid-template-columns:1.8fr 1fr; gap:18px; margin-bottom:24px;">
+  
+  <!-- GRÁFICO 1: LÍNEA DE TIEMPO INTERACTIVA (30 DÍAS) -->
+  <div class="panel" style="padding:18px; border-radius:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+      <div>
+        <h3 style="margin:0; font-size:16px; color:var(--navy); display:flex; align-items:center; gap:8px;">
+          📈 Línea de Tiempo de Transacciones (Últimos 30 Días)
+        </h3>
+        <small style="color:#64748b; font-size:12px;">Comparativa diaria de Ventas, Compras y Recaudos SaaS</small>
+      </div>
+      <button onclick="actualizarMetricasEnVivo()" class="btn btn-sm btn-secondary" style="font-size:11px; padding:4px 10px;">
+        🔄 Refrescar Gráficos
+      </button>
+    </div>
+    
+    <div style="height:260px; position:relative;">
+      <canvas id="chart-timeline"></canvas>
+    </div>
+  </div>
+
+  <!-- GRÁFICO 2: DISTRIBUCIÓN POR CANAL DE PAGO & EVENTOS EN VIVO -->
+  <div class="panel" style="padding:18px; border-radius:12px; display:flex; flex-direction:column;">
+    <h3 style="margin:0 0 4px 0; font-size:16px; color:var(--navy); display:flex; align-items:center; gap:8px;">
+      ⚡ Canales de Transacción
+    </h3>
+    <small style="color:#64748b; font-size:12px; margin-bottom:10px;">Bre-B Interoperable vs Mostrador Tradicional</small>
+
+    <div style="height:170px; position:relative; margin-bottom:14px;">
+      <canvas id="chart-canales"></canvas>
+    </div>
+
+    <!-- FEED EN VIVO DE CAMBIOS RECIENTES -->
+    <div style="border-top:1px solid #e2e8f0; padding-top:10px; flex:1;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="font-size:12px; color:#475569; text-transform:uppercase;">⚡ Actividad Reciente en Vivo</strong>
+        <span id="live-time" style="font-size:11px; color:#94a3b8;">Actualizado</span>
+      </div>
+      <div id="live-feed-list" style="max-height:140px; overflow-y:auto; font-size:12px;">
+        {% for ev in eventos_recientes %}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #f1f5f9;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>{{ ev.icono }}</span>
+            <div>
+              <span style="font-weight:bold; color:#1e293b;">{{ ev.titulo }}</span>
+              <div style="font-size:11px; color:#64748b;">{{ ev.detalle }}</div>
+            </div>
+          </div>
+          <span style="font-weight:bold; color:{{ ev.color }}; white-space:nowrap;">
+            ${{ ev.monto|floatformat:0 }}
+          </span>
+        </div>
+        {% empty %}
+        <div style="color:#94a3b8; text-align:center; padding:10px;">Esperando transacciones...</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FILA 3: SALUD DE SERVICIOS Y METRICAS SAAS -->
 <div class="panel" style="margin-bottom:20px; padding:16px 20px; background:#0f172a; color:#fff; border-radius:12px;">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:12px;">
     <div style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:20px;">🖥️</span>
-      <h3 style="margin:0; font-size:16px; color:#f8fafc;">Infraestructura y Salud del Sistema</h3>
+      <h3 style="margin:0; font-size:16px; color:#f8fafc;">Infraestructura de Servidor y Estado de Servicios</h3>
     </div>
     <div style="display:flex; gap:8px;">
-      <a href="/admin/" target="_blank" class="btn btn-sm" style="background:#0284c7; color:#fff; font-weight:bold;">
-        ⚙️ Base de Datos Django (/admin/)
+      <a href="{% url 'superadmin_configuracion' %}" class="btn btn-sm" style="background:#0284c7; color:#fff; font-weight:bold;">
+        ⚙️ Configurar Bre-B, WhatsApp & SMTP
+      </a>
+      <a href="/admin/" target="_blank" class="btn btn-sm" style="background:#334155; color:#f8fafc;">
+        🗄️ Django Admin
       </a>
       <a href="{% url 'auditoria' %}" class="btn btn-sm" style="background:#334155; color:#f8fafc;">
         📋 Logs de Seguridad
@@ -34,28 +168,34 @@
   </div>
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:13px;">
     <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
-      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Servidor Web Core</span>
-      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 En Línea (Port 8001)</div>
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Servidor WSGI Producción</span>
+      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 Waitress / WhiteNoise (<50MB RAM)</div>
+      <small style="color:#94a3b8; font-size:10px;">Protección activa WinError 1450</small>
     </div>
     <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
-      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Demonio Bot Telegram</span>
-      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 Polling Activo (Daemon)</div>
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Demonio Telegram</span>
+      <div style="color:#4ade80; font-weight:bold; font-size:14px; margin-top:2px;">🟢 Polling Activo</div>
+      <small style="color:#94a3b8; font-size:10px;">{{ canales_activos }} Sesiones conectadas</small>
     </div>
     <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
-      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Riel de Pagos Bre-B</span>
-      <div style="color:#38bdf8; font-weight:bold; font-size:14px; margin-top:2px;">⚡ BanRep EMVCo Ready</div>
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Llave Bre-B Central</span>
+      <div style="color:#38bdf8; font-weight:bold; font-size:14px; margin-top:2px;">⚡ {{ cfg_saas.llave_bre_b_general }}</div>
+      <small style="color:#94a3b8; font-size:10px;">WA Técnico: {{ cfg_saas.whatsapp_soporte_general }}</small>
     </div>
     <div style="background:#1e293b; padding:10px 14px; border-radius:8px;">
-      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Sesiones Móviles Conectadas</span>
-      <div style="color:#f8fafc; font-weight:bold; font-size:14px; margin-top:2px;">📱 {{ canales_activos }} Dispositivos</div>
+      <span style="color:#94a3b8; font-size:11px; text-transform:uppercase; font-weight:bold;">Servidor SMTP Correo</span>
+      <div style="color:{% if cfg_saas.smtp_activo %}#4ade80{% else %}#fbbf24{% endif %}; font-weight:bold; font-size:14px; margin-top:2px;">
+        {% if cfg_saas.smtp_activo %}🟢 Conectado ({{ cfg_saas.smtp_host }}){% else %}🟡 Modo Consola (Inactivo){% endif %}
+      </div>
+      <small style="color:#94a3b8; font-size:10px;">{{ conteo_envios_reportes }} Envíos a contadores</small>
     </div>
   </div>
 </div>
 
-<!-- FILA SUPERIOR: METRICAS SAAS Y COBRANZA -->
+<!-- FILA 4: METRICAS SAAS DE TENANTS -->
 <div class="cards cards-5" style="grid-template-columns: repeat(5, 1fr); margin-bottom:20px;">
   <div class="card">
-    <span>Comercios (Tenants)</span>
+    <span>Comercios Totales</span>
     <strong>{{ total_comercios }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #10b981;">
@@ -63,12 +203,12 @@
     <strong style="color:#059669;">{{ comercios_activos }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #0284c7;">
-    <span>Plan $0 (Prueba)</span>
+    <span>Plan $0 (Lanzamiento)</span>
     <strong style="color:#0284c7;">{{ comercios_plan_cero }}</strong>
   </div>
-  <div class="card" style="border-left:4px solid #10b981;">
-    <span>Recaudado Este Mes</span>
-    <strong style="font-size:18px; color:#059669;">$ {{ total_recaudado_mes|floatformat:0 }} COP</strong>
+  <div class="card" style="border-left:4px solid #e11d48;">
+    <span>Suspendidos / En Mora</span>
+    <strong style="color:#e11d48;">{{ comercios_suspendidos }} / {{ comercios_mora }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #065f46;">
     <span>MRR Proyectado</span>
@@ -99,82 +239,84 @@
           <th>Plan & Cobro</th>
           <th>Vigencia</th>
           <th>Estado</th>
-          <th style="text-align:center;">Acciones de Gestión & Cobro</th>
+          <th>Acciones de Soporte</th>
         </tr>
       </thead>
       <tbody>
-        {% for c in comercios %}
-        <tr>
-          <td class="mono">{{ c.obj.pk }}</td>
+        {% for item in comercios %}
+        {% with c=item.obj %}
+        <tr style="{% if c.estado == 'suspendido' %}background:#fff1f2;{% endif %}">
+          <td><code>#{{ c.id }}</code></td>
           <td>
-            <strong>{{ c.obj.nombre }}</strong>
-            <br>
-            <small class="mono" style="color:#64748b;">NIT: {{ c.obj.nit|default:"Sin NIT" }}</small>
-            {% if c.obj.propietario_creador %}
-              <br><small style="color:#0369a1;">👤 Dueño: {{ c.obj.propietario_creador.username }}</small>
-            {% endif %}
+            <strong>{{ c.nombre }}</strong>
+            <div style="font-size:11px; color:#64748b;">
+              NIT: {{ c.nit|default:"Sin NIT" }} • Dueño: <strong>{{ c.propietario_creador.username|default:"Admin Central" }}</strong>
+            </div>
+            <div style="font-size:11px; color:#059669; font-weight:bold;">
+              {{ item.total_ventas_hist }} ventas históricas
+            </div>
           </td>
           <td>
-            {{ c.obj.municipio.nombre|default:"Tunja" }}
-            <br><small class="mono" style="color:#64748b;">DANE: {{ c.obj.municipio.codigo_dane|default:"15001" }}</small>
-          </td>
-          <td>
-            {% if c.tiene_medio_pago %}
-              <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:4px 8px; font-size:12px; color:#065f46;">
-                <strong>⚡ Bre-B:</strong> {{ c.obj.llave_bre_b }}
-                <br>
-                <small style="color:#047857;">🏦 {{ c.obj.banco_receptor_bre_b|default:"Entidad Interoperable" }}</small>
-              </div>
+            {% if c.municipio %}
+              {{ c.municipio.nombre }}
+              <div style="font-size:10px; color:#64748b;">{{ c.municipio.departamento }} ({{ c.municipio.codigo_dane }})</div>
             {% else %}
-              <span class="tag" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-size:11px;">
-                ⚠️ Sin llave inscrita
-              </span>
+              <span style="color:#94a3b8;">Sin asignar</span>
             {% endif %}
           </td>
           <td>
-            <span class="tag" style="background:{% if c.obj.plan_suscripcion == 'lanzamiento_cero' %}#e0f2fe; color:#0369a1;{% elif c.obj.plan_suscripcion == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
-              {{ c.obj.get_plan_suscripcion_display|default:c.obj.plan_suscripcion }}
-            </span>
-            {% if c.obj.fecha_ultimo_pago %}
-              <br><small style="font-size:11px; color:#64748b;">Último pago: {{ c.obj.fecha_ultimo_pago|date:"d/m/Y" }}</small>
-            {% endif %}
-          </td>
-          <td>
-            {% if c.en_riesgo %}
-              <strong style="color:#dc2626; font-size:13px;">⚠️ {{ c.dias_restantes }} días</strong>
+            {% if item.tiene_medio_pago %}
+              <span style="color:#059669; font-weight:bold; font-size:12px;">⚡ {{ c.llave_bre_b }}</span>
+              <div style="font-size:10px; color:#64748b;">{{ c.get_tipo_llave_bre_b_display }} ({{ c.banco_receptor_bre_b|default:"BanRep" }})</div>
             {% else %}
-              <span style="color:#059669; font-weight:bold; font-size:13px;">{{ c.dias_restantes }} días</span>
+              <span style="color:#dc2626; font-size:11px; font-weight:bold;">⚠️ Sin Bre-B</span>
             {% endif %}
-            <br>
-            <small style="color:#64748b; font-size:11px;">Vence: {{ c.obj.fecha_fin_prueba|date:"d/m/Y"|default:"Indefinido" }}</small>
           </td>
           <td>
-            <span class="tag" style="background:{% if c.obj.estado == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
-              {{ c.obj.estado|upper }}
+            <span class="badge" style="font-size:11px; padding:3px 8px; border-radius:4px;
+              {% if c.plan_suscripcion == 'activo' %}background:#dcfce7; color:#15803d;
+              {% elif c.plan_suscripcion == 'mora' %}background:#fee2e2; color:#b91c1c;
+              {% else %}background:#e0f2fe; color:#0369a1;{% endif %}">
+              {{ c.get_plan_suscripcion_display }}
             </span>
-          </td>
-          <td style="text-align:center;">
-            <div style="display:inline-flex; gap:5px; flex-wrap:wrap; justify-content:center;">
-              <a href="{% url 'superadmin_comercio_cobrar' c.obj.pk %}" class="btn btn-sm" style="background:#059669; color:#fff; text-decoration:none; font-weight:bold;" title="Cobrar mensualidad Bre-B o asentar pago">
-                💳 Cobrar / Asentar
+            <div style="margin-top:4px;">
+              <a href="{% url 'superadmin_comercio_cobrar' c.id %}" class="btn btn-sm btn-primary" style="padding:2px 8px; font-size:11px; background:#0284c7;">
+                💳 Cobrar
               </a>
-              <a href="{% url 'superadmin_asistir_tienda' c.obj.pk %}" class="btn btn-sm" style="background:#0284c7; color:#fff; text-decoration:none; font-weight:bold;" title="Asistir al dueño, cajeros y resolver problemas">
+            </div>
+          </td>
+          <td>
+            <strong>{{ item.dias_restantes }} días</strong>
+            <div style="font-size:10px; color:#64748b;">Hasta {{ c.fecha_fin_prueba|date:"d/m/Y"|default:"Indefinido" }}</div>
+          </td>
+          <td>
+            {% if c.estado == "activo" %}
+              <span class="badge" style="background:#dcfce7; color:#15803d; padding:4px 8px; border-radius:6px; font-weight:bold;">🟢 Activo</span>
+            {% else %}
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; padding:4px 8px; border-radius:6px; font-weight:bold;">🔴 Suspendido</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <a href="{% url 'superadmin_asistir_tienda' c.id %}" class="btn btn-sm btn-secondary" style="font-size:11px; padding:4px 8px;" title="Asistir y administrar usuarios de este comercio">
                 🛠️ Asistir
               </a>
-              <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de acceso para {{ c.obj.nombre }}?');">
-                {% if c.obj.estado == 'activo' %}⏸️{% else %}▶️{% endif %}
-              </a>
-              <a href="{% url 'superadmin_comercio_eliminar' c.obj.pk %}" class="btn btn-danger btn-sm" title="Eliminar o dar de baja comercio">
+              <form method="post" action="{% url 'superadmin_toggle_estado' c.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm {% if c.estado == 'activo' %}btn-danger{% else %}btn-primary{% endif %}" style="font-size:11px; padding:4px 8px;">
+                  {% if c.estado == "activo" %}⏸️ Suspender{% else %}▶️ Reactivar{% endif %}
+                </button>
+              </form>
+              <a href="{% url 'superadmin_comercio_eliminar' c.id %}" class="btn btn-sm btn-danger" style="font-size:11px; padding:4px 8px; background:#991b1b;" title="Eliminar comercio permanentemente">
                 🗑️
               </a>
             </div>
           </td>
         </tr>
+        {% endwith %}
         {% empty %}
         <tr>
-          <td colspan="8" style="text-align:center; padding:20px; color:#64748b;">
-            No hay comercios registrados en la base de datos.
-          </td>
+          <td colspan="8" style="text-align:center; padding:20px; color:var(--muted);">No hay comercios registrados en esta vista.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -182,83 +324,211 @@
   </div>
 </div>
 
-<!-- HISTORIAL DE COBROS Y RECAUDOS SAAS -->
+<!-- RED DE CONTADORES REPOSITORIO -->
 <div class="panel" style="margin-bottom:20px;">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-    <h3 style="margin:0; font-size:17px; color:var(--navy);">💰 Historial de Recaudos y Pagos de Suscripciones SaaS</h3>
-    <small style="color:var(--muted);">Auditoría de ingresos por mensualidades cobradas a comercios</small>
-  </div>
-
+  <h3 style="margin-top:0; font-size:17px; color:var(--navy);">👨‍💼 Red de Contadores Receptores Aliados</h3>
   <div class="tabla-wrap">
     <table>
       <thead>
         <tr>
-          <th>Fecha</th>
-          <th>Comercio</th>
-          <th>Monto Cobrado</th>
-          <th>Medio de Pago</th>
-          <th>Vigencia Añadida</th>
-          <th>N° Comprobante / Ref</th>
-          <th>Registrado Por</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for pago in ultimos_pagos %}
-        <tr>
-          <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
-          <td><strong>{{ pago.establecimiento.nombre }}</strong></td>
-          <td><strong style="color:#059669; font-size:14px;">$ {{ pago.monto|floatformat:0 }} COP</strong></td>
-          <td><span class="tag" style="background:#e0f2fe; color:#0369a1;">{{ pago.get_metodo_display }}</span></td>
-          <td>+{{ pago.periodo_dias }} días</td>
-          <td class="mono">{{ pago.referencia|default:"S/N" }}</td>
-          <td><small>{{ pago.registrado_por.username|default:"Sistema" }}</small></td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" style="text-align:center; padding:16px; color:#64748b;">
-            No se han registrado pagos de suscripción aún.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- RED DE CONTADORES ALIADOS -->
-<div class="panel" id="contadores">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-    <h3 style="margin:0; font-size:17px; color:var(--navy);">🤝 Red de Contadores Públicos Aliados</h3>
-    <small style="color:var(--muted);">Monitoreo de contadores que reciben los anexos contables e ICA de los clientes</small>
-  </div>
-
-  <div class="tabla-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Correo Electrónico del Contador</th>
-          <th style="text-align:center;">Clientes Vinculados</th>
-          <th style="text-align:center;">Reportes Enviados</th>
-          <th>Canal de Distribución</th>
+          <th>Correo Contador</th>
+          <th>Comercios Asociados</th>
+          <th>Reportes Descargados</th>
         </tr>
       </thead>
       <tbody>
         {% for cont in contadores %}
         <tr>
           <td><strong>{{ cont.correo_reportes }}</strong></td>
-          <td style="text-align:center;"><span class="tag" style="background:#e0f2fe; color:#0369a1; font-weight:bold;">{{ cont.total_clientes }} negocios</span></td>
-          <td style="text-align:center;">{{ cont.total_descargas }} envíos</td>
-          <td><span style="color:#059669; font-weight:bold;">Recomendador Activo B2B2C</span></td>
+          <td><span class="badge" style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px;">{{ cont.total_clientes }} tiendas</span></td>
+          <td>{{ cont.total_descargas }} veces</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" style="text-align:center; padding:20px; color:#64748b;">
-            No hay contadores asignados por los comercios todavía.
-          </td>
+          <td colspan="3" style="text-align:center; padding:16px; color:var(--muted);">No hay contadores registrados.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- SCRIPT CHART.JS Y POLLING EN TIEMPO REAL -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const labels = {{ timeline_labels_json|safe }};
+  const ventas = {{ timeline_ventas_json|safe }};
+  const compras = {{ timeline_compras_json|safe }};
+  const saas = {{ timeline_saas_json|safe }};
+  const canalesData = {{ canales_data_json|safe }};
+
+  // 1. Gráfico de Línea de Tiempo (Timeline Chart)
+  const ctxTimeline = document.getElementById("chart-timeline").getContext("2d");
+  window.timelineChart = new Chart(ctxTimeline, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Ventas Totales ($ COP)",
+          data: ventas,
+          borderColor: "#059669",
+          backgroundColor: "rgba(5, 150, 105, 0.1)",
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+        },
+        {
+          label: "Compras / Gastos ($ COP)",
+          data: compras,
+          borderColor: "#dc2626",
+          backgroundColor: "rgba(220, 38, 38, 0.05)",
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+        },
+        {
+          label: "Recaudos SaaS ($ COP)",
+          data: saas,
+          borderColor: "#7c3aed",
+          backgroundColor: "rgba(124, 58, 237, 0.1)",
+          fill: false,
+          tension: 0.3,
+          borderWidth: 2,
+          borderDash: [4, 4],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "top", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ": $" + Number(context.raw).toLocaleString("es-CO");
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) { return "$" + Number(value).toLocaleString("es-CO"); },
+            font: { size: 10 }
+          }
+        },
+        x: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+
+  // 2. Gráfico de Canales (Doughnut Chart)
+  const ctxCanales = document.getElementById("chart-canales").getContext("2d");
+  window.canalesChart = new Chart(ctxCanales, {
+    type: "doughnut",
+    data: {
+      labels: ["Bre-B Interoperable", "Efectivo Mostrador", "Otros / Factura"],
+      datasets: [{
+        data: canalesData,
+        backgroundColor: ["#059669", "#0284c7", "#d97706"],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.label + ": $" + Number(context.raw).toLocaleString("es-CO");
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Polling en tiempo real cada 15 segundos
+  setInterval(actualizarMetricasEnVivo, 15000);
+});
+
+function actualizarMetricasEnVivo() {
+  const munId = "{{ municipio_seleccionado.id|default:'' }}";
+  const url = "/api/superadmin/metricas-tiempo-real/" + (munId ? "?municipio=" + munId : "");
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "ok") {
+        // Actualizar KPIs
+        document.getElementById("kpi-ventas").textContent = "$ " + Number(data.totales.total_ventas).toLocaleString("es-CO") + " COP";
+        document.getElementById("kpi-compras").textContent = "$ " + Number(data.totales.total_compras).toLocaleString("es-CO") + " COP";
+        document.getElementById("kpi-flujo").textContent = "$ " + Number(data.totales.flujo_neto).toLocaleString("es-CO") + " COP";
+        document.getElementById("kpi-ica").textContent = "$ " + Number(data.totales.total_ica).toLocaleString("es-CO") + " COP";
+        document.getElementById("kpi-saas").textContent = "$ " + Number(data.totales.total_recaudo_saas).toLocaleString("es-CO") + " COP";
+
+        // Actualizar Timeline Chart
+        if (window.timelineChart) {
+          window.timelineChart.data.labels = data.timeline.labels;
+          window.timelineChart.data.datasets[0].data = data.timeline.ventas;
+          window.timelineChart.data.datasets[1].data = data.timeline.compras;
+          window.timelineChart.data.datasets[2].data = data.timeline.saas;
+          window.timelineChart.update("none");
+        }
+
+        // Actualizar Canales Chart
+        if (window.canalesChart) {
+          window.canalesChart.data.datasets[0].data = [data.canales.bre_b, data.canales.efectivo, data.canales.otros];
+          window.canalesChart.update("none");
+        }
+
+        // Actualizar Feed de Eventos
+        const feedList = document.getElementById("live-feed-list");
+        if (data.eventos && data.eventos.length > 0) {
+          let html = "";
+          data.eventos.forEach(ev => {
+            html += `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span>${ev.icono}</span>
+                  <div>
+                    <span style="font-weight:bold; color:#1e293b;">${ev.titulo}</span>
+                    <div style="font-size:11px; color:#64748b;">${ev.detalle}</div>
+                  </div>
+                </div>
+                <span style="font-weight:bold; color:${ev.color}; white-space:nowrap;">
+                  $${Number(ev.monto).toLocaleString("es-CO")}
+                </span>
+              </div>
+            `;
+          });
+          feedList.innerHTML = html;
+        }
+
+        const liveTime = document.getElementById("live-time");
+        if (liveTime) {
+          liveTime.textContent = "Actualizado: " + data.timestamp;
+        }
+      }
+    })
+    .catch(err => console.warn("Error en polling tiempo real:", err));
+}
+</script>
+
+<style>
+.live-pulse {
+  animation: pulse-dot 1.5s infinite ease-in-out;
+}
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+</style>
 {% endblock %}

@@ -51,12 +51,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'registro.middleware.TenantSuspensionMiddleware',
 ]
 
 ROOT_URLCONF = 'diariocomercial.urls'
@@ -87,6 +89,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'CONN_MAX_AGE': 600,
     }
 }
 
@@ -134,14 +137,28 @@ PASSWORD_HASHERS = [
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Configuración de compresión y cache WhiteNoise en producción
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = DEBUG
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'login'
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Configuración de Envío de Correos Electrónicos (SMTP / Consola)
+import os
+EMAIL_BACKEND = os.environ.get('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp-relay.brevo.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'soporte@diariocomercial.co')
+
 TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
 
 # ============================================================================
@@ -150,4 +167,5 @@ TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
 SAAS_LLAVE_PAGOS_BRE_B = "3028530041"      # Llave Bre-B / BanRep / Nequi oficial para cobro de suscripciones
 SAAS_WHATSAPP_CONTACTO = "3146922087"      # WhatsApp técnico y de contacto soporte de la plataforma
 SAAS_TARIFA_MENSUAL_COP = 19900            # Tarifa plana de suscripción mensual ($19.900 COP)
+
 
