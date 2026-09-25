@@ -32,6 +32,7 @@ from .forms import (
     SoporteEditarTiendaForm,
     ClienteFacturacionForm,
     AsistenteDeclaracionInicialForm,
+    NuevaTiendaSedeForm,
 )
 from .models import (
     ActividadCIIU,
@@ -2290,6 +2291,8 @@ def asistente_inicial_declaracion(request):
         if form.is_valid():
             data = form.cleaned_data
             # 1. Guardar datos del Establecimiento (Renglones 1 al 7, 29, 32 y Facturación)
+            if not est.propietario_creador:
+                est.propietario_creador = request.user
             est.nit = data["nit"]
             est.nombre = data["nombre"]
             est.direccion = data["direccion"]
@@ -2298,6 +2301,8 @@ def asistente_inicial_declaracion(request):
             est.llave_bre_b = data["telefono"]
             est.tipo_llave_bre_b = "celular"
             est.clasificacion_tributaria = data["clasificacion_tributaria"]
+            est.declara_renta_dian = data.get("declara_renta_dian", False)
+            est.otros_ingresos_nacionales_anual = data.get("otros_ingresos_nacionales_anual") or Decimal("0")
             est.anticipo_ano_anterior = data.get("anticipo_ano_anterior") or Decimal("0")
             est.saldo_favor_anterior = data.get("saldo_favor_anterior") or Decimal("0")
             est.resolucion_dian_numero = data.get("resolucion_dian") or "18764000001"
@@ -2356,6 +2361,8 @@ def asistente_inicial_declaracion(request):
             "telefono": est.llave_bre_b or "",
             "correo_reportes": est.correo_reportes or "",
             "clasificacion_tributaria": getattr(est, "clasificacion_tributaria", "comun") or "comun",
+            "declara_renta_dian": getattr(est, "declara_renta_dian", False),
+            "otros_ingresos_nacionales_anual": getattr(est, "otros_ingresos_nacionales_anual", Decimal("0")) or Decimal("0"),
             "ciiu_codigo": actividad_actual.codigo if actividad_actual else "4722",
             "ciiu_descripcion": actividad_actual.descripcion if actividad_actual else "Comercio al por menor de carnes y productos cárnicos",
             "ciiu_tarifa_x_mil": actividad_actual.tarifa_x_mil if actividad_actual else Decimal("5.0"),
@@ -2377,6 +2384,143 @@ def asistente_inicial_declaracion(request):
             "es_primera_vez": not est.configuracion_inicial_completada,
         }
     )
+
+
+# ============================================================================
+# ADMINISTRADOR MULTI-ESTABLECIMIENTO (EMPRESARIO / DUEÑO DE VARIAS TIENDAS)
+# ============================================================================
+
+@login_required
+def tiendas_lista_consolidada(request):
+    """
+    Panel Consolidado para el Empresario Multi-Establecimiento.
+    Permite monitorear y consolidar ingresos nacionales (Renglón 8) y rendimiento
+    exclusivamente de las tiendas de su propiedad (estricto aislamiento tenant).
+    """
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Acceso restringido para propietarios y empresarios.")
+        return redirect("inicio")
+
+    tiendas_qs = perfil.establecimientos_propios()
+    total_tiendas = tiendas_qs.count()
+
+    # Si solo tiene una tienda, ofrecerle registrar su segunda sede
+    ano_actual = timezone.localdate().year
+    resumen_tiendas = []
+    total_ventas_consolidadas = Decimal("0")
+    total_compras_consolidadas = Decimal("0")
+
+    for t in tiendas_qs:
+        v_tot = Venta.objects.filter(establecimiento=t, estado="vigente", fecha__year=ano_actual).aggregate(tot=Sum("valor"))["tot"] or Decimal("0")
+        c_tot = Compra.objects.filter(establecimiento=t, estado="vigente", fecha__year=ano_actual).aggregate(tot=Sum("valor"))["tot"] or Decimal("0")
+        cajeros_count = Perfil.objects.filter(establecimiento=t, user__is_active=True).count()
+        stock_bajo_count = Producto.objects.filter(establecimiento=t, estado="activo", stock_kilos__lte=5, es_servicio=False).count()
+
+        total_ventas_consolidadas += v_tot
+        total_compras_consolidadas += c_tot
+
+        resumen_tiendas.append({
+            "tienda": t,
+            "es_activa": (t.pk == perfil.establecimiento_id),
+            "ventas_ano": v_tot,
+            "compras_ano": c_tot,
+            "margen": v_tot - c_tot,
+            "cajeros_count": cajeros_count,
+            "stock_bajo_count": stock_bajo_count,
+        })
+
+    return render(
+        request,
+        "empresario/panel_consolidado.html",
+        {
+            "tiendas": resumen_tiendas,
+            "total_tiendas": total_tiendas,
+            "total_ventas_consolidadas": total_ventas_consolidadas,
+            "total_compras_consolidadas": total_compras_consolidadas,
+            "ano_actual": ano_actual,
+            "tienda_activa": perfil.establecimiento,
+        }
+    )
+
+
+@login_required
+def tiendas_crear(request):
+    """Permite al empresario registrar una nueva tienda o sucursal de su propiedad."""
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo los propietarios pueden registrar nuevas tiendas o sucursales.")
+        return redirect("inicio")
+
+    if request.method == "POST":
+        form = NuevaTiendaSedeForm(request.POST)
+        if form.is_valid():
+            nueva_tienda = form.save(commit=False)
+            nueva_tienda.propietario_creador = request.user
+            # Heredar correo y datos base si no fueron provistos
+            if not nueva_tienda.nit:
+                nueva_tienda.nit = perfil.establecimiento.nit
+            nueva_tienda.save()
+
+            # Promover rol a empresario
+            if perfil.rol != "empresario":
+                perfil.rol = "empresario"
+                perfil.save(update_fields=["rol"])
+
+            # Clonar o crear actividad base
+            act_base = ActividadCIIU.objects.filter(establecimiento=perfil.establecimiento).first()
+            if act_base:
+                nueva_act = ActividadCIIU.objects.create(
+                    establecimiento=nueva_tienda,
+                    codigo=act_base.codigo,
+                    descripcion=act_base.descripcion,
+                    tarifa_x_mil=act_base.tarifa_x_mil,
+                )
+                MotivoVenta.objects.create(
+                    establecimiento=nueva_tienda,
+                    actividad=nueva_act,
+                    nombre="Venta en Mostrador",
+                    es_predeterminado=True,
+                )
+
+            messages.success(request, f"🏬 ¡Nueva sucursal '{nueva_tienda.nombre}' creada con éxito!")
+            # Cambiar a la nueva tienda
+            perfil.establecimiento = nueva_tienda
+            perfil.save(update_fields=["establecimiento"])
+            request.session["establecimiento_activo_id"] = nueva_tienda.pk
+            return redirect("inicio")
+    else:
+        # Prellenar con NIT y correo del negocio principal
+        form = NuevaTiendaSedeForm(initial={
+            "nit": perfil.establecimiento.nit,
+            "correo_reportes": perfil.establecimiento.correo_reportes,
+            "municipio": perfil.establecimiento.municipio,
+        })
+
+    return render(request, "empresario/crear_tienda.html", {"form": form})
+
+
+@login_required
+def tiendas_cambiar_activa(request, pk):
+    """
+    Store Switcher: Cambia la tienda activa de la sesión de trabajo.
+    Valida rigurosamente que el usuario sea el dueño o propietario de esa tienda.
+    """
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "No tiene permisos para cambiar de establecimiento.")
+        return redirect("inicio")
+
+    tiendas_propias = perfil.establecimientos_propios()
+    tienda_objetivo = get_object_or_404(tiendas_propias, pk=pk)
+
+    perfil.establecimiento = tienda_objetivo
+    perfil.save(update_fields=["establecimiento"])
+    request.session["establecimiento_activo_id"] = tienda_objetivo.pk
+
+    messages.success(request, f"🏬 Establecimiento activo cambiado a: '{tienda_objetivo.nombre}'")
+    return redirect("inicio")
+
 
 
 

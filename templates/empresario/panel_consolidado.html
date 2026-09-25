@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}Panel Empresarial Multi-Tienda — DiarioComercial{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+  <div>
+    <span style="background:#0f172a; color:#38bdf8; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; padding:3px 10px; border-radius:12px;">
+      🏢 Administrador Multi-Tienda
+    </span>
+    <h2 style="margin:4px 0 6px 0; color:var(--navy);">
+      Panel Consolidado de mis Establecimientos
+    </h2>
+    <p class="lead" style="margin:0;">
+      Monitoree en tiempo real el rendimiento consolidado y las ventas nacionales (Renglón 8) de todas sus sedes comerciales propias.
+    </p>
+  </div>
+  <div style="display:flex; gap:10px;">
+    <a href="{% url 'tiendas_crear' %}" class="btn btn-primary" style="background:#00A859;">
+      ➕ Abrir Nueva Sucursal
+    </a>
+  </div>
+</div>
+
+<!-- TARJETAS CONSOLIDADAS DEL EMPRESARIO -->
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+  <div class="panel" style="padding:18px; border-left:4px solid #0284c7; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:bold;">Ventas Consolidadas País (R. 8)</div>
+    <div style="font-size:26px; font-weight:900; color:var(--navy); margin-top:4px;">
+      {{ total_ventas_consolidadas|pesos }}
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">Suma nacional año {{ ano_actual }}</div>
+  </div>
+
+  <div class="panel" style="padding:18px; border-left:4px solid #f59e0b; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#b45309; font-weight:bold;">Compras y Costos Acumulados</div>
+    <div style="font-size:26px; font-weight:900; color:#b45309; margin-top:4px;">
+      {{ total_compras_consolidadas|pesos }}
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">Todas las sedes {{ ano_actual }}</div>
+  </div>
+
+  <div class="panel" style="padding:18px; border-left:4px solid #10b981; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#047857; font-weight:bold;">Margen Bruto Combinado</div>
+    <div style="font-size:26px; font-weight:900; color:#047857; margin-top:4px;">
+      {% widthratio total_ventas_consolidadas 1 1 as v %}
+      {{ total_ventas_consolidadas|pesos }}
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">Ventas menos compras</div>
+  </div>
+
+  <div class="panel" style="padding:18px; border-left:4px solid #8b5cf6; margin:0;">
+    <div style="font-size:11px; text-transform:uppercase; color:#6d28d9; font-weight:bold;">Sucursales Propias Activas</div>
+    <div style="font-size:26px; font-weight:900; color:#6d28d9; margin-top:4px;">
+      {{ total_tiendas }} Tienda(s)
+    </div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">Tienda actual: <strong>{{ tienda_activa.nombre }}</strong></div>
+  </div>
+</div>
+
+<!-- TABLA DE ESTABLECIMIENTOS DEL EMPRESARIO -->
+<div class="panel" style="padding:20px;">
+  <h3 style="margin-top:0; font-size:16px; color:var(--navy);">Mis Tiendas y Puntos de Venta Registrados</h3>
+  <div style="overflow-x:auto;">
+    <table class="tabla" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0; text-align:left;">
+          <th style="padding:10px 12px; font-size:12px; color:#475569;">TIENDA / SUCURSAL</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569;">MUNICIPIO / DIRECCIÓN</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569; text-align:right;">VENTAS {{ ano_actual }}</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569; text-align:right;">COMPRAS {{ ano_actual }}</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569; text-align:center;">PERSONAL</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569; text-align:center;">STOCK CRÍTICO</th>
+          <th style="padding:10px 12px; font-size:12px; color:#475569; text-align:center;">ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in tiendas %}
+        <tr style="border-bottom:1px solid #f1f5f9; {% if r.es_activa %}background:#f0fdf4; font-weight:bold;{% endif %}">
+          <td style="padding:12px;">
+            {{ r.tienda.nombre }}
+            {% if r.es_activa %}
+            <span style="background:#dcfce7; color:#15803d; font-size:10px; padding:2px 8px; border-radius:10px; margin-left:6px; font-weight:bold;">
+              ● TIENDA ACTIVA
+            </span>
+            {% endif %}
+          </td>
+          <td style="padding:12px; font-size:12px; color:#64748b;">
+            📍 {{ r.tienda.municipio.nombre|default:"Tunja" }}<br>
+            <small>{{ r.tienda.direccion|default:"Dirección no asignada" }}</small>
+          </td>
+          <td style="padding:12px; text-align:right; font-family:monospace; font-size:14px; color:#0f172a;">
+            {{ r.ventas_ano|pesos }}
+          </td>
+          <td style="padding:12px; text-align:right; font-family:monospace; font-size:13px; color:#b45309;">
+            {{ r.compras_ano|pesos }}
+          </td>
+          <td style="padding:12px; text-align:center; font-size:13px;">
+            👥 {{ r.cajeros_count }} cajero(s)
+          </td>
+          <td style="padding:12px; text-align:center;">
+            {% if r.stock_bajo_count > 0 %}
+            <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:bold;">
+              ⚠️ {{ r.stock_bajo_count }} agotándose
+            </span>
+            {% else %}
+            <span style="color:#10b981; font-size:12px;">✅ Óptimo</span>
+            {% endif %}
+          </td>
+          <td style="padding:12px; text-align:center;">
+            {% if r.es_activa %}
+            <span style="color:#00A859; font-size:12px; font-weight:bold;">Operando aquí</span>
+            {% else %}
+            <a href="{% url 'tiendas_cambiar_activa' r.tienda.pk %}" class="btn btn-sm btn-primary" style="background:#0284c7; padding:4px 10px; font-size:12px;">
+              🏬 Entrar a esta Tienda
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:30px; color:#94a3b8;">
+            Aún no ha registrado sucursales adicionales.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -501,6 +501,26 @@ class AsistenteDeclaracionInicialForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-control"}),
         help_text="La mayoría de minimarkets y carnicerías declaran bimestral en Régimen Común."
     )
+    declara_renta_dian = forms.BooleanField(
+        label="¿El comerciante o empresa declara Impuesto de Renta ante la DIAN?",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Marque esta casilla si presenta declaración anual de Renta (Formulario 110 o 210) ante la DIAN."
+    )
+    otros_ingresos_nacionales_anual = forms.DecimalField(
+        label="Renglón 9: Otros ingresos brutos obtenidos fuera de este municipio ($ COP)",
+        min_value=Decimal("0"),
+        max_digits=14,
+        decimal_places=2,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "placeholder": "Ej: 0 (o ventas brutas de sedes en otras ciudades, arriendos, etc.)",
+            "step": "1000",
+            "class": "form-control",
+        }),
+        help_text="Si declara renta a la DIAN, estos ingresos se consolidan en el Renglón 8 y se descuentan en el Renglón 9 para que solo tribute en Tunja."
+    )
 
     # SECCIÓN C: ACTIVIDAD ECONÓMICA Y TARIFAS (Renglones 16 y 17)
     ciiu_codigo = forms.CharField(
@@ -616,4 +636,38 @@ class AsistenteDeclaracionInicialForm(forms.Form):
         if not nit_limpio:
             raise forms.ValidationError("El NIT o Cédula debe contener números válidos.")
         return nit_limpio
+
+
+class NuevaTiendaSedeForm(forms.ModelForm):
+    """Formulario para que un empresario registre una nueva tienda o sucursal propia."""
+    class Meta:
+        model = Establecimiento
+        fields = [
+            "nombre",
+            "nit",
+            "municipio",
+            "direccion",
+            "llave_bre_b",
+            "correo_reportes",
+            "clasificacion_tributaria",
+        ]
+        labels = {
+            "nombre": "Nombre de la Nueva Sede o Sucursal",
+            "nit": "NIT o Cédula (Mismo del contribuyente o específico)",
+            "municipio": "Municipio (DANE)",
+            "direccion": "Dirección Física de la Sucursal",
+            "llave_bre_b": "Celular / Llave Bre-B para pagos de esta sede",
+            "correo_reportes": "Correo para reportes de esta sede",
+            "clasificacion_tributaria": "Régimen Tributario",
+        }
+        widgets = {
+            "nombre": forms.TextInput(attrs={"placeholder": "Ej: Carnicería La Floresta - Sede Norte", "class": "form-control"}),
+            "nit": forms.TextInput(attrs={"placeholder": "Ej: 901234567", "class": "form-control"}),
+            "municipio": forms.Select(attrs={"class": "form-control"}),
+            "direccion": forms.TextInput(attrs={"placeholder": "Ej: Av. Universitaria # 45-12 Local 2", "class": "form-control"}),
+            "llave_bre_b": forms.TextInput(attrs={"placeholder": "3109876543", "class": "form-control"}),
+            "correo_reportes": forms.EmailInput(attrs={"placeholder": "sedenorte@comercio.co", "class": "form-control"}),
+            "clasificacion_tributaria": forms.Select(attrs={"class": "form-control"}),
+        }
+
 

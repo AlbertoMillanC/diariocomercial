@@ -14,7 +14,20 @@
       <div class="logo">DC</div>
       <div>
         <h1>DiarioComercial</h1>
-        <small>{% if user.is_superuser %}<span style="color:#4ade80; font-weight:bold;">OPERADOR CENTRAL DEL SISTEMA SAAS</span>{% elif user.perfil %}{{ user.perfil.establecimiento.nombre }}{% endif %}</small>
+        <small>
+          {% if user.is_superuser %}
+            <span style="color:#4ade80; font-weight:bold;">OPERADOR CENTRAL DEL SISTEMA SAAS</span>
+          {% elif user.perfil %}
+            {% if user.perfil.es_propietario and user.perfil.establecimientos_propios.count > 1 %}
+              🏬 <strong>{{ user.perfil.establecimiento.nombre }}</strong>
+              <a href="{% url 'tiendas_lista_consolidada' %}" style="background:#0284c7; color:#fff; font-size:11px; padding:2px 8px; border-radius:4px; text-decoration:none; font-weight:bold; margin-left:4px;" title="Ver panel consolidado o cambiar de tienda">
+                Mis Tiendas ({{ user.perfil.establecimientos_propios.count }}) ▾
+              </a>
+            {% else %}
+              {{ user.perfil.establecimiento.nombre }}
+            {% endif %}
+          {% endif %}
+        </small>
       </div>
     </div>
     <div class="userbox">
@@ -22,7 +35,9 @@
       {% if user.is_superuser %}
         <span class="tag" style="background:#0f172a; color:#4ade80; font-size:11px;">Super-Administrador</span>
       {% elif user.perfil %}
-        {{ user.perfil.get_rol_display }}
+        <span class="tag" style="{% if user.perfil.es_empresario %}background:#312e81; color:#c7d2fe;{% endif %}">
+          {{ user.perfil.get_rol_display }}
+        </span>
       {% endif %}
     </div>
   </header>
@@ -47,6 +62,7 @@
       <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
       <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>
       {% if user.perfil.es_propietario %}
+      <a href="{% url 'tiendas_lista_consolidada' %}" class="{% if request.resolver_match.url_name == 'tiendas_lista_consolidada' %}activo{% endif %}" style="background:#1e1b4b; color:#c7d2fe; border:1px solid #6366f1;">🏢 Multi-Tienda</a>
       <a href="{% url 'declaracion_ica' %}" class="{% if request.resolver_match.url_name == 'declaracion_ica' %}activo{% endif %}" style="background:rgba(0,168,89,0.2); border:1px solid #10b981; color:#a7f3d0;">🏛️ ICA Tunja</a>
       <a href="{% url 'exogena_dian' %}" class="{% if request.resolver_match.url_name == 'exogena_dian' %}activo{% endif %}" style="border:1px solid #38bdf8; color:#38bdf8;">📊 Exógena 1007</a>
       <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>

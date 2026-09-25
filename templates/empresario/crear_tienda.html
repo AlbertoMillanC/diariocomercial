@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Abrir Nueva Sucursal o Tienda — DiarioComercial{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 0 auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div>
+      <h2>🏬 Abrir Nueva Sede o Sucursal</h2>
+      <p class="lead" style="margin:0;">Registre un nuevo punto de venta para administrarlo de forma independiente o consolidada.</p>
+    </div>
+    <a href="{% url 'tiendas_lista_consolidada' %}" class="btn btn-ghost">← Volver al Panel</a>
+  </div>
+
+  <div class="panel" style="padding: 24px;">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.nombre.label }} *</label>
+        {{ form.nombre }}
+        {{ form.nombre.errors }}
+        <small style="color:#64748b; font-size:11px;">Ejemplo: Carnicería La Floresta - Sede Norte o Sede Plaza de Mercado.</small>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.nit.label }}</label>
+          {{ form.nit }}
+          {{ form.nit.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.municipio.label }} *</label>
+          {{ form.municipio }}
+          {{ form.municipio.errors }}
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.direccion.label }}</label>
+        {{ form.direccion }}
+        {{ form.direccion.errors }}
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.llave_bre_b.label }}</label>
+          {{ form.llave_bre_b }}
+          {{ form.llave_bre_b.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.correo_reportes.label }}</label>
+          {{ form.correo_reportes }}
+          {{ form.correo_reportes.errors }}
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">{{ form.clasificacion_tributaria.label }}</label>
+        {{ form.clasificacion_tributaria }}
+        {{ form.clasificacion_tributaria.errors }}
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center; border-top:1px solid #e2e8f0; padding-top:16px;">
+        <button type="submit" class="btn btn-primary" style="background:#00A859; padding:10px 24px; font-size:15px;">
+          🚀 Crear Sucursal y Entrar
+        </button>
+        <a href="{% url 'tiendas_lista_consolidada' %}" class="btn btn-ghost">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -134,8 +134,27 @@ def liquidar_declaracion_sugerida_ica(
     ).aggregate(total=Sum("valor"))["total"] or Decimal("0")
 
     # Mapeo oficial Formulario Único Nacional (Formulario 02 - Tunja)
-    r8_ingresos_pais = ingresos_brutos
-    r9_ingresos_fuera = ingresos_fuera_municipio or Decimal("0")
+    # Renglón 8: Total ingresos en todo el país (Consolidación DIAN)
+    # Renglón 9: Menos ingresos obtenidos fuera de este municipio
+    if getattr(establecimiento, "declara_renta_dian", False):
+        propietario = getattr(establecimiento, "propietario_creador", None)
+        ingresos_otras_sedes = Decimal("0")
+        if propietario:
+            from .models import Establecimiento as EstModel
+            otras_sedes = EstModel.objects.filter(propietario_creador=propietario).exclude(pk=establecimiento.pk)
+            for s in otras_sedes:
+                vt = Venta.objects.filter(establecimiento=s, fecha__range=(fecha_inicio, fecha_fin), estado="vigente")
+                subt = vt.aggregate(total=Sum("valor"))["total"] or Decimal("0")
+                ingresos_otras_sedes += subt
+
+        otros_fuera = (getattr(establecimiento, "otros_ingresos_nacionales_anual", Decimal("0")) or Decimal("0")) + (ingresos_fuera_municipio or Decimal("0"))
+        total_fuera = ingresos_otras_sedes + otros_fuera
+        r8_ingresos_pais = ingresos_brutos + total_fuera
+        r9_ingresos_fuera = total_fuera
+    else:
+        r8_ingresos_pais = ingresos_brutos + (ingresos_fuera_municipio or Decimal("0"))
+        r9_ingresos_fuera = ingresos_fuera_municipio or Decimal("0")
+
     r10_ingresos_municipio = max(Decimal("0"), r8_ingresos_pais - r9_ingresos_fuera)
     r11_devoluciones = devoluciones_descuentos or Decimal("0")
     r12_exportaciones = Decimal("0")

@@ -37,6 +37,10 @@ urlpatterns = [
     path("api/bre-b/status/<str:referencia>/", views.api_status_bre_b, name="api_status_bre_b"),
     path("api/bre-b/mock-webhook/<str:referencia>/", views.api_mock_webhook_bre_b, name="api_mock_webhook_bre_b"),
     path("ventas/<int:pk>/ticket-escpos/<int:ancho>/", views.imprimir_ticket_escpos, name="ticket_escpos"),
+    # Administrador Multi-Tienda (Empresario & Store Switcher)
+    path("mis-tiendas/", views.tiendas_lista_consolidada, name="tiendas_lista_consolidada"),
+    path("mis-tiendas/nueva/", views.tiendas_crear, name="tiendas_crear"),
+    path("mis-tiendas/cambiar/<int:pk>/", views.tiendas_cambiar_activa, name="tiendas_cambiar_activa"),
     # Asistente Inicial de Declaración (Onboarding Renglón por Renglón)
     path("asistente-inicial/", views.asistente_inicial_declaracion, name="asistente_inicial"),
     # Tributario ICA Tunja (Acuerdo 0032/2020)

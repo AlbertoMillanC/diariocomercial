@@ -60,6 +60,28 @@ class Establecimiento(models.Model):
     rango_hasta = models.PositiveIntegerField(default=5000)
     consecutivo_actual = models.PositiveIntegerField(default=1)
 
+    # Vínculo de Propiedad y Multi-Establecimiento (Aislamiento de Tenant)
+    propietario_creador = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="establecimientos_creados",
+        help_text="Usuario dueño que creó y administra este establecimiento"
+    )
+
+    # Parámetros Renta DIAN & Territorialidad (Renglones 8 y 9)
+    declara_renta_dian = models.BooleanField(
+        default=False,
+        help_text="Indica si el comerciante declara impuesto de Renta ante la DIAN"
+    )
+    otros_ingresos_nacionales_anual = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Renglón 9: Otros ingresos anuales brutos fuera de este municipio o de otras sedes"
+    )
+
     # Parámetros Declaración ICA Renglón por Renglón (Formulario Oficial)
     anticipo_ano_anterior = models.DecimalField(
         max_digits=14, decimal_places=2, default=Decimal("0"),
@@ -99,10 +121,11 @@ class Establecimiento(models.Model):
 
 class Perfil(models.Model):
     ROLES = (
+        ("empresario", "Empresario Multi-Establecimiento"),
         ("propietario", "Propietario"),
         ("dependiente", "Dependiente"),
     )
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
     rol = models.CharField(max_length=20, choices=ROLES, default="dependiente")
 
@@ -110,7 +133,18 @@ class Perfil(models.Model):
         return f"{self.user.username} ({self.rol})"
 
     def es_propietario(self):
-        return self.rol == "propietario"
+        return self.rol in ("propietario", "empresario")
+
+    def es_empresario(self):
+        if self.rol == "empresario":
+            return True
+        return self.user and self.user.establecimientos_creados.count() >= 2
+
+    def establecimientos_propios(self):
+        from django.db.models import Q
+        return Establecimiento.objects.filter(
+            Q(propietario_creador=self.user) | Q(perfil__user=self.user, perfil__rol__in=["propietario", "empresario"])
+        ).distinct()
 
 
 class ActividadCIIU(models.Model):
