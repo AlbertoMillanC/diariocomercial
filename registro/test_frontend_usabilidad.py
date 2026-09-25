@@ -52,7 +52,7 @@ class FrontendUsabilidadTests(TestCase):
             user=self.cajero, establecimiento=self.est, rol="dependiente"
         )
         self.staff_user = User.objects.create_user(
-            username="super_carlos", password="password_carlos", is_staff=True
+            username="super_carlos", password="password_carlos", is_superuser=True
         )
 
         self.ciiu = ActividadCIIU.objects.create(

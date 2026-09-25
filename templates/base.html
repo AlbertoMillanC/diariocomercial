@@ -37,7 +37,7 @@
     <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
     <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>
     {% endif %}
-    {% if user.is_staff %}
+    {% if user.is_superuser %}
     <a href="{% url 'superadmin_dashboard' %}" class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}activo{% endif %}" style="background:#0f172a; border:1px solid #4ade80; color:#4ade80;">👑 SuperAdmin</a>
     {% endif %}
     <form class="logout" method="post" action="{% url 'logout' %}">

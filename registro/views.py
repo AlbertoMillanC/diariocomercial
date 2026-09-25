@@ -1072,9 +1072,13 @@ def exportar_declaracion_ica(request):
 # FASE 5: DASHBOARD DE SUPER-ADMINISTRADOR SAAS
 # ============================================================================
 
-@staff_member_required(login_url="login")
+@login_required
 def superadmin_dashboard(request):
     """Panel de monitoreo SaaS, control multi-tenant y cobranza."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: El panel Super-Administrador es exclusivo para el operador central de la plataforma SaaS.")
+        return redirect("inicio")
+
     hoy = timezone.localdate()
 
     total_comercios = Establecimiento.objects.count()
@@ -1122,9 +1126,13 @@ def superadmin_dashboard(request):
     )
 
 
-@staff_member_required(login_url="login")
+@login_required
 def superadmin_toggle_estado(request, pk):
     """Activa o suspende el servicio de un comercio al instante."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
     est = get_object_or_404(Establecimiento, pk=pk)
     est.estado = "suspendido" if est.estado == "activo" else "activo"
     est.save(update_fields=["estado"])

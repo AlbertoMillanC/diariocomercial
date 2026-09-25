@@ -34,8 +34,8 @@ class Command(BaseCommand):
             defaults={"first_name": "María", "last_name": "Gómez", "email": "maria@local"},
         )
         maria.set_password("tunja2026")
-        maria.is_staff = True
-        maria.is_superuser = True
+        maria.is_staff = False
+        maria.is_superuser = False
         maria.save()
         Perfil.objects.get_or_create(
             user=maria, defaults={"establecimiento": est, "rol": "propietario"}
