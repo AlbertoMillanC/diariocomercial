@@ -446,3 +446,54 @@ class InventarioExcelPagosTests(TestCase):
         self.assertContains(res_filtro, "Soporte telefónico con doña María")
         self.assertNotContains(res_filtro, "Llegó remisión de pollo")
 
+    def test_09_generar_etiqueta_qr_producto_individual(self):
+        """Verifica la generación del PDF de etiqueta adhesiva térmica con QR de tienda para un producto."""
+        self.client.login(username="maria.admin", password="password123")
+        url = reverse("inventario_producto_etiqueta_qr", kwargs={"pk": self.prod_pollo.pk})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/pdf")
+        self.assertIn(f"etiqueta_qr_{self.prod_pollo.pk}.pdf", res["Content-Disposition"])
+        self.assertTrue(len(res.content) > 500)
+
+    def test_10_generar_etiquetas_qr_masivo(self):
+        """Verifica la generación del PDF con el lote masivo de etiquetas QR para productos de la tienda."""
+        self.client.login(username="maria.admin", password="password123")
+        url = reverse("inventario_etiquetas_qr_masivo")
+        res = self.client.get(f"{url}?filtro=sin_codigo")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/pdf")
+        self.assertTrue(len(res.content) > 500)
+
+    def test_11_api_buscar_producto_reconoce_qr_y_bascula_ean13(self):
+        """Verifica que el API reconozca QR de tienda y códigos de báscula comercial con peso variable (EAN-13 20...)."""
+        self.client.login(username="maria.admin", password="password123")
+        url_api = reverse("api_buscar_producto_codigo")
+
+        # 1. Búsqueda por código QR de tienda
+        codigo_qr = f"DC:P:{self.prod_pollo.pk}:SKU:770111222333:COP:18000"
+        res_qr = self.client.get(f"{url_api}?codigo={codigo_qr}")
+        self.assertEqual(res_qr.status_code, 200)
+        data_qr = res_qr.json()
+        self.assertTrue(data_qr["encontrado"])
+        self.assertEqual(data_qr["id"], self.prod_pollo.pk)
+        self.assertEqual(data_qr["nombre"], self.prod_pollo.nombre)
+
+        # 2. Asignar un código PLU de 5 dígitos al producto de pollo (ej. 00104)
+        self.prod_pollo.codigo_barras = "00104"
+        self.prod_pollo.precio_kilo = Decimal("18000")
+        self.prod_pollo.save()
+
+        # Simular código de báscula etiquetadora:
+        # Prefijo: 20, PLU: 00104, Peso: 01500 gramos (1.500 kg), Checksum: 0
+        codigo_bascula = "2000104015000"
+        res_bascula = self.client.get(f"{url_api}?codigo={codigo_bascula}")
+        self.assertEqual(res_bascula.status_code, 200)
+        data_b = res_bascula.json()
+        self.assertTrue(data_b["encontrado"])
+        self.assertTrue(data_b["es_bascula"])
+        self.assertEqual(data_b["peso_bascula"], 1.5)
+        # Precio = 18000 * 1.5 = 27000
+        self.assertEqual(data_b["precio"], 27000)
+        self.assertIn("1.500", data_b["detalle_bascula"])
+

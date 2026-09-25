@@ -19,15 +19,65 @@
     {{ form.non_field_errors }}
     
     <!-- BARRA LECTORA DE CÓDIGO DE BARRAS / SKU -->
-    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 16px; margin-bottom:18px; display:flex; gap:14px; align-items:center;">
+    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 16px; margin-bottom:14px; display:flex; gap:14px; align-items:center;">
       <span style="font-size:24px;">🏷️</span>
       <div style="flex:1;">
         <label for="barcode-scanner" style="display:block; font-size:12px; font-weight:bold; color:#166534; margin-bottom:4px;">
-          PISTOLA LECTORA DE CÓDIGO DE BARRAS / BÚSQUEDA RÁPIDA (USB / ÓPTICO)
+          PISTOLA LECTORA DE CÓDIGO DE BARRAS, QR DE TIENDA O BÁSCULA (USB / ÓPTICO)
         </label>
-        <input type="text" id="barcode-scanner" placeholder="Pase el escáner sobre el producto o ingrese código/nombre..." style="width:100%; padding:9px 12px; border:2px solid #10b981; border-radius:6px; font-size:15px; font-weight:bold;" autofocus>
+        <input type="text" id="barcode-scanner" placeholder="Pase el escáner sobre el producto, QR de tienda o etiqueta de báscula..." style="width:100%; padding:9px 12px; border:2px solid #10b981; border-radius:6px; font-size:15px; font-weight:bold;" autofocus>
       </div>
       <div id="barcode-info-box" style="font-size:12px; color:#15803d; font-weight:bold; min-width:200px; text-align:right;"></div>
+    </div>
+
+    <!-- SECCIÓN INTERACTIVA DE BÁSCULA DE MOSTRADOR (USB / SERIAL / WEB SERIAL API & BALANZA DIGITAL) -->
+    <div style="background:#0f172a; border-radius:12px; padding:14px 18px; margin-bottom:18px; color:#ffffff; box-shadow:0 4px 12px rgba(15,23,42,0.15);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:26px;">⚖️</span>
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <strong style="font-size:14px; color:#38bdf8;">Báscula Electrónica de Mostrador</strong>
+              <span id="bascula-status-tag" style="background:#334155; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:6px; font-weight:bold;">
+                🔌 Desconectada (Modo Manual / USB)
+              </span>
+            </div>
+            <p style="margin:2px 0 0 0; font-size:11px; color:#94a3b8;">
+              Compatible con básculas Torrey, Dibal, Toledo, Systel, Rhino y códigos EAN-13 de balanza.
+            </p>
+          </div>
+        </div>
+
+        <!-- DISPLAY LCD DE BÁSCULA DIGITAL -->
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="background:#020617; border:2px solid #38bdf8; border-radius:8px; padding:4px 16px; text-align:right; min-width:160px;">
+            <div style="font-size:9px; color:#38bdf8; font-family:monospace; letter-spacing:1px; text-align:left;">PESO EN BALANZA</div>
+            <span id="bascula-display" style="font-family:'Courier New', monospace; font-size:28px; font-weight:900; color:#4ade80; text-shadow:0 0 8px rgba(74,222,128,0.6);">
+              0.000 kg
+            </span>
+          </div>
+
+          <button type="button" id="btn-conectar-bascula" onclick="conectarBasculaSerial()" class="btn" style="background:#0284c7; color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;" title="Conectar báscula física por puerto USB o Serial usando Web Serial API">
+            🔌 Conectar Báscula (USB)
+          </button>
+        </div>
+      </div>
+
+      <!-- BOTONES RÁPIDOS Y SIMULADOR TÁCTIL DE PESO -->
+      <div style="margin-top:12px; padding-top:10px; border-top:1px solid #1e293b; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:#94a3b8;">Peso Manual / Rápido:</span>
+          <button type="button" onclick="fijarPesoManual(0.250)" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#e2e8f0; border:1px solid #334155;">+250 g</button>
+          <button type="button" onclick="fijarPesoManual(0.500)" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#e2e8f0; border:1px solid #334155;">+500 g (1 Lb)</button>
+          <button type="button" onclick="fijarPesoManual(1.000)" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#e2e8f0; border:1px solid #334155;">+1.000 Kg</button>
+          <button type="button" onclick="fijarPesoManual(2.000)" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#e2e8f0; border:1px solid #334155;">+2.000 Kg</button>
+          <button type="button" onclick="tararBascula()" class="btn btn-ghost" style="padding:3px 8px; font-size:11px; color:#f87171; border:1px solid #7f1d1d;">Tarar / Cero</button>
+        </div>
+
+        <div id="bascula-calculo-box" style="font-size:12px; color:#38bdf8; font-weight:bold;">
+          Coloque el producto en el plato o escanee el código de barras
+        </div>
+      </div>
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
@@ -330,7 +380,110 @@ function reproducirChimeExito() {
   } catch(e) {}
 }
 
-// Lector de código de barras (USB / óptico)
+// ==========================================
+// INTEGRACIÓN DE BÁSCULA DE MOSTRADOR (USB / SERIAL)
+// ==========================================
+let pesoActualKg = 0.000;
+let productoActual = null;
+let serialPort = null;
+let serialReader = null;
+
+function actualizarPesoBascula(kg) {
+  pesoActualKg = Math.max(0, parseFloat(kg) || 0);
+  const display = document.getElementById("bascula-display");
+  if (display) {
+    display.innerText = pesoActualKg.toFixed(3) + " kg";
+  }
+
+  // Si hay un producto por peso seleccionado, recalcular total al instante
+  const valorInput = document.getElementById("id_valor");
+  const calcBox = document.getElementById("bascula-calculo-box");
+
+  if (productoActual && productoActual.unidad === "kg" && !productoActual.es_servicio) {
+    if (pesoActualKg > 0) {
+      const nuevoTotal = Math.round(pesoActualKg * productoActual.precio_unitario);
+      if (valorInput) valorInput.value = nuevoTotal;
+      if (calcBox) {
+        calcBox.innerHTML = `⚖️ <strong>${productoActual.nombre}</strong>: ${pesoActualKg.toFixed(3)} Kg × $${Math.round(productoActual.precio_unitario).toLocaleString("es-CO")} = <span style="color:#4ade80;">$${nuevoTotal.toLocaleString("es-CO")} COP</span>`;
+      }
+    }
+  } else if (calcBox && pesoActualKg > 0) {
+    calcBox.innerHTML = `⚖️ Peso en plato: <strong>${pesoActualKg.toFixed(3)} Kg</strong> (Seleccione o escanee el producto)`;
+  }
+}
+
+function fijarPesoManual(deltaKg) {
+  actualizarPesoBascula(pesoActualKg + deltaKg);
+}
+
+function tararBascula() {
+  actualizarPesoBascula(0.000);
+  const statusTag = document.getElementById("bascula-status-tag");
+  if (statusTag && (!serialPort || !serialPort.readable)) {
+    statusTag.style.background = "#334155";
+    statusTag.style.color = "#94a3b8";
+    statusTag.innerText = "🔌 Desconectada (Modo Manual / USB)";
+  }
+  const calcBox = document.getElementById("bascula-calculo-box");
+  if (calcBox) {
+    calcBox.innerText = "Balanza en CERO (0.000 kg). Coloque el producto.";
+  }
+}
+
+async function conectarBasculaSerial() {
+  if (!("serial" in navigator)) {
+    alert("Tu navegador no soporta la Web Serial API nativa. Te recomendamos usar Google Chrome, Microsoft Edge u Opera en PC/Tablet para conectar básculas físicas por USB.");
+    return;
+  }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    // Protocolo estándar básculas comerciales (Torrey, Dibal, Systel, Toledo): 9600 8-N-1
+    await serialPort.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none" });
+
+    const statusTag = document.getElementById("bascula-status-tag");
+    const btnConectar = document.getElementById("btn-conectar-bascula");
+    if (statusTag) {
+      statusTag.style.background = "#065f46";
+      statusTag.style.color = "#4ade80";
+      statusTag.innerText = "🟢 Báscula Conectada (En Vivo)";
+    }
+    if (btnConectar) {
+      btnConectar.style.background = "#10b981";
+      btnConectar.innerText = "✅ Báscula en Línea";
+    }
+
+    const textDecoder = new TextDecoderStream();
+    serialPort.readable.pipeTo(textDecoder.writable);
+    serialReader = textDecoder.readable.getReader();
+
+    let buffer = "";
+    while (true) {
+      const { value, done } = await serialReader.read();
+      if (done) break;
+      if (value) {
+        buffer += value;
+        const lineas = buffer.split(/[\r\n]+/);
+        if (lineas.length > 1) {
+          const lineaValida = lineas[lineas.length - 2].trim();
+          buffer = lineas[lineas.length - 1];
+          // Buscar patrones de peso: ej. " 1.450kg", "ST,GS,+  1.450", "1.450"
+          const match = lineaValida.match(/([0-9]+\.[0-9]{2,3})/);
+          if (match) {
+            actualizarPesoBascula(parseFloat(match[1]));
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "NotFoundError") {
+      alert("Error comunicando con el puerto de la báscula: " + err.message);
+    }
+  }
+}
+
+// ==========================================
+// LECTOR DE CÓDIGOS DE BARRA, QR Y BÁSCULAS EAN-13
+// ==========================================
 const scannerInput = document.getElementById("barcode-scanner");
 const infoBox = document.getElementById("barcode-info-box");
 if (scannerInput) {
@@ -342,24 +495,48 @@ if (scannerInput) {
       if (infoBox) infoBox.innerHTML = "";
       return;
     }
-    // Auto-consulta si el escáner envía Enter o código de barras
+    // Auto-consulta si el escáner envía código
     timerBarcode = setTimeout(() => {
       fetch(`/api/productos/buscar/?codigo=${encodeURIComponent(code)}`)
         .then(r => r.json())
         .then(data => {
           if (data.encontrado) {
-            // Autocompletar valor y motivo
+            productoActual = data;
             const valorInput = document.getElementById("id_valor");
             const motivoInput = document.getElementById("id_nuevo_motivo");
             const obsInput = document.getElementById("id_observacion");
-            if (valorInput) valorInput.value = Math.round(data.precio);
+
+            // Si es código de báscula etiquetadora (EAN-13 prefijo 20 con peso)
+            if (data.es_bascula) {
+              actualizarPesoBascula(data.peso_bascula);
+              const statusTag = document.getElementById("bascula-status-tag");
+              if (statusTag) {
+                statusTag.style.background = "#1e3a8a";
+                statusTag.style.color = "#93c5fd";
+                statusTag.innerText = "🏷️ Etiqueta de Báscula (EAN-13)";
+              }
+            } else if (pesoActualKg > 0 && data.unidad === "kg" && !data.es_servicio) {
+              // Si ya había peso en la balanza, recalcular con este producto
+              actualizarPesoBascula(pesoActualKg);
+            } else {
+              if (valorInput) valorInput.value = Math.round(data.precio);
+            }
+
             if (motivoInput && !motivoInput.value) motivoInput.value = data.nombre;
-            if (obsInput && !obsInput.value) obsInput.value = `SKU: ${data.codigo_barras || 'N/A'}`;
+            if (obsInput && !obsInput.value) {
+              obsInput.value = data.es_bascula ? data.detalle_bascula : `SKU: ${data.codigo_barras || 'QR-TIENDA'}`;
+            }
+
+            let extraInfo = "";
+            if (data.es_bascula) {
+              extraInfo = `<br><span style="color:#0284c7; font-weight:bold;">${data.detalle_bascula}</span>`;
+            }
 
             infoBox.innerHTML = `
               <span style="color:#065f46; font-size:12px;">
                 ✅ <strong>${data.nombre}</strong><br>
                 Precio: <strong>$${Math.round(data.precio).toLocaleString('es-CO')} COP</strong> | Stock: ${data.stock} ${data.unidad}
+                ${extraInfo}
               </span>
             `;
           } else {
@@ -369,7 +546,7 @@ if (scannerInput) {
         .catch(err => {
           console.error(err);
         });
-    }, 250);
+    }, 200);
   });
 }
 </script>

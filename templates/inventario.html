@@ -13,6 +13,9 @@
     </p>
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button onclick="document.getElementById('modal-etiquetas-qr').style.display='flex'" class="btn" style="background:#7c3aed; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Imprimir etiquetas con códigos QR de la tienda para pegar a los productos">
+      🏷️ Imprimir Etiquetas QR Tienda
+    </button>
     <a href="{% url 'inventario_descargar_plantilla_excel' %}" class="btn" style="background:#065f46; color:#fff; text-decoration:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px;" title="Descargar formato estándar compatible con sistemas POS y retail">
       📥 Descargar Plantilla Excel (.xlsx)
     </a>
@@ -67,9 +70,9 @@
     <small style="color:var(--muted); font-size:11px;">En el catálogo comercial</small>
   </div>
   <div class="card">
-    <span>Lector de Código de Barras</span>
-    <strong style="color:#38bdf8;">USB / Óptico Listo</strong>
-    <small style="color:var(--muted); font-size:11px;">EAN-13, SKU, Code128</small>
+    <span>Básculas & Lector de Códigos</span>
+    <strong style="color:#38bdf8;">USB / Serial / QR Listo</strong>
+    <small style="color:var(--muted); font-size:11px;">Torrey, Dibal, EAN-13 Báscula, QR Tienda</small>
   </div>
 </div>
 
@@ -109,14 +112,14 @@
     <table>
       <thead>
         <tr>
-          <th>Código de Barras</th>
+          <th>Código / SKU</th>
           <th>Tipo / Categoría</th>
           <th>Producto / Servicio</th>
           <th>Stock Actual</th>
           {% if puede_editar %}<th>Costo Compra</th>{% endif %}
           <th>Precio de Venta</th>
-          <th>Cobro QR Bre-B</th>
-          <th>Etiqueta</th>
+          <th style="text-align:center;">Etiquetas Imprimibles</th>
+          <th style="text-align:center;">Cobro Rápido</th>
           <th>{% if puede_editar %}Gestión Administrador{% else %}Entrada Mercancía{% endif %}</th>
         </tr>
       </thead>
@@ -127,7 +130,9 @@
             {% if p.codigo_barras %}
               <code style="background:#0f172a; color:#38bdf8; padding:3px 6px; border-radius:4px; font-size:12px; font-weight:bold;">{{ p.codigo_barras }}</code>
             {% else %}
-              <span style="color:var(--muted); font-size:11px; italic;">Sin código</span>
+              <span class="tag" style="background:#f3e8ff; color:#6b21a8; font-size:11px; font-weight:bold;" title="Producto sin código de fábrica: utiliza el QR propio generado de la tienda">
+                🏷️ QR Tienda #{{ p.pk }}
+              </span>
             {% endif %}
           </td>
           <td>
@@ -166,14 +171,19 @@
               <small style="display:block; color:var(--muted); font-size:11px;">Libra: ${{ p.precio_libra|floatformat:0 }}</small>
             {% endif %}
           </td>
-          <td>
-            <a href="{% url 'inventario_producto_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#065f46; border:1px solid #10b981;" title="Ver tarjeta QR Bre-B para cobrar este producto">
-              📱 QR Bre-B
-            </a>
+          <td style="text-align:center;">
+            <div style="display:inline-flex; gap:4px; flex-wrap:wrap; justify-content:center;">
+              <a href="{% url 'inventario_producto_etiqueta_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:3px 7px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; color:#7c3aed; border:1px solid #c4b5fd; font-weight:bold;" title="Generar e imprimir etiqueta adhesiva con código QR de la tienda para este producto">
+                🏷️ Imprimir QR
+              </a>
+              <a href="{% url 'inventario_producto_etiqueta_barras' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:3px 7px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; color:#1d4ed8; border:1px solid #93c5fd;" title="Imprimir etiqueta térmica con código de barras Code128">
+                🏷️ Barra
+              </a>
+            </div>
           </td>
-          <td>
-            <a href="{% url 'inventario_producto_etiqueta_barras' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#1d4ed8; border:1px solid #93c5fd;" title="Imprimir etiqueta térmica 58mm x 40mm">
-              🏷️ Etiqueta
+          <td style="text-align:center;">
+            <a href="{% url 'inventario_producto_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#065f46; border:1px solid #10b981; font-weight:bold;" title="Ver tarjeta QR Bre-B para cobrar este producto">
+              📱 Bre-B
             </a>
           </td>
           <td>
@@ -380,6 +390,62 @@
         <button type="button" onclick="document.getElementById('modal-surtir').style.display='none'" class="btn btn-ghost">Cancelar</button>
         <button type="submit" class="btn btn-primary" style="background:#065f46; border-color:#065f46; font-weight:bold;">
           ➕ Confirmar Entrada de Mercancía
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL PARA IMPRIMIR ETIQUETAS QR MASIVAS -->
+<div id="modal-etiquetas-qr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:520px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+      <h3 style="margin:0; font-size:18px; color:#6b21a8; display:flex; align-items:center; gap:8px;">
+        🏷️ Imprimir Etiquetas QR de Tienda (Adhesivas / Térmicas)
+      </h3>
+      <button onclick="document.getElementById('modal-etiquetas-qr').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+
+    <p style="font-size:13px; color:#475569; margin-bottom:14px; line-height:1.5;">
+      Genera un documento PDF estándar de etiquetas adhesivas (58mm x 40mm) con el <strong>Código QR propio de la tienda</strong>, nombre del producto, precio por kilo/unidad y código interno. Ideal para productos a granel, carnes al corte, fruver o productos que no traen código de fábrica.
+    </p>
+
+    <form method="get" action="{% url 'inventario_etiquetas_qr_masivo' %}" target="_blank">
+      <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:12px; margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:8px; color:#581c87;">
+          ¿Cuáles productos deseas incluir en el lote de etiquetas?
+        </label>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px; color:#374151;">
+          <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <input type="radio" name="filtro" value="sin_codigo" checked>
+            <strong>Solo productos SIN código de fábrica</strong> (los que necesitan QR de tienda)
+          </label>
+          <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <input type="radio" name="filtro" value="todos">
+            <span>Todos los productos activos del catálogo</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#374151;">Filtrar por categoría (opcional):</label>
+        <select name="categoria" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+          <option value="todas">Todas las categorías</option>
+          <option value="carnes">Carnes y Embutidos</option>
+          <option value="abarrotes">Víveres y Abarrotes</option>
+          <option value="lacteos">Lácteos y Huevos</option>
+          <option value="fruver">Frutas y Verduras</option>
+          <option value="bebidas">Bebidas</option>
+          <option value="aseo">Aseo y Limpieza</option>
+          <option value="servicios">Servicios y Mano de Obra</option>
+          <option value="otros">Otros</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-etiquetas-qr').style.display='none'" class="btn btn-ghost" style="padding:8px 16px;">Cerrar</button>
+        <button type="submit" class="btn btn-primary" style="background:#7c3aed; border-color:#7c3aed; font-weight:bold; padding:8px 18px;" onclick="setTimeout(() => document.getElementById('modal-etiquetas-qr').style.display='none', 800)">
+          🖨️ Generar y Descargar Etiquetas (PDF)
         </button>
       </div>
     </form>

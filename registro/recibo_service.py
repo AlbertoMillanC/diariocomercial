@@ -276,3 +276,145 @@ def generar_pdf_etiqueta_barras(producto) -> bytes:
 
     c.save()
     return buf.getvalue()
+
+
+def generar_pdf_etiqueta_qr_producto(producto) -> bytes:
+    """
+    Genera una etiqueta adhesiva térmica profesional (58mm x 40mm) con el Código QR de la Tienda.
+    Ideal para productos artesanales, carnes al corte, frutas/verduras y productos sin código de fábrica.
+    Permite pegar el adhesivo al empaque, bolsa o góndola para lectura óptica en mostrador.
+    """
+    from reportlab.lib.pagesizes import mm
+    from reportlab.graphics.barcode import qr
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics import renderPDF
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+    est = producto.establecimiento
+
+    # Encabezado: Nombre de la tienda
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawCentredString(29 * mm, 36 * mm, est.nombre[:30].upper())
+
+    c.setLineWidth(0.4)
+    c.line(4 * mm, 34.5 * mm, 54 * mm, 34.5 * mm)
+
+    # Nombre del producto
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawCentredString(29 * mm, 30.5 * mm, producto.nombre[:30])
+
+    # Código QR de Tienda (izquierdo)
+    codigo_val = producto.codigo_barras or f"DC{producto.pk:05d}"
+    qr_payload = f"DC:P:{producto.pk}:SKU:{codigo_val}:COP:{int(producto.precio_kilo)}"
+
+    qr_code = qr.QrCodeWidget(qr_payload)
+    bounds = qr_code.getBounds()
+    qw = bounds[2] - bounds[0]
+    qh = bounds[3] - bounds[1]
+
+    lado_qr = 20 * mm
+    d = Drawing(lado_qr, lado_qr, transform=[lado_qr / qw, 0, 0, lado_qr / qh, 0, 0])
+    d.add(qr_code)
+    renderPDF.draw(d, c, 5 * mm, 9 * mm)
+
+    # Columna derecha: Detalles de precio y SKU
+    c.setFont("Helvetica", 6.5)
+    c.drawString(27 * mm, 25 * mm, f"CAT: {producto.get_categoria_display()[:15].upper()}")
+
+    c.setFont("Helvetica-Bold", 10.5)
+    unidad_str = producto.unidad_medida.upper()
+    if producto.es_servicio:
+        c.drawString(27 * mm, 19.5 * mm, f"${producto.precio_kilo:,.0f}".replace(",", "."))
+        c.setFont("Helvetica", 6.5)
+        c.drawString(27 * mm, 15.5 * mm, "SERVICIO")
+    else:
+        c.drawString(27 * mm, 19.5 * mm, f"${producto.precio_kilo:,.0f}".replace(",", "."))
+        c.setFont("Helvetica", 6.5)
+        c.drawString(27 * mm, 15.5 * mm, f"POR {unidad_str}")
+        if producto.unidad_medida == "kg":
+            c.drawString(27 * mm, 12 * mm, f"Lb: ${producto.precio_libra:,.0f}".replace(",", "."))
+
+    # Pie de etiqueta
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val} • QR DE TIENDA")
+
+    c.save()
+    return buf.getvalue()
+
+
+def generar_pdf_etiquetas_qr_masivo(establecimiento, productos=None, solo_sin_codigo=False) -> bytes:
+    """
+    Genera un lote continuo de etiquetas QR (58mm x 40mm por página)
+    para imprimir todas las etiquetas de la tienda en impresoras térmicas de rollo
+    (Xprinter, Zebra, etc.) o impresoras POS.
+    """
+    from django.db.models import Q
+    from reportlab.lib.pagesizes import mm
+    from reportlab.graphics.barcode import qr
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics import renderPDF
+
+    if productos is None:
+        qs = establecimiento.productos.filter(estado="activo")
+        if solo_sin_codigo:
+            qs = qs.filter(Q(codigo_barras="") | Q(codigo_barras__isnull=True))
+        productos = list(qs.order_by("categoria", "nombre"))
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+
+    if not productos:
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(29 * mm, 20 * mm, "No hay productos para imprimir")
+        c.save()
+        return buf.getvalue()
+
+    for idx, prod in enumerate(productos):
+        if idx > 0:
+            c.showPage()
+
+        # Encabezado
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawCentredString(29 * mm, 36 * mm, establecimiento.nombre[:30].upper())
+        c.setLineWidth(0.4)
+        c.line(4 * mm, 34.5 * mm, 54 * mm, 34.5 * mm)
+
+        # Nombre producto
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawCentredString(29 * mm, 30.5 * mm, prod.nombre[:30])
+
+        # QR
+        codigo_val = prod.codigo_barras or f"DC{prod.pk:05d}"
+        qr_payload = f"DC:P:{prod.pk}:SKU:{codigo_val}:COP:{int(prod.precio_kilo)}"
+        qr_code = qr.QrCodeWidget(qr_payload)
+        bounds = qr_code.getBounds()
+        qw = bounds[2] - bounds[0]
+        qh = bounds[3] - bounds[1]
+        lado_qr = 20 * mm
+        d = Drawing(lado_qr, lado_qr, transform=[lado_qr / qw, 0, 0, lado_qr / qh, 0, 0])
+        d.add(qr_code)
+        renderPDF.draw(d, c, 5 * mm, 9 * mm)
+
+        # Detalles
+        c.setFont("Helvetica", 6.5)
+        c.drawString(27 * mm, 25 * mm, f"CAT: {prod.get_categoria_display()[:15].upper()}")
+        c.setFont("Helvetica-Bold", 10.5)
+        unidad_str = prod.unidad_medida.upper()
+        if prod.es_servicio:
+            c.drawString(27 * mm, 19.5 * mm, f"${prod.precio_kilo:,.0f}".replace(",", "."))
+            c.setFont("Helvetica", 6.5)
+            c.drawString(27 * mm, 15.5 * mm, "SERVICIO")
+        else:
+            c.drawString(27 * mm, 19.5 * mm, f"${prod.precio_kilo:,.0f}".replace(",", "."))
+            c.setFont("Helvetica", 6.5)
+            c.drawString(27 * mm, 15.5 * mm, f"POR {unidad_str}")
+            if prod.unidad_medida == "kg":
+                c.drawString(27 * mm, 12 * mm, f"Lb: ${prod.precio_libra:,.0f}".replace(",", "."))
+
+        # Pie
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val} • QR DE TIENDA")
+
+    c.save()
+    return buf.getvalue()

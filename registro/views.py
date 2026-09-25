@@ -66,6 +66,8 @@ from .excel_service import (
 from .recibo_service import (
     generar_tarjeta_qr_producto,
     generar_pdf_etiqueta_barras,
+    generar_pdf_etiqueta_qr_producto,
+    generar_pdf_etiquetas_qr_masivo,
 )
 
 
@@ -1122,7 +1124,54 @@ def inventario_producto_etiqueta_barras(request, pk):
 
 
 @login_required
+def inventario_producto_etiqueta_qr(request, pk):
+    """Genera e imprime la etiqueta adhesiva térmica (58x40mm) con el Código QR de la tienda."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
+    pdf_bytes = generar_pdf_etiqueta_qr_producto(prod)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="etiqueta_qr_{prod.pk}.pdf"'
+    return response
+
+
+@login_required
+def inventario_etiquetas_qr_masivo(request):
+    """
+    Genera el lote/rollo de etiquetas QR para toda la tienda o para productos sin código de fábrica.
+    Permite imprimir masivamente en rollo térmico o adhesivo.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    solo_sin_codigo = request.GET.get("filtro") == "sin_codigo"
+    categoria = request.GET.get("categoria") or "todas"
+
+    qs = Producto.objects.filter(establecimiento=est, estado="activo")
+    if solo_sin_codigo:
+        qs = qs.filter(Q(codigo_barras="") | Q(codigo_barras__isnull=True))
+    if categoria != "todas":
+        qs = qs.filter(categoria=categoria)
+
+    productos = list(qs.order_by("categoria", "nombre"))
+    pdf_bytes = generar_pdf_etiquetas_qr_masivo(est, productos=productos)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="etiquetas_qr_{est.pk}.pdf"'
+    return response
+
+
+@login_required
 def api_buscar_producto_codigo(request):
+    """
+    Búsqueda ultrarrápida para mostrador / caja compatible con:
+    1. Código de barras tradicional (EAN-13, SKU, Code128).
+    2. Código QR de Tienda (formato DC:P:{pk}:...).
+    3. Básculas etiquetadoras comerciales (EAN-13 de peso variable estándar retail prefijo 20-29):
+       Ej. 200004201450C -> Producto #42, Peso: 1.450 Kg.
+    4. Búsqueda por texto (nombre del producto).
+    """
     perfil = _perfil(request.user)
     if not perfil:
         return JsonResponse({"encontrado": False, "error": "No autorizado"}, status=401)
@@ -1130,30 +1179,99 @@ def api_buscar_producto_codigo(request):
     if not codigo:
         return JsonResponse({"encontrado": False, "error": "Código vacío"})
 
-    prod = Producto.objects.filter(
-        establecimiento=perfil.establecimiento,
-        codigo_barras__iexact=codigo,
-    ).first()
+    est = perfil.establecimiento
+    prod = None
+    es_bascula = False
+    peso_bascula = None
+    precio_calculado = None
+    detalle_bascula = ""
 
+    # Caso A: QR de Tienda DiarioComercial (DC:P:{pk}:...)
+    if "DC:P:" in codigo.upper():
+        try:
+            partes = codigo.split(":")
+            idx_p = partes.index("P")
+            pk_prod = int(partes[idx_p + 1])
+            prod = Producto.objects.filter(establecimiento=est, pk=pk_prod).first()
+        except Exception:
+            prod = None
+
+    # Caso B: Código de Báscula Etiquetadora con peso variable incrustado (EAN-13 prefijo 20 a 29)
+    # Formato GS1: 20 [PPPPP ó PPPP] [WWWWW] C (Donde W es peso en gramos o valor)
+    if not prod and len(codigo) == 13 and codigo.isdigit() and codigo.startswith(("20", "21", "22", "23", "24", "25", "26", "27", "28", "29")):
+        plu_5 = codigo[2:7]
+        plu_4 = codigo[2:6]
+        gramos = int(codigo[7:12])
+        peso_kg = Decimal(str(round(gramos / 1000.0, 3)))
+
+        # Intentar coincidir con código de barras, SKU o ID del producto
+        candidatos = [plu_5, plu_4, str(int(plu_5)), str(int(plu_4))]
+        prod = Producto.objects.filter(
+            establecimiento=est,
+            codigo_barras__in=candidatos
+        ).first()
+
+        if not prod:
+            try:
+                prod = Producto.objects.filter(establecimiento=est, pk=int(plu_5)).first()
+            except Exception:
+                pass
+        if not prod:
+            try:
+                prod = Producto.objects.filter(establecimiento=est, pk=int(plu_4)).first()
+            except Exception:
+                pass
+
+        if prod:
+            es_bascula = True
+            peso_bascula = float(peso_kg)
+            precio_calculado = float(round(prod.precio_kilo * peso_kg))
+            detalle_bascula = f"⚖️ Báscula de mostrador: {peso_bascula:.3f} {prod.unidad_medida} a ${prod.precio_kilo:,.0f}/{prod.unidad_medida}"
+
+    # Caso C: Búsqueda exacta por código de barras o SKU
     if not prod:
         prod = Producto.objects.filter(
-            establecimiento=perfil.establecimiento,
+            establecimiento=est,
+            codigo_barras__iexact=codigo,
+        ).first()
+
+    # Caso D: Búsqueda por ID numérico directo (si coincide con DC00042 o ID numérico)
+    if not prod:
+        clean_id = codigo.upper().replace("DC", "").lstrip("0")
+        if clean_id.isdigit():
+            try:
+                prod = Producto.objects.filter(
+                    establecimiento=est,
+                    pk=int(clean_id),
+                ).first()
+            except Exception:
+                pass
+
+    # Caso E: Búsqueda por coincidencia de nombre
+    if not prod:
+        prod = Producto.objects.filter(
+            establecimiento=est,
             nombre__icontains=codigo,
         ).first()
 
     if prod:
+        precio_final = precio_calculado if es_bascula else float(prod.precio_kilo)
         return JsonResponse({
             "encontrado": True,
             "id": prod.pk,
             "nombre": prod.nombre,
             "codigo_barras": prod.codigo_barras,
             "categoria": prod.categoria,
-            "precio": float(prod.precio_kilo),
+            "precio": precio_final,
+            "precio_unitario": float(prod.precio_kilo),
             "stock": float(prod.stock_kilos),
             "unidad": prod.unidad_medida,
             "es_servicio": prod.es_servicio,
+            "es_bascula": es_bascula,
+            "peso_bascula": peso_bascula,
+            "detalle_bascula": detalle_bascula,
         })
-    return JsonResponse({"encontrado": False, "mensaje": f"No se encontró producto con código '{codigo}'"})
+    return JsonResponse({"encontrado": False, "mensaje": f"No se encontró producto con código o QR '{codigo}'"})
 
 
 @login_required
