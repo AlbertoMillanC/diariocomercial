@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Asistente de Configuración Inicial — Declaración Renglón por Renglón — DiarioComercial{% endblock %}
+
+{% block content %}
+<style>
+  .wizard-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0f172a;
+    color: #38bdf8;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+  .renglon-tag {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .hint-box {
+    background: #f8fafc;
+    border-left: 3px solid #0284c7;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #475569;
+    border-radius: 0 6px 6px 0;
+    margin-top: 4px;
+  }
+  .quick-chip {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+  }
+  .quick-chip:hover {
+    background: #00A859;
+    color: #ffffff;
+    border-color: #00A859;
+    transform: translateY(-1px);
+  }
+</style>
+
+<div style="max-width: 960px; margin: 0 auto;">
+  <div style="margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <span class="section-badge">🚀 Asistente de Primera Vez</span>
+      <h2 style="margin: 4px 0 6px 0; font-size:24px; color:var(--navy);">
+        Configuración Inicial: Declaración Renglón por Renglón
+      </h2>
+      <p class="lead" style="margin:0;">
+        Complete estos datos una sola vez. Cada campo corresponde exactamente a las casillas del Formulario Oficial (ICA Tunja / DIAN) para que sus impuestos y declaraciones se liquiden automáticamente.
+      </p>
+    </div>
+    {% if not es_primera_vez %}
+    <a href="{% url 'declaracion_ica' %}" class="btn btn-ghost">← Volver a Declaración ICA</a>
+    {% endif %}
+  </div>
+
+  <form method="post" id="form-wizard-declaracion">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <!-- PASO 1: SECCIÓN B — DATOS DEL CONTRIBUYENTE (RENGLONES 1 AL 7) -->
+    <div class="wizard-card">
+      <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:16px; color:var(--navy);">
+            📋 Sección B: Identificación y Ubicación del Contribuyente
+          </h3>
+          <span style="font-size:12px; color:#64748b;">Renglones 1 al 7 del Formulario Único Oficial</span>
+        </div>
+        <span style="font-size:22px;">🏛️</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:16px; margin-bottom:14px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglones 1 y 2</span> {{ form.nit.label }} *
+          </label>
+          {{ form.nit }}
+          {{ form.nit.errors }}
+          <div class="hint-box">
+            💡 <strong>¿De dónde lo saco?</strong> Casilla 5 de su RUT o su cédula de ciudadanía. Digite solo los números (sin puntos, comas ni guión del DV).
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglón 3</span> {{ form.nombre.label }} *
+          </label>
+          {{ form.nombre }}
+          {{ form.nombre.errors }}
+          <div class="hint-box">
+            💡 <strong>¿Cómo colocarlo?</strong> Razón social registrada en Cámara de Comercio / RUT, o sus nombres y apellidos si es persona natural.
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:16px; margin-bottom:14px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglón 4</span> {{ form.direccion.label }} *
+          </label>
+          {{ form.direccion }}
+          {{ form.direccion.errors }}
+          <div class="hint-box">
+            💡 <strong>¿Cómo colocarlo?</strong> Dirección física exacta del local (ej: Carrera 10 # 18-35 Local 1 Barrio Centro).
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglón 5</span> {{ form.municipio.label }} *
+          </label>
+          {{ form.municipio }}
+          {{ form.municipio.errors }}
+          <div class="hint-box">
+            💡 Municipio DANE donde ejerce la actividad comercial (predeterminado Tunja 15001).
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglón 6</span> {{ form.telefono.label }} *
+          </label>
+          {{ form.telefono }}
+          {{ form.telefono.errors }}
+          <div class="hint-box">
+            💡 Celular WhatsApp del negocio (sirve además como llave Bre-B).
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Renglón 7</span> {{ form.correo_reportes.label }} *
+          </label>
+          {{ form.correo_reportes }}
+          {{ form.correo_reportes.errors }}
+          <div class="hint-box">
+            💡 Correo donde recibirá el borrador oficial de la declaración y reportes.
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            Clasificación Tributaria
+          </label>
+          {{ form.clasificacion_tributaria }}
+          {{ form.clasificacion_tributaria.errors }}
+          <div class="hint-box">
+            💡 Régimen Común (declara bimestral) o Simplificado (declara anual).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 2: SECCIÓN C — ACTIVIDAD ECONÓMICA Y TARIFAS (RENGLONES 16 Y 17) -->
+    <div class="wizard-card">
+      <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:16px; color:var(--navy);">
+            🥩 Sección C: Actividad Económica Principal y Tarifa ICA
+          </h3>
+          <span style="font-size:12px; color:#64748b;">Renglones 16 y 17 — Discriminación de Actividades y Tarifa por Mil</span>
+        </div>
+        <span style="font-size:22px;">🏷️</span>
+      </div>
+
+      <!-- BOTONES DE AUTO-RELLENO EN 1 CLIC -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+        <span style="font-size:11px; font-weight:bold; color:#475569; text-transform:uppercase; display:block; margin-bottom:8px;">
+          ⚡ Auto-rellenar con 1 clic según el tipo de negocio (Tunja):
+        </span>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('4722', 'Comercio al por menor de carnes y productos cárnicos', 5.0, 'Venta Carne de Res y Cerdo')">🥩 Carnicería / Pescadería (4722 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('4711', 'Comercio al por menor en establecimientos no especializados (Surtido)', 5.0, 'Venta Víveres y Abarrotes')">🛒 Minimarket / Autoservicio (4711 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('4721', 'Comercio al por menor de frutas y verduras', 5.0, 'Venta Frutas y Verduras')">🥦 Frutería / Fruver (4721 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('1081', 'Elaboración de productos de panadería y pastelería', 5.0, 'Venta Pan y Pasteles')">🍞 Panadería (1081 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('4752', 'Comercio al por menor de artículos de ferretería y pintura', 5.0, 'Venta Artículos de Ferretería')">🔨 Ferretería (4752 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('4772', 'Comercio al por menor de medicamentos y productos farmacéuticos', 5.0, 'Venta Medicamentos y Aseo')">💊 Droguería (4772 - 5‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('5611', 'Expendio a la mesa de comidas preparadas en restaurantes', 7.0, 'Consumo en Restaurante')">🍽️ Restaurante (5611 - 7‰)</button>
+          <button type="button" class="quick-chip" onclick="seleccionarCiiu('9602', 'Peluquería y otros tratamientos de belleza', 7.0, 'Servicio de Peluquería')">✂️ Peluquería / Barbería (9602 - 7‰)</button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 140px 1.5fr 140px; gap:16px; margin-bottom:14px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">CIIU</span> Código (4 d.) *
+          </label>
+          {{ form.ciiu_codigo }}
+          {{ form.ciiu_codigo.errors }}
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            Descripción de la Actividad Económica *
+          </label>
+          {{ form.ciiu_descripcion }}
+          {{ form.ciiu_descripcion.errors }}
+        </div>
+
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            <span class="renglon-tag">Tarifa</span> Por Mil (x mil) *
+          </label>
+          {{ form.ciiu_tarifa_x_mil }}
+          {{ form.ciiu_tarifa_x_mil.errors }}
+        </div>
+      </div>
+
+      <div>
+        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+          Concepto Principal de Venta en Mostrador
+        </label>
+        {{ form.motivo_nombre }}
+        {{ form.motivo_nombre.errors }}
+        <div class="hint-box">
+          💡 Nombre sugerido para registrar rápidamente las ventas del día a día (ej: Venta Carne de Res, Venta Mostrador).
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 3: SECCIÓN D — ANTECEDENTES Y SALDOS DEL FORMULARIO ANTERIOR (RENGLONES 29 Y 32) -->
+    <div class="wizard-card">
+      <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:16px; color:var(--navy);">
+            💰 Sección D: Antecedentes Tributarios y Saldos Anteriores
+          </h3>
+          <span style="font-size:12px; color:#64748b;">Renglones 29 y 32 — Descuentos automáticos al total a pagar</span>
+        </div>
+        <span style="font-size:22px;">📉</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:18px;">
+        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px;">
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px; color:#92400e;">
+            <span style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:bold;">Renglón 29</span>
+            {{ form.anticipo_ano_anterior.label }}
+          </label>
+          {{ form.anticipo_ano_anterior }}
+          {{ form.anticipo_ano_anterior.errors }}
+          <div style="font-size:12px; color:#78350f; margin-top:6px; line-height:1.4;">
+            💡 <strong>¿De dónde lo saco?</strong> Si declaró el año anterior, busque el <strong>Renglón 30 ("Anticipo para el año siguiente")</strong> de ese formulario. El sistema se lo restará directamente a lo que deba pagar este año. Si no pagó anticipo o es su primer año, deje <code>0</code>.
+          </div>
+        </div>
+
+        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:14px;">
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px; color:#065f46;">
+            <span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-weight:bold;">Renglón 32</span>
+            {{ form.saldo_favor_anterior.label }}
+          </label>
+          {{ form.saldo_favor_anterior }}
+          {{ form.saldo_favor_anterior.errors }}
+          <div style="font-size:12px; color:#047857; margin-top:6px; line-height:1.4;">
+            💡 <strong>¿De dónde lo saco?</strong> Si en su declaración anterior le quedó saldo a favor, busque el <strong>Renglón 34 ("Total Saldo a Favor")</strong> de ese formulario. El sistema lo aplicará a su favor. Si no tenía saldo, deje <code>0</code>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 4: SECCIÓN E — FACTURACIÓN ELECTRÓNICA DIAN -->
+    <div class="wizard-card" style="background:#f8fafc;">
+      <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:16px; color:var(--navy);">
+            🧾 Sección E: Parámetros de Facturación Electrónica DIAN
+          </h3>
+          <span style="font-size:12px; color:#64748b;">Resolución de habilitación DIAN y correlativo consecutivo</span>
+        </div>
+        <span style="font-size:22px;">⚙️</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1.5fr 1fr 1fr; gap:16px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            {{ form.resolucion_dian.label }}
+          </label>
+          {{ form.resolucion_dian }}
+          {{ form.resolucion_dian.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            {{ form.prefijo_facturacion.label }}
+          </label>
+          {{ form.prefijo_facturacion }}
+          {{ form.prefijo_facturacion.errors }}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">
+            {{ form.consecutivo_inicial.label }}
+          </label>
+          {{ form.consecutivo_inicial }}
+          {{ form.consecutivo_inicial.errors }}
+        </div>
+      </div>
+      <div style="font-size:12px; color:#64748b; margin-top:8px;">
+        ℹ️ Estos valores ya vienen listos con los estándares de prueba. Puede ajustarlos cuando la DIAN le asigne su numeración definitiva.
+      </div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; flex-wrap:wrap; gap:12px;">
+      <a href="{% url 'inicio' %}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="background:#00A859; font-size:16px; padding:14px 28px; box-shadow:0 4px 14px rgba(0,168,89,0.35);">
+        🚀 Guardar Datos y Activar Declaración Sugerida Oficial
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  function seleccionarCiiu(codigo, descripcion, tarifa, motivo) {
+    const ciiuInput = document.getElementById("id_ciiu_codigo");
+    const descInput = document.getElementById("id_ciiu_descripcion");
+    const tarifaInput = document.getElementById("id_ciiu_tarifa_x_mil");
+    const motivoInput = document.getElementById("id_motivo_nombre");
+
+    if (ciiuInput) ciiuInput.value = codigo;
+    if (descInput) descInput.value = descripcion;
+    if (tarifaInput) tarifaInput.value = tarifa;
+    if (motivoInput && !motivoInput.value) motivoInput.value = motivo;
+
+    // Resaltar visualmente los campos actualizados
+    [ciiuInput, descInput, tarifaInput].forEach(el => {
+      if (el) {
+        el.style.transition = "background-color 0.4s ease";
+        el.style.backgroundColor = "#dcfce7";
+        setTimeout(() => { el.style.backgroundColor = ""; }, 800);
+      }
+    });
+  }
+</script>
+{% endblock %}

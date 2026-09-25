@@ -60,6 +60,32 @@ class Establecimiento(models.Model):
     rango_hasta = models.PositiveIntegerField(default=5000)
     consecutivo_actual = models.PositiveIntegerField(default=1)
 
+    # Parámetros Declaración ICA Renglón por Renglón (Formulario Oficial)
+    anticipo_ano_anterior = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal("0"),
+        help_text="Renglón 29: Menos anticipo liquidado en el año anterior"
+    )
+    saldo_favor_anterior = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal("0"),
+        help_text="Renglón 32: Menos saldo a favor del periodo anterior"
+    )
+    clasificacion_tributaria = models.CharField(
+        max_length=30,
+        choices=(
+            ("comun", "Régimen Común / Ordinario (Bimestral)"),
+            ("simplificado", "Régimen Simplificado (Anual)"),
+            ("simple_rst", "Régimen Simple de Tributación (RST)"),
+        ),
+        default="comun",
+        help_text="Clasificación tributaria en el municipio"
+    )
+    matricula_mercantil = models.CharField(
+        max_length=40, blank=True, help_text="Matrícula mercantil Cámara de Comercio (ej: TUN-012345)"
+    )
+    configuracion_inicial_completada = models.BooleanField(
+        default=False, help_text="Indica si completó el asistente inicial de declaración renglón a renglón"
+    )
+
     def siguiente_consecutivo_factura(self):
         consec = self.consecutivo_actual
         numero = f"{self.prefijo_facturacion}-{consec:05d}"

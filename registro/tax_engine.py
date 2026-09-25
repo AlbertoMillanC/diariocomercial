@@ -160,10 +160,10 @@ def liquidar_declaracion_sugerida_ica(
     r26_exenciones = Decimal("0")
     r27_retenciones_favor = retenciones_favor
     r28_autorretenciones = Decimal("0")
-    r29_anticipo_anterior = Decimal("0")
+    r29_anticipo_anterior = getattr(establecimiento, "anticipo_ano_anterior", Decimal("0")) or Decimal("0")
     r30_anticipo_siguiente = Decimal("0")
     r31_sanciones = Decimal("0")
-    r32_saldo_favor_anterior = Decimal("0")
+    r32_saldo_favor_anterior = getattr(establecimiento, "saldo_favor_anterior", Decimal("0")) or Decimal("0")
 
     subtotal_cargo = (
         r25_total_impuesto_cargo - r26_exenciones - r27_retenciones_favor

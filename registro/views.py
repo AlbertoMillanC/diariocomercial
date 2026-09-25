@@ -31,6 +31,7 @@ from .forms import (
     SoporteCrearCajeroForm,
     SoporteEditarTiendaForm,
     ClienteFacturacionForm,
+    AsistenteDeclaracionInicialForm,
 )
 from .models import (
     ActividadCIIU,
@@ -308,6 +309,7 @@ def inicio(request):
             "neto": neto,
             "movimientos": movimientos,
             "por_ciiu": por_ciiu,
+            "requiere_asistente_inicial": perfil.es_propietario() and not getattr(est, "configuracion_inicial_completada", False) if perfil else False,
         },
     )
 
@@ -2262,5 +2264,119 @@ def exogena_dian_exportar_excel(request):
     )
     resp["Content-Disposition"] = f'attachment; filename="DIAN_Exogena_1007_{est.nit}_{ano_filtro}.xlsx"'
     return resp
+
+
+@login_required
+def asistente_inicial_declaracion(request):
+    """
+    Asistente de configuración inicial (Onboarding Wizard) renglón por renglón
+    para la Declaración de Industria y Comercio (Formulario 02 de Tunja) y DIAN.
+    Guía al usuario paso a paso con explicaciones claras y placeholders detallados.
+    """
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "Solo el propietario del establecimiento puede configurar los datos de la declaración.")
+        return redirect("inicio")
+
+    est = perfil.establecimiento
+    municipio_default = est.municipio or Municipio.objects.filter(codigo_dane="15001").first() or Municipio.objects.first()
+
+    # Obtener actividad CIIU principal actual si existe
+    actividad_actual = ActividadCIIU.objects.filter(establecimiento=est).first()
+    motivo_actual = MotivoVenta.objects.filter(establecimiento=est, es_predeterminado=True).first()
+
+    if request.method == "POST":
+        form = AsistenteDeclaracionInicialForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            # 1. Guardar datos del Establecimiento (Renglones 1 al 7, 29, 32 y Facturación)
+            est.nit = data["nit"]
+            est.nombre = data["nombre"]
+            est.direccion = data["direccion"]
+            est.municipio = data["municipio"]
+            est.correo_reportes = data["correo_reportes"]
+            est.llave_bre_b = data["telefono"]
+            est.tipo_llave_bre_b = "celular"
+            est.clasificacion_tributaria = data["clasificacion_tributaria"]
+            est.anticipo_ano_anterior = data.get("anticipo_ano_anterior") or Decimal("0")
+            est.saldo_favor_anterior = data.get("saldo_favor_anterior") or Decimal("0")
+            est.resolucion_dian_numero = data.get("resolucion_dian") or "18764000001"
+            est.prefijo_facturacion = data.get("prefijo_facturacion") or "FE"
+            est.consecutivo_actual = data.get("consecutivo_inicial") or 1
+            est.configuracion_inicial_completada = True
+            est.save()
+
+            # 2. Registrar o Actualizar Actividad CIIU Principal (Sección C - Renglón 16)
+            codigo_ciiu = data["ciiu_codigo"].strip()
+            desc_ciiu = data["ciiu_descripcion"].strip()
+            tarifa = data["ciiu_tarifa_x_mil"]
+            if actividad_actual:
+                actividad_actual.codigo = codigo_ciiu
+                actividad_actual.descripcion = desc_ciiu
+                actividad_actual.tarifa_x_mil = tarifa
+                actividad_actual.save()
+                act_usada = actividad_actual
+            else:
+                act_usada, _ = ActividadCIIU.objects.get_or_create(
+                    establecimiento=est,
+                    codigo=codigo_ciiu,
+                    defaults={
+                        "descripcion": desc_ciiu,
+                        "tarifa_x_mil": tarifa,
+                    }
+                )
+
+            # 3. Registrar o Actualizar Motivo de Venta Predeterminado
+            motivo_nombre = data["motivo_nombre"].strip() or "Venta en Mostrador"
+            if motivo_actual:
+                motivo_actual.actividad = act_usada
+                motivo_actual.nombre = motivo_nombre
+                motivo_actual.save()
+            else:
+                MotivoVenta.objects.get_or_create(
+                    establecimiento=est,
+                    actividad=act_usada,
+                    nombre=motivo_nombre,
+                    defaults={"es_predeterminado": True}
+                )
+
+            messages.success(
+                request,
+                "🎉 ¡Felicitaciones! Su negocio ha quedado configurado renglón por renglón. "
+                "Ahora todas las ventas calcularán automáticamente el ICA y generarán su Declaración Sugerida oficial."
+            )
+            return redirect("declaracion_ica")
+    else:
+        # Pre-cargar datos existentes
+        initial_data = {
+            "nit": est.nit or "",
+            "nombre": est.nombre or "",
+            "direccion": est.direccion or "",
+            "municipio": municipio_default,
+            "telefono": est.llave_bre_b or "",
+            "correo_reportes": est.correo_reportes or "",
+            "clasificacion_tributaria": getattr(est, "clasificacion_tributaria", "comun") or "comun",
+            "ciiu_codigo": actividad_actual.codigo if actividad_actual else "4722",
+            "ciiu_descripcion": actividad_actual.descripcion if actividad_actual else "Comercio al por menor de carnes y productos cárnicos",
+            "ciiu_tarifa_x_mil": actividad_actual.tarifa_x_mil if actividad_actual else Decimal("5.0"),
+            "motivo_nombre": motivo_actual.nombre if motivo_actual else "Venta en Mostrador",
+            "anticipo_ano_anterior": getattr(est, "anticipo_ano_anterior", Decimal("0")) or Decimal("0"),
+            "saldo_favor_anterior": getattr(est, "saldo_favor_anterior", Decimal("0")) or Decimal("0"),
+            "resolucion_dian": est.resolucion_dian_numero or "18764000001",
+            "prefijo_facturacion": est.prefijo_facturacion or "FE",
+            "consecutivo_inicial": est.consecutivo_actual or 1,
+        }
+        form = AsistenteDeclaracionInicialForm(initial=initial_data)
+
+    return render(
+        request,
+        "asistente_inicial.html",
+        {
+            "form": form,
+            "establecimiento": est,
+            "es_primera_vez": not est.configuracion_inicial_completada,
+        }
+    )
+
 
 

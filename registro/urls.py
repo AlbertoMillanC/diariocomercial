@@ -37,6 +37,8 @@ urlpatterns = [
     path("api/bre-b/status/<str:referencia>/", views.api_status_bre_b, name="api_status_bre_b"),
     path("api/bre-b/mock-webhook/<str:referencia>/", views.api_mock_webhook_bre_b, name="api_mock_webhook_bre_b"),
     path("ventas/<int:pk>/ticket-escpos/<int:ancho>/", views.imprimir_ticket_escpos, name="ticket_escpos"),
+    # Asistente Inicial de Declaración (Onboarding Renglón por Renglón)
+    path("asistente-inicial/", views.asistente_inicial_declaracion, name="asistente_inicial"),
     # Tributario ICA Tunja (Acuerdo 0032/2020)
     path("tributario/ica/", views.declaracion_sugerida_ica_view, name="declaracion_ica"),
     path("tributario/ica/exportar/", views.exportar_declaracion_ica, name="exportar_ica"),

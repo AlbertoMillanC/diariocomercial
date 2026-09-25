@@ -2,6 +2,22 @@
 {% load dinero %}
 {% block title %}Inicio{% endblock %}
 {% block content %}
+{% if requiere_asistente_inicial %}
+<div style="background: linear-gradient(135deg, #0f172a, #1e3a8a); color:#fff; border-radius:12px; padding:18px 24px; margin-bottom:20px; box-shadow:0 10px 25px -5px rgba(15,23,42,0.3); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+  <div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:24px;">🚀</span>
+      <h3 style="margin:0; font-size:18px; color:#38bdf8;">¡Configure su Declaración Tributaria Renglón por Renglón!</h3>
+    </div>
+    <p style="margin:6px 0 0 0; font-size:13px; color:#cbd5e1; max-width:650px;">
+      Al usar por primera vez DiarioComercial, complete los datos de su negocio (NIT, Actividad CIIU, Anticipos y Saldos) con nuestro formulario rápido guiado. Esto activará el cálculo automático del ICA y su borrador de declaración oficial.
+    </p>
+  </div>
+  <a href="{% url 'asistente_inicial' %}" class="btn btn-primary" style="background:#00A859; font-size:14px; font-weight:bold; padding:10px 20px; border-radius:8px; white-space:nowrap; box-shadow:0 4px 12px rgba(0,168,89,0.4);">
+    ⚡ Iniciar Asistente Renglón a Renglón →
+  </a>
+</div>
+{% endif %}
 <h2>Consolidado del periodo</h2>
 <p class="lead">ICA estimado según tarifa CIIU (x mil). Solo suman los registros vigentes.</p>
 <form class="filters" method="get">

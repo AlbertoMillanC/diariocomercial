@@ -16,6 +16,7 @@ from .models import (
     Venta,
     Establecimiento,
     Cliente,
+    Municipio,
 )
 
 
@@ -429,3 +430,190 @@ class ClienteFacturacionForm(forms.ModelForm):
             cleaned_data["dv"] = str(residuo if residuo <= 1 else 11 - residuo)
 
         return cleaned_data
+
+
+class AsistenteDeclaracionInicialForm(forms.Form):
+    """
+    Formulario de configuración inicial (Onboarding Wizard) renglón por renglón
+    del Formulario Oficial de Declaración de Impuestos (Formulario 02 de ICA / DIAN).
+    Incluye placeholders explicativos y datos pedagógicos para el comerciante.
+    """
+    # SECCIÓN B: IDENTIFICACIÓN Y DATOS DEL CONTRIBUYENTE (Renglones 1 al 7)
+    nit = forms.CharField(
+        label="NIT o Cédula de Ciudadanía (Renglones 1 y 2)",
+        max_length=20,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: 1049654321 o 901234567 (Solo números, sin puntos ni comas)",
+            "class": "form-control",
+            "autofocus": "autofocus",
+        }),
+        help_text="Casilla 5 de su RUT o número de cédula física. Digite solo números."
+    )
+    nombre = forms.CharField(
+        label="Razón Social o Nombre Completo (Renglón 3)",
+        max_length=120,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: Carnicería y Fruver La 20 o Distribuidora El Ganadero",
+            "class": "form-control",
+        }),
+        help_text="Nombre de su negocio o su nombre si opera como persona natural."
+    )
+    direccion = forms.CharField(
+        label="Dirección del Establecimiento (Renglón 4)",
+        max_length=160,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: Carrera 10 # 18-35 Local 1 Barrio Centro",
+            "class": "form-control",
+        }),
+        help_text="Dirección física exacta donde atiende sus clientes en el municipio."
+    )
+    municipio = forms.ModelChoiceField(
+        label="Municipio y Departamento (Renglón 5)",
+        queryset=Municipio.objects.all(),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="Municipio donde está matriculado su negocio (ej: Tunja 15001)."
+    )
+    telefono = forms.CharField(
+        label="Teléfono / Celular WhatsApp (Renglón 6)",
+        max_length=20,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: 3101234567 (Para contacto y cobros Bre-B)",
+            "class": "form-control",
+        }),
+        help_text="Número móvil de su negocio. Servirá además para vincular pagos Bre-B."
+    )
+    correo_reportes = forms.EmailField(
+        label="Correo Electrónico para Reportes y Declaración (Renglón 7)",
+        widget=forms.EmailInput(attrs={
+            "placeholder": "Ej: miempresa@gmail.com o contador@asesoria.com",
+            "class": "form-control",
+        }),
+        help_text="Correo donde el sistema enviará los borradores en PDF y Excel para su contador."
+    )
+    clasificacion_tributaria = forms.ChoiceField(
+        label="Régimen y Clasificación del Negocio",
+        choices=(
+            ("comun", "Régimen Común / Ordinario (Declaración Bimestral en Tunja)"),
+            ("simplificado", "Régimen Simplificado (Declaración Anual)"),
+            ("simple_rst", "Régimen Simple de Tributación (RST)"),
+        ),
+        initial="comun",
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="La mayoría de minimarkets y carnicerías declaran bimestral en Régimen Común."
+    )
+
+    # SECCIÓN C: ACTIVIDAD ECONÓMICA Y TARIFAS (Renglones 16 y 17)
+    ciiu_codigo = forms.CharField(
+        label="Código de Actividad CIIU Principal (4 dígitos)",
+        max_length=10,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: 4722 (O presione uno de los botones rápidos de abajo)",
+            "class": "form-control",
+        }),
+        help_text="Código de 4 dígitos de la casilla 46 de su RUT (ej: 4722 Carnicería, 4711 Minimarket)."
+    )
+    ciiu_descripcion = forms.CharField(
+        label="Descripción de la Actividad Económica",
+        max_length=160,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: Comercio al por menor de carnes y productos cárnicos en establecimientos especializados",
+            "class": "form-control",
+        }),
+        help_text="Nombre oficial de la actividad económica inscrita."
+    )
+    ciiu_tarifa_x_mil = forms.DecimalField(
+        label="Tarifa ICA por Mil (x mil)",
+        min_value=Decimal("1.0"),
+        max_digits=5,
+        decimal_places=2,
+        initial=Decimal("5.0"),
+        widget=forms.NumberInput(attrs={
+            "placeholder": "Ej: 5.0 (Tarifa legal en Tunja para comercio al por menor: 5 por mil)",
+            "step": "0.1",
+            "class": "form-control",
+        }),
+        help_text="Tarifa fijada por el Estatuto Tributario Municipal. En Tunja el comercio paga el 5.0 por mil."
+    )
+    motivo_nombre = forms.CharField(
+        label="Concepto de Venta Principal en Mostrador",
+        max_length=100,
+        initial="Venta en Mostrador",
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: Venta Carne de Res y Cerdo o Viveres Generales",
+            "class": "form-control",
+        }),
+        help_text="El producto o categoría que más se vende en el mostrador para registrar ventas rápidas."
+    )
+
+    # SECCIÓN D: ANTECEDENTES Y SALDOS DE LA DECLARACIÓN ANTERIOR (Renglones 29 y 32)
+    anticipo_ano_anterior = forms.DecimalField(
+        label="Renglón 29: Menos Anticipo liquidado en el año anterior ($ COP)",
+        min_value=Decimal("0"),
+        max_digits=14,
+        decimal_places=2,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "placeholder": "Ej: 0 (o el valor del Renglón 30 de su formulario del año pasado)",
+            "step": "1000",
+            "class": "form-control",
+        }),
+        help_text="Si en su formulario del año pasado pagó anticipo, colóquelo aquí para descontarlo este año. Si no, deje 0."
+    )
+    saldo_favor_anterior = forms.DecimalField(
+        label="Renglón 32: Menos Saldo a favor del periodo anterior ($ COP)",
+        min_value=Decimal("0"),
+        max_digits=14,
+        decimal_places=2,
+        initial=Decimal("0"),
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "placeholder": "Ej: 0 (o el valor del Renglón 34 de su formulario del año pasado)",
+            "step": "1000",
+            "class": "form-control",
+        }),
+        help_text="Si el año pasado le quedó saldo a favor, digítelo aquí para que el sistema lo reste de su pago. Si no, deje 0."
+    )
+
+    # SECCIÓN E: FACTURACIÓN ELECTRÓNICA DIAN (OPCIONAL / DEFAULT LISTO)
+    resolucion_dian = forms.CharField(
+        label="Resolución DIAN de Facturación",
+        max_length=60,
+        initial="18764000001",
+        required=False,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: 18764000001 (Número de habilitación DIAN)",
+            "class": "form-control",
+        }),
+        help_text="Número oficial de la resolución expedida por la DIAN para facturar."
+    )
+    prefijo_facturacion = forms.CharField(
+        label="Prefijo de Facturación",
+        max_length=10,
+        initial="FE",
+        required=False,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ej: FE o SETT",
+            "class": "form-control",
+        }),
+        help_text="Letras que anteceden al número de factura (ej: FE)."
+    )
+    consecutivo_inicial = forms.IntegerField(
+        label="Consecutivo Inicial de Factura",
+        min_value=1,
+        initial=1,
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "placeholder": "Ej: 1 (O el número de su próxima factura)",
+            "class": "form-control",
+        }),
+        help_text="Número desde el cual se empezarán a numerar las facturas electrónicas."
+    )
+
+    def clean_nit(self):
+        nit = self.cleaned_data.get("nit", "").strip()
+        nit_limpio = "".join(c for c in nit if c.isdigit())
+        if not nit_limpio:
+            raise forms.ValidationError("El NIT o Cédula debe contener números válidos.")
+        return nit_limpio
+

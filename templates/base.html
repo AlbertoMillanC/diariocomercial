@@ -51,6 +51,7 @@
       <a href="{% url 'exogena_dian' %}" class="{% if request.resolver_match.url_name == 'exogena_dian' %}activo{% endif %}" style="border:1px solid #38bdf8; color:#38bdf8;">📊 Exógena 1007</a>
       <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
       <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
+      <a href="{% url 'asistente_inicial' %}" class="{% if request.resolver_match.url_name == 'asistente_inicial' %}activo{% endif %}">🚀 Asistente Declaración</a>
       <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>
       {% endif %}
     {% endif %}
