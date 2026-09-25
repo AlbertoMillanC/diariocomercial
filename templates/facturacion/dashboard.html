@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Facturación Electrónica DIAN & POS Electrónico{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2>🧾 Centro de Facturación Electrónica DIAN & POS</h2>
+    <p class="lead" style="margin:0;">Control y emisión de facturas electrónicas con validación previa DIAN (Resolución 000165 / UBL 2.1).</p>
+  </div>
+  <div style="display:flex; gap:10px;">
+    <a href="{% url 'venta_nueva' %}" class="btn btn-primary" style="background:#059669; font-weight:bold;">
+      ➕ Emitir Venta / Factura
+    </a>
+    <a href="{% url 'clientes_lista' %}" class="btn btn-secondary" style="font-weight:bold;">
+      👥 Clientes DIAN
+    </a>
+  </div>
+</div>
+
+<!-- TARJETAS DE ESTADO DIAN -->
+<div class="cards cards-4" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
+  <div class="card" style="border-left:4px solid #059669;">
+    <span>Facturas Electrónicas Emitidas</span>
+    <strong style="color:#059669;">{{ total_facturas_emitidas }}</strong>
+    <small style="color:#64748b; font-size:11px;">Con CUFE y reporte individual</small>
+  </div>
+  <div class="card" style="border-left:4px solid #0284c7;">
+    <span>Monto Total Facturado (FE)</span>
+    <strong style="color:#0284c7; font-size:17px;">$ {{ monto_total_facturado_fe|floatformat:0 }} COP</strong>
+    <small style="color:#64748b; font-size:11px;">Base con soporte legal</small>
+  </div>
+  <div class="card" style="border-left:4px solid #f59e0b;">
+    <span>Ventas Consumidor Final</span>
+    <strong style="color:#d97706;">{{ total_ventas_mostrador }}</strong>
+    <small style="color:#64748b; font-size:11px;">Mostrador (NIT 222222222222)</small>
+  </div>
+  <div class="card" style="border-left:4px solid #6366f1;">
+    <span>Numeración DIAN Restante</span>
+    <strong style="color:#4f46e5;">{{ disponibles_rango }} disponibles</strong>
+    <small style="color:#64748b; font-size:11px;">Rango hasta #{{ establecimiento.rango_hasta }}</small>
+  </div>
+</div>
+
+<!-- GUÍA PEDAGÓGICA: CÓMO FUNCIONA LA FACTURACIÓN ELECTRÓNICA -->
+<div class="panel" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="const g = document.getElementById('guia-dian'); g.style.display = g.style.display === 'none' ? 'block' : 'none';">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:22px;">💡</span>
+      <h3 style="margin:0; font-size:15px; color:var(--navy);">¿Cómo se hacen las Facturas Electrónicas en Colombia y en DiarioComercial?</h3>
+    </div>
+    <span style="font-size:13px; color:#0284c7; font-weight:bold;">Ver Guía Normativa ▾</span>
+  </div>
+
+  <div id="guia-dian" style="margin-top:14px; padding-top:12px; border-top:1px dashed #cbd5e1; font-size:13px; line-height:1.6; color:#334155;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div>
+        <strong style="color:#0f172a; display:block; margin-bottom:4px;">1. Ventas a Clientes de Mostrador (Consumidor Final):</strong>
+        <p style="margin:0 0 8px 0;">
+          Por normativa DIAN, las personas que no solicitan factura con su nombre se registran bajo el adquirente genérico con <strong>NIT 222222222222 (Consumidor Final)</strong>. En DiarioComercial esto se hace en 1 segundo sin pedirle datos al cliente.
+        </p>
+      </div>
+      <div>
+        <strong style="color:#0f172a; display:block; margin-bottom:4px;">2. Clientes que solicitan Factura Electrónica:</strong>
+        <p style="margin:0 0 8px 0;">
+          Si un cliente pide factura para deducir costos o para su empresa, solo debe activar la casilla <strong>"¿Cliente solicita Factura Electrónica individual?"</strong> al registrar la venta y seleccionar o crear al cliente con su <strong>Cédula/NIT, Nombre y Correo electrónico</strong>.
+        </p>
+      </div>
+    </div>
+    <div style="background:#e0f2fe; border-radius:6px; padding:10px 14px; margin-top:8px; color:#0369a1; font-size:12px;">
+      📌 <strong>Datos Legales de la Tienda:</strong> Resolución DIAN N° <strong>{{ establecimiento.resolucion_dian_numero }}</strong> • Prefijo <strong>{{ establecimiento.prefijo_facturacion }}</strong> • Rango autorizado: <strong>{{ establecimiento.rango_desde }} al {{ establecimiento.rango_hasta }}</strong> • Consecutivo actual: <strong>{{ establecimiento.consecutivo_actual }}</strong>.
+    </div>
+  </div>
+</div>
+
+<!-- TABLA DE FACTURAS ELECTRÓNICAS EMITIDAS -->
+<div class="panel">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:16px; color:var(--navy);">📑 Facturas Electrónicas Emitidas</h3>
+    <small style="color:var(--muted);">Listado con CUFE y enlace de validación directa DIAN</small>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>N° Factura</th>
+          <th>Fecha y Hora</th>
+          <th>Cliente / Razón Social</th>
+          <th>NIT / Cédula</th>
+          <th>Total COP</th>
+          <th>CUFE (Validación)</th>
+          <th>Estado DIAN</th>
+          <th style="text-align:center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in facturas %}
+        <tr>
+          <td class="mono"><strong>{{ f.numero_factura_electronica|default:"FE" }}</strong></td>
+          <td>{{ f.fecha_hora|date:"d/m/Y H:i" }}</td>
+          <td><strong>{{ f.cliente.nombre }}</strong></td>
+          <td class="mono">{{ f.cliente.nit_cedula }}</td>
+          <td><strong style="color:#059669; font-size:14px;">$ {{ f.valor|floatformat:0 }} COP</strong></td>
+          <td>
+            {% if f.cufe %}
+              <span class="mono" style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;" title="{{ f.cufe }}">
+                {{ f.cufe|slice:":12" }}...
+              </span>
+            {% else %}
+              <span style="color:#94a3b8; font-size:11px;">Pendiente</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="tag" style="background:#dcfce7; color:#166534; font-weight:bold; font-size:11px;">
+              ✓ {{ f.get_estado_dian_display|default:"APROBADA" }}
+            </span>
+          </td>
+          <td style="text-align:center;">
+            <div style="display:inline-flex; gap:6px;">
+              <a href="{% url 'factura_electronica_detalle' f.pk %}" class="btn btn-sm btn-primary" style="background:#0284c7; text-decoration:none;" title="Ver e imprimir factura formal">
+                👁️ Ver / Tirilla
+              </a>
+              <a href="{% url 'factura_electronica_pdf' f.pk %}" class="btn btn-sm btn-secondary" style="text-decoration:none;" title="Descargar PDF formal con QR DIAN">
+                📄 PDF
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:24px; color:#64748b;">
+            Aún no se han emitido facturas electrónicas individuales.
+            <br>
+            <a href="{% url 'venta_nueva' %}" style="display:inline-block; margin-top:8px; color:#0284c7; font-weight:bold;">
+              Registrar una venta y marcar "¿Cliente solicita Factura Electrónica?"
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

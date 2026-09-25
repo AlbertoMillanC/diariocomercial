@@ -45,6 +45,7 @@
     {% if user.is_superuser %}
       <!-- NAVEGACIÓN EXCLUSIVA PARA EL ADMINISTRADOR DEL SISTEMA SAAS -->
       <a href="{% url 'superadmin_dashboard' %}" class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}activo{% endif %}" style="background:#0f172a; border:1px solid #4ade80; color:#4ade80; font-weight:bold;">👑 Panel del Sistema</a>
+      <a href="{% url 'superadmin_comercio_crear' %}" class="{% if request.resolver_match.url_name == 'superadmin_comercio_crear' %}activo{% endif %}" style="background:#059669; color:#fff; font-weight:bold;">➕ Nuevo Comercio</a>
       <a href="{% url 'superadmin_dashboard' %}#directorio">🏢 Directorio de Negocios</a>
       <a href="{% url 'superadmin_dashboard' %}#contadores">🤝 Red de Contadores</a>
       <a href="/admin/" target="_blank" style="color:#38bdf8;">⚙️ Base de Datos Django</a>
@@ -53,11 +54,12 @@
       <!-- NAVEGACIÓN EXCLUSIVA DEL COMERCIO (TIENDA / CARNICERÍA / MINIMARKET) -->
       <a href="{% url 'inicio' %}" class="{% if request.resolver_match.url_name == 'inicio' %}activo{% endif %}">Inicio</a>
       <a href="{% url 'venta_nueva' %}" class="{% if request.resolver_match.url_name == 'venta_nueva' %}activo{% endif %}">Ventas</a>
+      <a href="{% url 'facturacion_electronica_dashboard' %}" class="{% if request.resolver_match.url_name == 'facturacion_electronica_dashboard' or request.resolver_match.url_name == 'factura_electronica_detalle' %}activo{% endif %}" style="background:#042f2e; color:#5eead4; border:1px solid #14b8a6;">🧾 Facturación DIAN</a>
       <a href="{% url 'compra_nueva' %}" class="{% if request.resolver_match.url_name == 'compra_nueva' %}activo{% endif %}">Compras</a>
       <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
       <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
       <a href="{% url 'pagos_electronicos' %}" class="{% if request.resolver_match.url_name == 'pagos_electronicos' %}activo{% endif %}" style="color:#38bdf8;">💳 Pagos Electrónicos</a>
-      <a href="{% url 'clientes_lista' %}" class="{% if request.resolver_match.url_name == 'clientes_lista' %}activo{% endif %}">👥 Clientes / Factura E.</a>
+      <a href="{% url 'clientes_lista' %}" class="{% if request.resolver_match.url_name == 'clientes_lista' %}activo{% endif %}">👥 Clientes</a>
       <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
       <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
       <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>

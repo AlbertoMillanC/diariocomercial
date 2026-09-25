@@ -33,6 +33,8 @@ from .forms import (
     ClienteFacturacionForm,
     AsistenteDeclaracionInicialForm,
     NuevaTiendaSedeForm,
+    SuperadminNuevoComercioForm,
+    RegistrarPagoSuscripcionForm,
 )
 from .models import (
     ActividadCIIU,
@@ -51,6 +53,7 @@ from .models import (
     TokenVinculacion,
     TransaccionBreB,
     Cliente,
+    PagoSuscripcion,
 )
 from .bot_service import generar_token_vinculacion
 from .bre_b_service import generar_qr_dinamico_bre_b, procesar_confirmacion_bre_b
@@ -1857,7 +1860,16 @@ def superadmin_dashboard(request):
     canales_activos = VinculoCanal.objects.filter(activo=True).count()
     usuarios_totales = User.objects.count()
 
-    comercios_qs = Establecimiento.objects.select_related("municipio").all().order_by("-id")
+    # Recaudos del mes actual en curso
+    total_recaudado_mes = (
+        PagoSuscripcion.objects.filter(
+            fecha_pago__month=hoy.month, fecha_pago__year=hoy.year
+        ).aggregate(total=Sum("monto"))["total"]
+        or Decimal("0")
+    )
+    ultimos_pagos = PagoSuscripcion.objects.select_related("establecimiento", "registrado_por").all()[:15]
+
+    comercios_qs = Establecimiento.objects.select_related("municipio", "propietario_creador").all().order_by("-id")
     lista_comercios = []
     for c in comercios_qs:
         dias_restantes = (c.fecha_fin_prueba - hoy).days if c.fecha_fin_prueba else 30
@@ -1865,6 +1877,8 @@ def superadmin_dashboard(request):
             "obj": c,
             "dias_restantes": max(0, dias_restantes),
             "en_riesgo": dias_restantes <= 5,
+            "tiene_medio_pago": bool(c.llave_bre_b and c.llave_bre_b.strip()),
+            "total_ventas_hist": c.venta_set.count(),
         })
 
     contadores = (
@@ -1877,6 +1891,8 @@ def superadmin_dashboard(request):
         .order_by("-total_clientes")
     )
 
+    form_nuevo_pago = RegistrarPagoSuscripcionForm()
+
     return render(
         request,
         "superadmin/dashboard.html",
@@ -1886,10 +1902,13 @@ def superadmin_dashboard(request):
             "comercios_plan_cero": comercios_plan_cero,
             "comercios_mora": comercios_mora,
             "mrr_saas": mrr_saas,
+            "total_recaudado_mes": total_recaudado_mes,
+            "ultimos_pagos": ultimos_pagos,
             "canales_activos": canales_activos,
             "usuarios_totales": usuarios_totales,
             "comercios": lista_comercios,
             "contadores": contadores,
+            "form_nuevo_pago": form_nuevo_pago,
             "hoy": hoy,
         },
     )
@@ -1907,6 +1926,263 @@ def superadmin_toggle_estado(request, pk):
     est.save(update_fields=["estado"])
     messages.info(request, f"Establecimiento '{est.nombre}' marcado como {est.estado.upper()}.")
     return redirect("superadmin_dashboard")
+
+
+@login_required
+def superadmin_comercio_crear(request):
+    """Permite al Super-Administrador dar de alta un nuevo comercio en la plataforma."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    if request.method == "POST":
+        form = SuperadminNuevoComercioForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            from datetime import timedelta
+            hoy = timezone.localdate()
+            dias = data.get("dias_vigencia") or 30
+            fecha_fin = hoy + timedelta(days=dias)
+
+            # 1. Crear el Establecimiento
+            est = Establecimiento.objects.create(
+                nombre=data["nombre"].strip(),
+                nit=data["nit"].strip(),
+                municipio=data["municipio"],
+                direccion=data["direccion"].strip(),
+                correo_reportes=data.get("correo_reportes", "").strip(),
+                llave_bre_b=data.get("llave_bre_b", "").strip(),
+                tipo_llave_bre_b=data.get("tipo_llave_bre_b", "celular"),
+                banco_receptor_bre_b=data.get("banco_receptor_bre_b", "").strip(),
+                plan_suscripcion=data.get("plan_suscripcion", "lanzamiento_cero"),
+                fecha_fin_prueba=fecha_fin,
+                prefijo_facturacion=data.get("prefijo_facturacion", "FE").strip().upper(),
+                consecutivo_actual=data.get("consecutivo_inicial", 1),
+                estado="activo",
+            )
+
+            # 2. Gestionar usuario propietario
+            if data.get("crear_nuevo_usuario"):
+                username = data["username_propietario"].strip()
+                password = data["password_propietario"].strip()
+                email = data.get("correo_reportes", "")
+                user_prop = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    first_name=data["nombre"][:30],
+                )
+                Perfil.objects.create(
+                    user=user_prop,
+                    establecimiento=est,
+                    rol="propietario",
+                )
+                est.propietario_creador = user_prop
+                est.save(update_fields=["propietario_creador"])
+                info_usuario = f"Usuario '{username}' creado como Propietario."
+            else:
+                user_existente = data["usuario_existente"]
+                est.propietario_creador = user_existente
+                est.save(update_fields=["propietario_creador"])
+                perfil_exist = getattr(user_existente, "perfil", None)
+                if perfil_exist:
+                    perfil_exist.rol = "empresario"
+                    perfil_exist.save(update_fields=["rol"])
+                else:
+                    Perfil.objects.create(
+                        user=user_existente,
+                        establecimiento=est,
+                        rol="propietario",
+                    )
+                info_usuario = f"Asignado al propietario existente '{user_existente.username}'."
+
+            # 3. Crear Actividad CIIU por defecto (Comercio 4711)
+            ActividadCIIU.objects.create(
+                establecimiento=est,
+                codigo="4711",
+                descripcion="Comercio al por menor en establecimientos no especializados",
+                tarifa_x_mil=Decimal("5.00"),
+            )
+
+            # 4. Token inicial de vinculación
+            usuario_para_token = user_prop if data.get("crear_nuevo_usuario") else user_existente
+            generar_token_vinculacion(usuario_para_token, est)
+
+            # 5. Auditoría
+            _audit(
+                request.user,
+                "Establecimiento",
+                est,
+                "crear_superadmin",
+                "",
+                f"Nombre={est.nombre}, NIT={est.nit}, Plan={est.plan_suscripcion}",
+                motivo="Alta directa de comercio desde panel de Super-Administrador",
+            )
+
+            messages.success(
+                request,
+                f"✅ ¡Comercio '{est.nombre}' registrado con éxito! {info_usuario}"
+            )
+            return redirect("superadmin_dashboard")
+    else:
+        form = SuperadminNuevoComercioForm()
+
+    return render(
+        request,
+        "superadmin/crear_comercio.html",
+        {"form": form},
+    )
+
+
+@login_required
+def superadmin_comercio_eliminar(request, pk):
+    """Permite al Super-Administrador dar de baja o eliminar un comercio con confirmación estricta."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    est = get_object_or_404(Establecimiento, pk=pk)
+
+    total_ventas = est.venta_set.count()
+    total_compras = est.compra_set.count()
+    total_productos = est.productos.count()
+    total_usuarios = Perfil.objects.filter(establecimiento=est).count()
+
+    if request.method == "POST":
+        confirmar = request.POST.get("confirmacion", "").strip()
+        if confirmar.lower() != est.nombre.lower().strip() and confirmar != "ELIMINAR":
+            messages.error(request, f"Para eliminar el comercio debe escribir exactamente '{est.nombre}' o 'ELIMINAR'.")
+            return redirect("superadmin_comercio_eliminar", pk=pk)
+
+        nombre_borrado = est.nombre
+        _audit(
+            request.user,
+            "Establecimiento",
+            est,
+            "eliminar_superadmin",
+            f"ID={est.pk}, Nombre={est.nombre}, Ventas={total_ventas}, Compras={total_compras}",
+            "ELIMINADO",
+            motivo=request.POST.get("motivo", "Baja solicitada por SuperAdmin").strip(),
+        )
+        from django.db import transaction
+        with transaction.atomic():
+            est.venta_set.all().delete()
+            est.compra_set.all().delete()
+            est.retencion_set.all().delete()
+            est.delete()
+        messages.warning(request, f"🗑️ El comercio '{nombre_borrado}' y sus datos asociados han sido eliminados de la plataforma.")
+        return redirect("superadmin_dashboard")
+
+    return render(
+        request,
+        "superadmin/eliminar_comercio.html",
+        {
+            "establecimiento": est,
+            "total_ventas": total_ventas,
+            "total_compras": total_compras,
+            "total_productos": total_productos,
+            "total_usuarios": total_usuarios,
+        },
+    )
+
+
+@login_required
+def superadmin_comercio_cobrar(request, pk):
+    """
+    Gestión de Cobranza y Facturación de Suscripción SaaS para un comercio:
+    - Genera orden de cobro con QR Bre-B ($19.900 COP) y link de WhatsApp.
+    - Permite asentar y registrar el pago recibido extendiendo la vigencia de la tienda.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    est = get_object_or_404(Establecimiento, pk=pk)
+    hoy = timezone.localdate()
+
+    if request.method == "POST":
+        form = RegistrarPagoSuscripcionForm(request.POST)
+        if form.is_valid():
+            monto = form.cleaned_data["monto"]
+            metodo = form.cleaned_data["metodo"]
+            dias = int(form.cleaned_data["periodo_dias"])
+            ref = form.cleaned_data.get("referencia", "").strip()
+            notas = form.cleaned_data.get("notas", "").strip()
+
+            pago = est.registrar_pago_suscripcion(
+                monto=monto,
+                metodo=metodo,
+                referencia=ref,
+                dias=dias,
+                user=request.user,
+                notas=notas,
+            )
+
+            _audit(
+                request.user,
+                "PagoSuscripcion",
+                pago,
+                "registrar_cobro",
+                "",
+                f"Monto={monto}, Metodo={metodo}, Dias={dias}, Comercio={est.nombre}",
+                motivo=f"Cobro suscripción asentado por SuperAdmin: {notas}",
+            )
+
+            messages.success(
+                request,
+                f"✅ ¡Pago de suscripción por ${monto:,.0f} COP registrado exitosamente! Vigencia de '{est.nombre}' extendida por {dias} días (Hasta {est.fecha_fin_prueba.strftime('%d/%m/%Y')})."
+            )
+            return redirect("superadmin_dashboard")
+    else:
+        form = RegistrarPagoSuscripcionForm(initial={"monto": Decimal("19900"), "periodo_dias": 30})
+
+    contacto_dueno = est.llave_bre_b if est.tipo_llave_bre_b == "celular" else ""
+    mensaje_whatsapp_cobro = (
+        f"Hola {est.nombre}, te saludamos de DiarioComercial. "
+        f"Tu suscripción mensual ($19.900 COP) está pendiente de renovación. "
+        f"Puedes pagar de inmediato a través de Bre-B / BanRep o Nequi a la llave oficial del sistema. "
+        f"¡Gracias por confiar en DiarioComercial!"
+    )
+
+    return render(
+        request,
+        "superadmin/cobrar_comercio.html",
+        {
+            "establecimiento": est,
+            "form": form,
+            "hoy": hoy,
+            "contacto_dueno": contacto_dueno,
+            "mensaje_whatsapp_cobro": mensaje_whatsapp_cobro,
+            "historial_pagos": est.pagos_suscripcion.all()[:10],
+        },
+    )
+
+
+@login_required
+def superadmin_comercio_cambiar_plan(request, pk):
+    """Permite al SuperAdmin cambiar directamente el plan o agregar días de cortesía."""
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso restringido: Se requieren permisos de Super-Administrador.")
+        return redirect("inicio")
+
+    est = get_object_or_404(Establecimiento, pk=pk)
+    if request.method == "POST":
+        nuevo_plan = request.POST.get("plan", est.plan_suscripcion)
+        dias_extra = int(request.POST.get("dias_extra", 0))
+
+        if nuevo_plan in dict(Establecimiento.PLANES_SUSCRIPCION):
+            est.plan_suscripcion = nuevo_plan
+
+        if dias_extra > 0:
+            from datetime import timedelta
+            hoy = timezone.localdate()
+            base = max(hoy, est.fecha_fin_prueba) if est.fecha_fin_prueba else hoy
+            est.fecha_fin_prueba = base + timedelta(days=dias_extra)
+
+        est.save(update_fields=["plan_suscripcion", "fecha_fin_prueba"])
+        messages.info(request, f"Plan de '{est.nombre}' actualizado a {est.get_plan_suscripcion_display()}.")
+    return redirect("superadmin_dashboard")
+
 
 
 @login_required
@@ -2520,6 +2796,180 @@ def tiendas_cambiar_activa(request, pk):
 
     messages.success(request, f"🏬 Establecimiento activo cambiado a: '{tienda_objetivo.nombre}'")
     return redirect("inicio")
+
+
+# ============================================================================
+# FASE 7: CENTRO DE FACTURACIÓN ELECTRÓNICA DIAN & POS ELECTRÓNICO
+# ============================================================================
+
+@login_required
+def facturacion_electronica_dashboard(request):
+    """
+    Centro de Control de Facturación Electrónica DIAN & POS Electrónico.
+    Permite consultar facturas emitidas, ver estados DIAN, CUFE, QR y expedir comprobantes.
+    """
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    est = perfil.establecimiento if perfil else Establecimiento.objects.first()
+    if not est:
+        messages.error(request, "No hay establecimiento configurado.")
+        return redirect("inicio")
+
+    # Facturas electrónicas con reporte individual formal
+    facturas_qs = Venta.objects.filter(
+        establecimiento=est,
+        solicita_factura_electronica=True,
+    ).select_related("cliente", "usuario").order_by("-fecha_hora", "-id")
+
+    # Ventas de mostrador cuantías menores (Consumidor Final 222222222222)
+    total_ventas_mostrador = Venta.objects.filter(
+        establecimiento=est,
+        solicita_factura_electronica=False,
+    ).count()
+
+    total_facturas_emitidas = facturas_qs.count()
+    monto_total_facturado_fe = facturas_qs.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    total_clientes_fe = Cliente.objects.filter(establecimiento=est).exclude(es_consumidor_final=True).count()
+
+    # Rango de numeración restante
+    consecutivo_actual = est.consecutivo_actual
+    rango_hasta = est.rango_hasta
+    disponibles = max(0, rango_hasta - consecutivo_actual)
+
+    return render(
+        request,
+        "facturacion/dashboard.html",
+        {
+            "establecimiento": est,
+            "facturas": facturas_qs[:60],
+            "total_facturas_emitidas": total_facturas_emitidas,
+            "total_ventas_mostrador": total_ventas_mostrador,
+            "monto_total_facturado_fe": monto_total_facturado_fe,
+            "total_clientes_fe": total_clientes_fe,
+            "disponibles_rango": disponibles,
+        },
+    )
+
+
+@login_required
+def factura_electronica_detalle(request, pk):
+    """Vista web oficial imprimible de Factura Electrónica de Venta con QR DIAN y CUFE."""
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    venta = get_object_or_404(Venta, pk=pk)
+    est = venta.establecimiento
+
+    if perfil and not request.user.is_superuser and venta.establecimiento != perfil.establecimiento:
+        messages.error(request, "No tiene permisos para ver esta factura.")
+        return redirect("facturacion_electronica_dashboard")
+
+    # Si la venta no tiene número asignado o CUFE, generarlo
+    if not venta.numero_factura_electronica:
+        consec = est.consecutivo_actual
+        venta.numero_factura_electronica = f"{est.prefijo_facturacion}-{consec:05d}"
+        est.consecutivo_actual += 1
+        est.save(update_fields=["consecutivo_actual"])
+    if not venta.cufe:
+        import hashlib
+        nit_cli = venta.cliente.nit_cedula if venta.cliente else "222222222222"
+        cufe_raw = f"{venta.numero_factura_electronica}{venta.fecha_hora}{venta.valor}{nit_cli}{est.nit}"
+        venta.cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
+        venta.solicita_factura_electronica = True
+        venta.estado_dian = "aprobada"
+        venta.save(update_fields=["numero_factura_electronica", "cufe", "solicita_factura_electronica", "estado_dian"])
+
+    url_validacion_dian = f"https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey={venta.cufe}"
+
+    return render(
+        request,
+        "facturacion/factura_detalle.html",
+        {
+            "venta": venta,
+            "establecimiento": est,
+            "url_validacion_dian": url_validacion_dian,
+        },
+    )
+
+
+@login_required
+def factura_electronica_pdf(request, pk):
+    """Descarga de la Factura Electrónica formal en PDF con QR DIAN."""
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    venta = get_object_or_404(Venta, pk=pk)
+    if perfil and not request.user.is_superuser and venta.establecimiento != perfil.establecimiento:
+        return HttpResponse("No autorizado", status=403)
+
+    from .recibo_service import generar_pdf_factura_electronica_dian
+    pdf_bytes = generar_pdf_factura_electronica_dian(venta)
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="Factura_{venta.numero_factura_electronica or venta.pk}.pdf"'
+    return resp
+
+
+@login_required
+def venta_emitir_factura_electronica(request, pk):
+    """Convierte una venta de mostrador en Factura Electrónica individual DIAN."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+
+    est = perfil.establecimiento
+    venta = get_object_or_404(Venta, pk=pk, establecimiento=est)
+
+    if request.method == "POST":
+        cliente_id = request.POST.get("cliente_id")
+        cliente = get_object_or_404(Cliente, pk=cliente_id, establecimiento=est)
+
+        consec = est.consecutivo_actual
+        num_fe = f"{est.prefijo_facturacion}-{consec:05d}"
+        est.consecutivo_actual += 1
+        est.save(update_fields=["consecutivo_actual"])
+
+        import hashlib
+        cufe_raw = f"{num_fe}{venta.fecha_hora}{venta.valor}{cliente.nit_cedula}{est.nit}"
+        cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
+
+        venta.solicita_factura_electronica = True
+        venta.cliente = cliente
+        venta.numero_factura_electronica = num_fe
+        venta.cufe = cufe
+        venta.estado_dian = "aprobada"
+        venta.save(update_fields=["solicita_factura_electronica", "cliente", "numero_factura_electronica", "cufe", "estado_dian"])
+
+        _audit(
+            request.user,
+            "Venta",
+            venta,
+            "emitir_factura_electronica",
+            "Consumidor Final",
+            f"Factura #{num_fe}, Cliente={cliente.nombre}, CUFE={cufe[:12]}...",
+            motivo="Emisión de Factura Electrónica formal a solicitud de adquirente",
+        )
+
+        messages.success(
+            request,
+            f"🧾 ¡Factura Electrónica #{num_fe} generada exitosamente para {cliente.nombre}! CUFE: {cufe[:12]}..."
+        )
+        return redirect("factura_electronica_detalle", pk=venta.pk)
+
+    clientes = Cliente.objects.filter(establecimiento=est, activo=True).exclude(es_consumidor_final=True)
+    return render(
+        request,
+        "facturacion/emitir_desde_venta.html",
+        {
+            "venta": venta,
+            "establecimiento": est,
+            "clientes": clientes,
+        },
+    )
+
 
 
 

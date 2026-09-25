@@ -17,6 +17,7 @@ from .models import (
     Establecimiento,
     Cliente,
     Municipio,
+    PagoSuscripcion,
 )
 
 
@@ -669,5 +670,156 @@ class NuevaTiendaSedeForm(forms.ModelForm):
             "correo_reportes": forms.EmailInput(attrs={"placeholder": "sedenorte@comercio.co", "class": "form-control"}),
             "clasificacion_tributaria": forms.Select(attrs={"class": "form-control"}),
         }
+
+
+class SuperadminNuevoComercioForm(forms.Form):
+    """Formulario para que el Super-Administrador cree nuevos comercios (Tenants) en la plataforma."""
+    # Datos de la Tienda / Comercio
+    nombre = forms.CharField(
+        max_length=120,
+        label="Nombre Comercial del Negocio",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Carnicería El Samán, Droguería Central", "class": "form-control"}),
+    )
+    nit = forms.CharField(
+        max_length=20,
+        label="NIT o Cédula del Comercio",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 901456789-1 o 1049582123", "class": "form-control"}),
+    )
+    municipio = forms.ModelChoiceField(
+        queryset=Municipio.objects.all(),
+        label="Municipio (DANE)",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    direccion = forms.CharField(
+        max_length=160,
+        label="Dirección Física",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Carrera 10 # 18-42 Centro, Tunja", "class": "form-control"}),
+    )
+    correo_reportes = forms.EmailField(
+        required=False,
+        label="Correo del Contador o Reportes",
+        widget=forms.EmailInput(attrs={"placeholder": "contador@estudio.com", "class": "form-control"}),
+    )
+    # Medios de Pago Electrónicos del Comercio
+    llave_bre_b = forms.CharField(
+        required=False,
+        max_length=60,
+        label="Celular / Llave Bre-B del Comercio (Para recibir pagos)",
+        help_text="Número de celular, NIT o alias registrado en Bre-B / BanRep",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 3105554321", "class": "form-control"}),
+    )
+    banco_receptor_bre_b = forms.CharField(
+        required=False,
+        max_length=80,
+        label="Banco Receptor del Comercio",
+        help_text="Bancolombia, Nequi, Daviplata, Davivienda, etc.",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Bancolombia / Nequi", "class": "form-control"}),
+    )
+    # Plan SaaS y Licenciamiento
+    plan_suscripcion = forms.ChoiceField(
+        choices=Establecimiento.PLANES_SUSCRIPCION,
+        initial="lanzamiento_cero",
+        label="Plan de Suscripción Inicial",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    dias_vigencia = forms.IntegerField(
+        initial=30,
+        label="Días de Vigencia Inicial",
+        help_text="30 días de prueba gratuita para Plan $0, o los días contratados.",
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+    # Facturación Electrónica DIAN Inicial
+    prefijo_facturacion = forms.CharField(
+        initial="FE",
+        max_length=10,
+        label="Prefijo Facturación Electrónica DIAN",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    consecutivo_inicial = forms.IntegerField(
+        initial=1,
+        label="Consecutivo Inicial DIAN",
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+    # Propietario / Administrador
+    crear_nuevo_usuario = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Crear un nuevo usuario Propietario para esta tienda",
+    )
+    username_propietario = forms.CharField(
+        required=False,
+        max_length=150,
+        label="Usuario del Propietario",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: don_carlos_saman", "class": "form-control"}),
+    )
+    password_propietario = forms.CharField(
+        required=False,
+        label="Contraseña Temporal",
+        widget=forms.PasswordInput(attrs={"placeholder": "Mínimo 6 caracteres", "class": "form-control"}),
+    )
+    usuario_existente = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        label="O asociar a Propietario Existente (Empresario)",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        crear_nuevo = cleaned_data.get("crear_nuevo_usuario")
+        if crear_nuevo:
+            user = cleaned_data.get("username_propietario")
+            pwd = cleaned_data.get("password_propietario")
+            if not user or not user.strip():
+                self.add_error("username_propietario", "Debe ingresar el nombre de usuario del propietario.")
+            elif User.objects.filter(username=user.strip()).exists():
+                self.add_error("username_propietario", "Ese nombre de usuario ya está en uso.")
+            if not pwd or len(pwd.strip()) < 4:
+                self.add_error("password_propietario", "La contraseña debe tener al menos 4 caracteres.")
+        else:
+            if not cleaned_data.get("usuario_existente"):
+                self.add_error("usuario_existente", "Debe seleccionar un usuario existente si no va a crear uno nuevo.")
+        return cleaned_data
+
+
+class RegistrarPagoSuscripcionForm(forms.Form):
+    """Formulario para asentar el cobro y pago de suscripción SaaS de un comercio."""
+    monto = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        initial=Decimal("19900"),
+        label="Valor Cobrado ($ COP)",
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "100"}),
+    )
+    metodo = forms.ChoiceField(
+        choices=PagoSuscripcion.METODOS,
+        initial="bre_b",
+        label="Medio de Pago Utilizado",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    periodo_dias = forms.ChoiceField(
+        choices=(
+            (30, "1 Mes (30 días) - $19.900"),
+            (90, "Trimestre (90 días) - $55.000"),
+            (180, "Semestre (180 días) - $105.000"),
+            (365, "1 Año Completo (365 días) - $199.000"),
+        ),
+        initial=30,
+        label="Periodo de Renovación",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    referencia = forms.CharField(
+        required=False,
+        max_length=80,
+        label="N° Comprobante / Referencia de Pago",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: BREB-948271 o Transf. Bancolombia #129", "class": "form-control"}),
+    )
+    notas = forms.CharField(
+        required=False,
+        max_length=200,
+        label="Notas u Observaciones del Cobro",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Renovación oportuna mes de Octubre", "class": "form-control"}),
+    )
+
 
 

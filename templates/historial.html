@@ -58,6 +58,13 @@
         <td>{{ f.usuario }}</td>
         {% if puede_editar %}
         <td>
+          {% if f.key == 'venta' and f.obj.estado == 'vigente' %}
+            {% if f.obj.solicita_factura_electronica and f.obj.numero_factura_electronica %}
+              <a href="{% url 'factura_electronica_detalle' f.obj.pk %}" style="color:#059669; font-weight:bold;" title="Ver Factura Electrónica">🧾 {{ f.obj.numero_factura_electronica }}</a>
+            {% else %}
+              <a href="{% url 'venta_emitir_factura_electronica' f.obj.pk %}" style="color:#0284c7;" title="Convertir a Factura Electrónica DIAN">🧾 Factura E.</a>
+            {% endif %}
+          {% endif %}
           <a href="{% url 'editar' f.key f.obj.pk %}">Editar</a>
           {% if f.obj.estado == 'vigente' %}
           <a href="{% url 'anular' f.key f.obj.pk %}">Anular</a>

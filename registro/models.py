@@ -115,6 +115,40 @@ class Establecimiento(models.Model):
         self.save(update_fields=["consecutivo_actual"])
         return numero
 
+    def tiene_medio_pago_inscrito(self):
+        return bool(self.llave_bre_b and self.llave_bre_b.strip())
+
+    def dias_vigencia_restante(self):
+        hoy = timezone.localdate()
+        if self.fecha_fin_prueba:
+            return max(0, (self.fecha_fin_prueba - hoy).days)
+        return 30
+
+    def registrar_pago_suscripcion(self, monto, metodo="bre_b", referencia="", dias=30, user=None, notas=""):
+        from datetime import timedelta
+        hoy = timezone.localdate()
+        fecha_base = max(hoy, self.fecha_fin_prueba) if self.fecha_fin_prueba else hoy
+        nueva_fecha_fin = fecha_base + timedelta(days=dias)
+
+        self.plan_suscripcion = "activo"
+        self.fecha_ultimo_pago = hoy
+        self.fecha_fin_prueba = nueva_fecha_fin
+        if self.estado == "suspendido":
+            self.estado = "activo"
+        self.save(update_fields=["plan_suscripcion", "fecha_ultimo_pago", "fecha_fin_prueba", "estado"])
+
+        pago = PagoSuscripcion.objects.create(
+            establecimiento=self,
+            monto=monto,
+            fecha_pago=hoy,
+            periodo_dias=dias,
+            metodo=metodo,
+            referencia=referencia,
+            registrado_por=user,
+            notas=notas,
+        )
+        return pago
+
     def __str__(self):
         return self.nombre
 
@@ -671,4 +705,38 @@ class RegistroExogenaMunicipal(models.Model):
 
     def __str__(self):
         return f"Exógena {self.año_gravable} [{self.tipo_registro}] {self.nit_tercero}: ${self.monto_base}"
+
+
+# ============================================================================
+# FASE 6: FACTURACIÓN SAAS & COBRANZA DE SUSCRIPCIONES
+# ============================================================================
+
+class PagoSuscripcion(models.Model):
+    """Registro histórico de cobro y recaudos de suscripciones SaaS de la plataforma."""
+    METODOS = (
+        ("bre_b", "Bre-B (BanRep Interoperable)"),
+        ("nequi", "Nequi"),
+        ("daviplata", "Daviplata"),
+        ("transferencia", "Transferencia Bancaria"),
+        ("efectivo", "Efectivo / Cobro Directo"),
+        ("cortesia", "Cortesía / Promoción"),
+    )
+    establecimiento = models.ForeignKey(
+        Establecimiento, on_delete=models.CASCADE, related_name="pagos_suscripcion"
+    )
+    monto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("19900"))
+    fecha_pago = models.DateField(default=timezone.localdate)
+    periodo_dias = models.PositiveIntegerField(default=30, help_text="Días de vigencia añadidos")
+    metodo = models.CharField(max_length=20, choices=METODOS, default="bre_b")
+    referencia = models.CharField(max_length=80, blank=True, help_text="Comprobante bancario o ID de transacción")
+    registrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="pagos_registrados")
+    notas = models.CharField(max_length=200, blank=True)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_registro"]
+
+    def __str__(self):
+        return f"Pago {self.establecimiento.nombre} - ${self.monto} ({self.fecha_pago})"
+
 

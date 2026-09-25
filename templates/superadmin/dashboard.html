@@ -4,9 +4,12 @@
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
   <div>
     <h2>👑 Panel de Super-Administrador SaaS</h2>
-    <p class="lead" style="margin:0;">Administración central de infraestructura, control de licencias por comercio, cobro de suscripciones y salud del sistema.</p>
+    <p class="lead" style="margin:0;">Control centralizado de infraestructura, alta y baja de comercios, cobranza de suscripciones y facturación de la plataforma.</p>
   </div>
-  <div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <a href="{% url 'superadmin_comercio_crear' %}" class="btn btn-primary" style="background:#059669; font-weight:bold; font-size:14px; padding:8px 16px; border-radius:8px;">
+      ➕ Registrar Nuevo Comercio
+    </a>
     <span class="tag" style="background:#0f172a; color:#4ade80; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:8px;">
       MODO OPERADOR CENTRAL • {{ hoy|date:"d/m/Y" }}
     </span>
@@ -49,7 +52,7 @@
   </div>
 </div>
 
-<!-- FILA SUPERIOR: METRICAS SAAS DEL SISTEMA (NO VENTAS DE TIENDAS) -->
+<!-- FILA SUPERIOR: METRICAS SAAS Y COBRANZA -->
 <div class="cards cards-5" style="grid-template-columns: repeat(5, 1fr); margin-bottom:20px;">
   <div class="card">
     <span>Comercios (Tenants)</span>
@@ -60,24 +63,29 @@
     <strong style="color:#059669;">{{ comercios_activos }}</strong>
   </div>
   <div class="card" style="border-left:4px solid #0284c7;">
-    <span>Plan $0 (Pioneros)</span>
+    <span>Plan $0 (Prueba)</span>
     <strong style="color:#0284c7;">{{ comercios_plan_cero }}</strong>
   </div>
-  <div class="card" style="border-left:4px solid #ef4444;">
-    <span>En Mora / Suspendidos</span>
-    <strong style="color:#dc2626;">{{ comercios_mora }}</strong>
+  <div class="card" style="border-left:4px solid #10b981;">
+    <span>Recaudado Este Mes</span>
+    <strong style="font-size:18px; color:#059669;">$ {{ total_recaudado_mes|floatformat:0 }} COP</strong>
   </div>
   <div class="card" style="border-left:4px solid #065f46;">
-    <span>MRR Suscripciones SaaS</span>
+    <span>MRR Proyectado</span>
     <strong style="font-size:18px; color:#065f46;">$ {{ mrr_saas|floatformat:0 }} COP</strong>
   </div>
 </div>
 
 <!-- TABLA DE COMERCIOS MULTI-TENANT -->
 <div class="panel" id="directorio" style="margin-bottom:20px;">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-    <h3 style="margin:0; font-size:17px; color:var(--navy);">🏪 Directorio de Establecimientos (Tenants del Sistema)</h3>
-    <small style="color:var(--muted);">Control centralizado de acceso, plan contratado y suspensión de servicio</small>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+    <div>
+      <h3 style="margin:0; font-size:17px; color:var(--navy);">🏪 Directorio de Establecimientos (Tenants del Sistema)</h3>
+      <small style="color:var(--muted);">Control centralizado de acceso, medios de pago inscritos, cobro de mensualidades y soporte</small>
+    </div>
+    <a href="{% url 'superadmin_comercio_crear' %}" class="btn btn-sm btn-primary" style="background:#059669; font-weight:bold;">
+      ➕ Agregar Comercio
+    </a>
   </div>
 
   <div class="tabla-wrap">
@@ -85,39 +93,60 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Nombre del Negocio</th>
-          <th>Municipio (DANE)</th>
-          <th>Plan Suscripción</th>
-          <th>Vigencia Restante</th>
-          <th>Contador Asignado</th>
+          <th>Nombre del Negocio / Dueño</th>
+          <th>Municipio</th>
+          <th>Medio Electrónico Inscrito</th>
+          <th>Plan & Cobro</th>
+          <th>Vigencia</th>
           <th>Estado</th>
-          <th style="text-align:center;">Control de Acceso</th>
+          <th style="text-align:center;">Acciones de Gestión & Cobro</th>
         </tr>
       </thead>
       <tbody>
         {% for c in comercios %}
         <tr>
           <td class="mono">{{ c.obj.pk }}</td>
-          <td><strong>{{ c.obj.nombre }}</strong><br><small class="mono">NIT: {{ c.obj.nit|default:"Sin NIT" }}</small></td>
-          <td>{{ c.obj.municipio.nombre|default:"Tunja" }} ({{ c.obj.municipio.codigo_dane|default:"15001" }})</td>
+          <td>
+            <strong>{{ c.obj.nombre }}</strong>
+            <br>
+            <small class="mono" style="color:#64748b;">NIT: {{ c.obj.nit|default:"Sin NIT" }}</small>
+            {% if c.obj.propietario_creador %}
+              <br><small style="color:#0369a1;">👤 Dueño: {{ c.obj.propietario_creador.username }}</small>
+            {% endif %}
+          </td>
+          <td>
+            {{ c.obj.municipio.nombre|default:"Tunja" }}
+            <br><small class="mono" style="color:#64748b;">DANE: {{ c.obj.municipio.codigo_dane|default:"15001" }}</small>
+          </td>
+          <td>
+            {% if c.tiene_medio_pago %}
+              <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:4px 8px; font-size:12px; color:#065f46;">
+                <strong>⚡ Bre-B:</strong> {{ c.obj.llave_bre_b }}
+                <br>
+                <small style="color:#047857;">🏦 {{ c.obj.banco_receptor_bre_b|default:"Entidad Interoperable" }}</small>
+              </div>
+            {% else %}
+              <span class="tag" style="background:#fff7ed; color:#c2410c; border:1px solid #fdba74; font-size:11px;">
+                ⚠️ Sin llave inscrita
+              </span>
+            {% endif %}
+          </td>
           <td>
             <span class="tag" style="background:{% if c.obj.plan_suscripcion == 'lanzamiento_cero' %}#e0f2fe; color:#0369a1;{% elif c.obj.plan_suscripcion == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
               {{ c.obj.get_plan_suscripcion_display|default:c.obj.plan_suscripcion }}
             </span>
+            {% if c.obj.fecha_ultimo_pago %}
+              <br><small style="font-size:11px; color:#64748b;">Último pago: {{ c.obj.fecha_ultimo_pago|date:"d/m/Y" }}</small>
+            {% endif %}
           </td>
           <td>
             {% if c.en_riesgo %}
-              <strong style="color:#dc2626;">⚠️ {{ c.dias_restantes }} días</strong>
+              <strong style="color:#dc2626; font-size:13px;">⚠️ {{ c.dias_restantes }} días</strong>
             {% else %}
-              <span style="color:#059669;">{{ c.dias_restantes }} días</span>
+              <span style="color:#059669; font-weight:bold; font-size:13px;">{{ c.dias_restantes }} días</span>
             {% endif %}
-          </td>
-          <td>
-            {% if c.obj.correo_reportes %}
-              <span style="font-size:13px;">📧 {{ c.obj.correo_reportes }}</span>
-            {% else %}
-              <span style="color:#94a3b8; font-size:12px;">Sin contador</span>
-            {% endif %}
+            <br>
+            <small style="color:#64748b; font-size:11px;">Vence: {{ c.obj.fecha_fin_prueba|date:"d/m/Y"|default:"Indefinido" }}</small>
           </td>
           <td>
             <span class="tag" style="background:{% if c.obj.estado == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
@@ -125,12 +154,18 @@
             </span>
           </td>
           <td style="text-align:center;">
-            <div style="display:inline-flex; gap:6px;">
-              <a href="{% url 'superadmin_asistir_tienda' c.obj.pk %}" class="btn btn-sm" style="background:#0284c7; color:#fff; text-decoration:none; font-weight:bold;" title="Asistir al dueño, gestionar cajeros y resolver problemas">
-                🛠️ Asistir Tienda
+            <div style="display:inline-flex; gap:5px; flex-wrap:wrap; justify-content:center;">
+              <a href="{% url 'superadmin_comercio_cobrar' c.obj.pk %}" class="btn btn-sm" style="background:#059669; color:#fff; text-decoration:none; font-weight:bold;" title="Cobrar mensualidad Bre-B o asentar pago">
+                💳 Cobrar / Asentar
               </a>
-              <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-danger{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de acceso para {{ c.obj.nombre }}?');">
-                {% if c.obj.estado == 'activo' %}Suspender{% else %}Reactivar{% endif %}
+              <a href="{% url 'superadmin_asistir_tienda' c.obj.pk %}" class="btn btn-sm" style="background:#0284c7; color:#fff; text-decoration:none; font-weight:bold;" title="Asistir al dueño, cajeros y resolver problemas">
+                🛠️ Asistir
+              </a>
+              <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de acceso para {{ c.obj.nombre }}?');">
+                {% if c.obj.estado == 'activo' %}⏸️{% else %}▶️{% endif %}
+              </a>
+              <a href="{% url 'superadmin_comercio_eliminar' c.obj.pk %}" class="btn btn-danger btn-sm" title="Eliminar o dar de baja comercio">
+                🗑️
               </a>
             </div>
           </td>
@@ -139,6 +174,49 @@
         <tr>
           <td colspan="8" style="text-align:center; padding:20px; color:#64748b;">
             No hay comercios registrados en la base de datos.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- HISTORIAL DE COBROS Y RECAUDOS SAAS -->
+<div class="panel" style="margin-bottom:20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:17px; color:var(--navy);">💰 Historial de Recaudos y Pagos de Suscripciones SaaS</h3>
+    <small style="color:var(--muted);">Auditoría de ingresos por mensualidades cobradas a comercios</small>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Comercio</th>
+          <th>Monto Cobrado</th>
+          <th>Medio de Pago</th>
+          <th>Vigencia Añadida</th>
+          <th>N° Comprobante / Ref</th>
+          <th>Registrado Por</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pago in ultimos_pagos %}
+        <tr>
+          <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+          <td><strong>{{ pago.establecimiento.nombre }}</strong></td>
+          <td><strong style="color:#059669; font-size:14px;">$ {{ pago.monto|floatformat:0 }} COP</strong></td>
+          <td><span class="tag" style="background:#e0f2fe; color:#0369a1;">{{ pago.get_metodo_display }}</span></td>
+          <td>+{{ pago.periodo_dias }} días</td>
+          <td class="mono">{{ pago.referencia|default:"S/N" }}</td>
+          <td><small>{{ pago.registrado_por.username|default:"Sistema" }}</small></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:16px; color:#64748b;">
+            No se han registrado pagos de suscripción aún.
           </td>
         </tr>
         {% endfor %}

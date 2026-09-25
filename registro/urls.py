@@ -53,12 +53,21 @@ urlpatterns = [
     # Información Exógena DIAN Formato 1007 (Ingresos)
     path("tributario/exogena/", views.exogena_dian_view, name="exogena_dian"),
     path("tributario/exogena/exportar-excel/", views.exogena_dian_exportar_excel, name="exogena_dian_exportar_excel"),
-    # Super-Admin Dashboard SaaS & Soporte a Tiendas
+    # Super-Admin Dashboard SaaS, Gestión de Comercios y Cobranza
     path("superadmin/", views.superadmin_dashboard, name="superadmin_dashboard"),
+    path("superadmin/comercios/nuevo/", views.superadmin_comercio_crear, name="superadmin_comercio_crear"),
+    path("superadmin/establecimiento/<int:pk>/eliminar/", views.superadmin_comercio_eliminar, name="superadmin_comercio_eliminar"),
+    path("superadmin/establecimiento/<int:pk>/cobrar/", views.superadmin_comercio_cobrar, name="superadmin_comercio_cobrar"),
+    path("superadmin/establecimiento/<int:pk>/cambiar-plan/", views.superadmin_comercio_cambiar_plan, name="superadmin_comercio_cambiar_plan"),
     path("superadmin/establecimiento/<int:pk>/toggle-estado/", views.superadmin_toggle_estado, name="superadmin_toggle_estado"),
     path("superadmin/establecimiento/<int:pk>/asistir/", views.superadmin_asistir_tienda, name="superadmin_asistir_tienda"),
     path("superadmin/cajero/<int:pk_user>/reset-password/", views.superadmin_cajero_reset_password, name="superadmin_cajero_reset_password"),
     path("superadmin/cajero/<int:pk_user>/toggle-activo/", views.superadmin_cajero_toggle_activo, name="superadmin_cajero_toggle_activo"),
     path("superadmin/cajero/<int:pk_user>/eliminar/", views.superadmin_cajero_eliminar, name="superadmin_cajero_eliminar"),
     path("superadmin/venta/<int:pk>/anular-soporte/", views.superadmin_anular_venta_soporte, name="superadmin_anular_venta_soporte"),
+    # Facturación Electrónica DIAN & POS Electrónico
+    path("facturacion-electronica/", views.facturacion_electronica_dashboard, name="facturacion_electronica_dashboard"),
+    path("facturacion-electronica/<int:pk>/", views.factura_electronica_detalle, name="factura_electronica_detalle"),
+    path("facturacion-electronica/<int:pk>/pdf/", views.factura_electronica_pdf, name="factura_electronica_pdf"),
+    path("ventas/<int:pk>/emitir-factura-electronica/", views.venta_emitir_factura_electronica, name="venta_emitir_factura_electronica"),
 ]
