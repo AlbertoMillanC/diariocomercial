@@ -42,8 +42,9 @@ _TICKETS_ABIERTOS: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
 
 def generar_token_vinculacion(usuario: User, establecimiento: Establecimiento, duracion_minutos: int = 60) -> str:
-    """Genera un token criptográfico seguro para vincular un dispositivo en 1 toque."""
-    token = f"auth_{secrets.token_urlsafe(24)}"
+    """Genera un token de 6 dígitos seguro para vincular un dispositivo en 1 toque."""
+    pin_6 = f"{secrets.randbelow(900000) + 100000}"
+    token = f"auth_{pin_6}"
     expira = timezone.now() + timezone.timedelta(minutes=duracion_minutos)
     TokenVinculacion.objects.create(
         token=token,
@@ -89,10 +90,15 @@ def despachar_mensaje(
         .first()
     )
 
-    # 3. Flujo de Vinculación por Token (/start auth_XYZ o auth_XYZ)
+    # 3. Flujo de Vinculación por Token (/start auth_XYZ o código de 6 dígitos)
     match_token = re.search(r"auth_[A-Za-z0-9_-]+", texto)
-    if match_token:
+    if not match_token:
+        match_pin = re.search(r"\b\d{6}\b", texto)
+        token_str = f"auth_{match_pin.group(0)}" if match_pin else None
+    else:
         token_str = match_token.group(0)
+
+    if token_str:
         tok = TokenVinculacion.objects.select_related("usuario", "establecimiento").filter(token=token_str).first()
         if tok and tok.es_valido():
             tok.usado = True

@@ -3,13 +3,15 @@ from decimal import Decimal
 import urllib.parse
 
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.core.mail import send_mail
-from django.db.models import Q
-from django.http import Http404
+from django.db.models import Q, Count, Sum
+from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from .forms import (
@@ -34,7 +36,16 @@ from .models import (
     Producto,
     Retencion,
     Venta,
+    Establecimiento,
+    Municipio,
+    VinculoCanal,
+    TokenVinculacion,
+    TransaccionBreB,
 )
+from .bot_service import generar_token_vinculacion
+from .bre_b_service import generar_qr_dinamico_bre_b, procesar_confirmacion_bre_b
+from .print_service import generar_bytes_escpos_recibo
+from .tax_engine import liquidar_declaracion_sugerida_ica, generar_resumen_exogena_anual
 from .reportes import respuesta_csv, respuesta_pdf, texto_consolidado
 from .inventario_service import (
     procesar_salida_inventario,
@@ -157,8 +168,11 @@ def _audit(user, entidad, obj, accion, antes, despues, motivo=""):
     )
 
 
-@login_required
 def inicio(request):
+    if not request.user.is_authenticated:
+        return render(request, "landing.html", {
+            "version": "2.0",
+        })
     perfil = _perfil(request.user)
     desde, hasta, rango_malo = _parse_rango(request.GET)
     ingresos = egresos = retenciones = ica = neto = Decimal("0")
@@ -605,8 +619,34 @@ def configuracion(request):
                 objetivo.user.save()
                 messages.success(request, f"{objetivo.user.username} quedó activo.")
             return redirect("configuracion")
+        elif accion == "generar_token_movil":
+            uid = request.POST.get("user_id") or request.user.id
+            usuario_obj = get_object_or_404(User, pk=uid)
+            generar_token_vinculacion(usuario_obj, est, duracion_minutos=120)
+            messages.success(request, f"Nuevo código de vinculación generado para {usuario_obj.username}.")
+            return redirect("configuracion")
+        elif accion == "revocar_sesiones_moviles":
+            total_revocados = VinculoCanal.objects.filter(establecimiento=est, activo=True).update(activo=False)
+            TokenVinculacion.objects.filter(establecimiento=est, usado=False).update(usado=True)
+            _audit(request.user, "canal_movil", None, "revocar_todo", total_revocados, 0, "Kill-switch de seguridad ejecutado")
+            messages.warning(request, f"¡Seguridad activada! Se revocaron todas las sesiones móviles ({total_revocados} dispositivos desconectados).")
+            return redirect("configuracion")
+        elif accion == "desvincular_canal":
+            vid = request.POST.get("vinculo_id")
+            v = get_object_or_404(VinculoCanal, pk=vid, establecimiento=est)
+            v.activo = False
+            v.save()
+            _audit(request.user, "canal_movil", v, "desvincular", True, False, f"Desvinculado {v.canal} {v.identificador_externo}")
+            messages.success(request, f"Canal {v.canal} de {v.usuario.username} desvinculado.")
+            return redirect("configuracion")
 
+    from django.utils import timezone
     usuarios = Perfil.objects.filter(establecimiento=est).select_related("user").order_by("rol", "user__username")
+    vinculos_activos = VinculoCanal.objects.filter(establecimiento=est, activo=True).select_related("usuario").order_by("-fecha_creacion")
+    token_activo = TokenVinculacion.objects.filter(establecimiento=est, usuario=request.user, usado=False, expira__gt=timezone.now()).order_by("-id").first()
+    pin_6 = token_activo.token.replace("auth_", "") if token_activo else None
+    deep_link = f"https://t.me/DiarioComercial_bot?start={token_activo.token}" if token_activo else None
+
     return render(
         request,
         "configuracion.html",
@@ -618,6 +658,10 @@ def configuracion(request):
             "form_motivo": form_motivo,
             "form_usuario": form_usuario,
             "usuarios": usuarios,
+            "vinculos_activos": vinculos_activos,
+            "token_activo": token_activo,
+            "pin_6": pin_6,
+            "deep_link": deep_link,
         },
     )
 
@@ -868,3 +912,222 @@ def pedido_cambiar_estado(request, pk, accion):
 @login_required
 def instrucciones(request):
     return render(request, "instrucciones.html")
+
+
+# ============================================================================
+# FASE 3: COBRO RÁPIDO BRE-B & IMPRESIÓN ESC/POS
+# ============================================================================
+
+@login_required
+def api_generar_cobro_bre_b(request):
+    """Genera transacción EMVCo y payload QR para el modal de cobro en mostrador."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return JsonResponse({"error": "Usuario sin perfil comercial"}, status=403)
+
+    try:
+        monto_raw = request.POST.get("monto") or request.GET.get("monto") or "0"
+        monto = Decimal(str(monto_raw).replace(",", ".").strip())
+    except Exception:
+        return JsonResponse({"error": "Formato de monto inválido"}, status=400)
+
+    if monto <= Decimal("0"):
+        return JsonResponse({"error": "El monto a cobrar debe ser mayor a $0"}, status=400)
+
+    est = perfil.establecimiento
+    ciudad = est.municipio.nombre if est.municipio else "TUNJA"
+
+    tx, payload_emvco = generar_qr_dinamico_bre_b(
+        establecimiento=est,
+        monto=monto,
+        ciudad=ciudad,
+    )
+
+    return JsonResponse({
+        "referencia": tx.referencia_unica,
+        "token_visual": tx.token_visual_corto,
+        "monto": float(tx.monto),
+        "payload_emvco": payload_emvco,
+        "llave": tx.llave_utilizada,
+        "expira_en_segundos": 120,
+    })
+
+
+@login_required
+def api_status_bre_b(request, referencia):
+    """Consulta de estado polling con TTL para el modal de caja."""
+    tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
+    return JsonResponse({
+        "referencia": tx.referencia_unica,
+        "token_visual": tx.token_visual_corto,
+        "estado": tx.estado,
+        "aprobada": tx.estado == "aprobada",
+        "monto": float(tx.monto),
+        "venta_id": tx.venta_id if tx.venta else None,
+    })
+
+
+@login_required
+def api_mock_webhook_bre_b(request, referencia):
+    """Simulador de confirmación BanRep para demostraciones y pruebas de usabilidad."""
+    import secrets
+    tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
+    banrep_id = f"BANREP-SIM-{secrets.token_hex(4).upper()}"
+    exito, msg, venta, _ = procesar_confirmacion_bre_b(
+        referencia_unica=referencia,
+        monto_acreditado=tx.monto,
+        banrep_transaction_id=banrep_id,
+        banco_origen="Bancolombia / Nequi",
+        nombre_pagador="Cliente Mostrador",
+    )
+    return JsonResponse({
+        "exito": exito,
+        "mensaje": msg,
+        "venta_id": venta.pk if venta else None,
+        "banrep_id": banrep_id,
+    })
+
+
+@login_required
+def imprimir_ticket_escpos(request, pk, ancho=58):
+    """Retorna el binario puro ESC/POS para impresión térmica en papel de 58mm u 80mm."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return HttpResponse("No autorizado", status=403)
+    venta = get_object_or_404(Venta, pk=pk, establecimiento=perfil.establecimiento)
+    bytes_raw = generar_bytes_escpos_recibo(venta, ancho_papel_mm=int(ancho))
+    resp = HttpResponse(bytes_raw, content_type="application/octet-stream")
+    resp["Content-Disposition"] = f'inline; filename="ticket_{venta.pk}_{ancho}mm.bin"'
+    return resp
+
+
+# ============================================================================
+# FASE 4: DECLARACIÓN SUGERIDA ICA TUNJA (ACUERDO 0032 DE 2020)
+# ============================================================================
+
+@login_required
+def declaracion_sugerida_ica_view(request):
+    """Borrador de precálculo sugerido del Impuesto de Industria y Comercio de Tunja."""
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        messages.error(request, "El módulo de declaración tributaria está reservado para el propietario.")
+        return redirect("inicio")
+
+    desde, hasta, _ = _parse_rango(request.GET)
+    est = perfil.establecimiento
+    liq = liquidar_declaracion_sugerida_ica(est, desde, hasta)
+
+    return render(
+        request,
+        "tributario/declaracion_ica.html",
+        {
+            "establecimiento": est,
+            "liq": liq,
+            "desde": desde,
+            "hasta": hasta,
+            "hoy": timezone.localdate(),
+        },
+    )
+
+
+@login_required
+def exportar_declaracion_ica(request):
+    """Descarga anexo oficial para el contador en formato texto tabulado."""
+    perfil = _perfil(request.user)
+    if not perfil or not perfil.es_propietario():
+        return HttpResponse("No autorizado", status=403)
+
+    desde, hasta, _ = _parse_rango(request.GET)
+    est = perfil.establecimiento
+    liq = liquidar_declaracion_sugerida_ica(est, desde, hasta)
+    reng = liq.get("renglones", {})
+
+    lineas = [
+        f"ANEXO TRIBUTARIO ICA - {est.nombre.upper()}",
+        f"MUNICIPIO: {liq.get('municipio', 'Tunja')}",
+        f"NORMATIVA: {liq.get('normativa', 'Acuerdo 0032/2020')}",
+        f"PERIODO: {desde} AL {hasta}",
+        "--------------------------------------------------",
+        f"1. Ingresos Brutos Totales: ${reng.get('1_ingresos_brutos', Decimal('0')):,.2f}",
+        f"2. Menos Ingresos Fuera del Municipio: ${reng.get('2_ingresos_fuera_municipio', Decimal('0')):,.2f}",
+        f"3. Menos Devoluciones y Descuentos: ${reng.get('3_devoluciones_descuentos', Decimal('0')):,.2f}",
+        f"4. Base Gravable Neta: ${reng.get('4_base_gravable_neta', Decimal('0')):,.2f}",
+        f"5. Impuesto Neto de Industria y Comercio: ${reng.get('5_impuesto_neto_ica', Decimal('0')):,.2f}",
+        f"6. Avisos y Tableros (15%): ${reng.get('6_impuesto_avisos_tableros_15pct', Decimal('0')):,.2f}",
+        f"7. Sobretasa Bomberil (5%): ${reng.get('7_sobretasa_bomberil', Decimal('0')):,.2f}",
+        f"8. Total Impuesto a Cargo: ${reng.get('8_total_impuesto_a_cargo', Decimal('0')):,.2f}",
+        f"9. Menos Retenciones ICA que le practicaron: ${reng.get('9_menos_retenciones_ica_a_favor', Decimal('0')):,.2f}",
+        f"10. SALDO SUGERIDO A PAGAR: ${reng.get('10_total_saldo_a_pagar', Decimal('0')):,.2f}",
+        "--------------------------------------------------",
+        "DISCLAIMER LEGAL: Borrador de precálculo sugerido para apoyo contable.",
+        "Requiere revision y firma obligatoria de Contador Publico titulado.",
+    ]
+    contenido = "\r\n".join(lineas)
+    resp = HttpResponse(contenido, content_type="text/plain; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="ica_tunja_{desde}_{hasta}.txt"'
+    return resp
+
+
+# ============================================================================
+# FASE 5: DASHBOARD DE SUPER-ADMINISTRADOR SAAS
+# ============================================================================
+
+@staff_member_required(login_url="login")
+def superadmin_dashboard(request):
+    """Panel de monitoreo SaaS, control multi-tenant y cobranza."""
+    hoy = timezone.localdate()
+
+    total_comercios = Establecimiento.objects.count()
+    comercios_activos = Establecimiento.objects.filter(estado="activo").count()
+    comercios_plan_cero = Establecimiento.objects.filter(plan_suscripcion="lanzamiento_cero").count()
+    comercios_mora = Establecimiento.objects.filter(plan_suscripcion="mora").count()
+
+    volumen_hoy = Venta.objects.filter(fecha=hoy, estado="vigente").aggregate(Sum("valor"))["valor__sum"] or Decimal("0")
+    total_ica_estimado = Venta.objects.filter(estado="vigente").aggregate(Sum("ica_estimado"))["ica_estimado__sum"] or Decimal("0")
+
+    comercios_qs = Establecimiento.objects.select_related("municipio").all().order_by("-id")
+    lista_comercios = []
+    for c in comercios_qs:
+        dias_restantes = (c.fecha_fin_prueba - hoy).days if c.fecha_fin_prueba else 30
+        lista_comercios.append({
+            "obj": c,
+            "dias_restantes": max(0, dias_restantes),
+            "en_riesgo": dias_restantes <= 5,
+        })
+
+    contadores = (
+        Establecimiento.objects.exclude(correo_reportes="")
+        .values("correo_reportes")
+        .annotate(
+            total_clientes=Count("id", distinct=True),
+            total_descargas=Count("envioreporte__id", distinct=True)
+        )
+        .order_by("-total_clientes")
+    )
+
+    return render(
+        request,
+        "superadmin/dashboard.html",
+        {
+            "total_comercios": total_comercios,
+            "comercios_activos": comercios_activos,
+            "comercios_plan_cero": comercios_plan_cero,
+            "comercios_mora": comercios_mora,
+            "volumen_hoy": volumen_hoy,
+            "total_ica_estimado": total_ica_estimado,
+            "comercios": lista_comercios,
+            "contadores": contadores,
+            "hoy": hoy,
+        },
+    )
+
+
+@staff_member_required(login_url="login")
+def superadmin_toggle_estado(request, pk):
+    """Activa o suspende el servicio de un comercio al instante."""
+    est = get_object_or_404(Establecimiento, pk=pk)
+    est.estado = "suspendido" if est.estado == "activo" else "activo"
+    est.save(update_fields=["estado"])
+    messages.info(request, f"Establecimiento '{est.nombre}' marcado como {est.estado.upper()}.")
+    return redirect("superadmin_dashboard")
+

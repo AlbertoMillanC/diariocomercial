@@ -162,3 +162,59 @@ class MultiTenantBotServiceTests(TestCase):
         # Debe retornar la respuesta cacheada sin crear otra venta
         self.assertEqual(resp1, resp2)
         self.assertEqual(Venta.objects.filter(establecimiento=self.tienda1).count(), 1)
+
+    def test_vinculacion_con_pin_numerico_6_digitos(self):
+        """Un comerciante puede vincularse simplemente escribiendo el PIN de 6 dígitos."""
+        token = generar_token_vinculacion(self.user_pedro, self.tienda1)
+        pin_6 = token.replace("auth_", "")
+        self.assertEqual(len(pin_6), 6)
+
+        resp = despachar_mensaje("telegram", "chat_pedro_pin", pin_6)
+        self.assertIn("¡Dispositivo Vinculado Exitosamente!", resp)
+        self.assertIn("Carnicería Don Pedro", resp)
+
+        vinculo = VinculoCanal.objects.filter(canal="telegram", identificador_externo="chat_pedro_pin").first()
+        self.assertIsNotNone(vinculo)
+        self.assertTrue(vinculo.activo)
+
+    def test_kill_switch_revoca_todas_las_sesiones(self):
+        """El Kill-Switch desconecta todos los dispositivos móviles inmediatamente."""
+        self.client.force_login(self.user_pedro)
+        # Dispositivo 1
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="chat_emp_1",
+            usuario=self.user_cajero, establecimiento=self.tienda1, activo=True
+        )
+        # Dispositivo 2
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="chat_emp_2",
+            usuario=self.user_pedro, establecimiento=self.tienda1, activo=True
+        )
+
+        self.assertEqual(VinculoCanal.objects.filter(establecimiento=self.tienda1, activo=True).count(), 2)
+
+        # Disparar Kill-Switch por POST
+        resp = self.client.post("/configuracion/", {"accion": "revocar_sesiones_moviles"})
+        self.assertEqual(resp.status_code, 302)
+
+        # Todos los vínculos quedan inactivos
+        self.assertEqual(VinculoCanal.objects.filter(establecimiento=self.tienda1, activo=True).count(), 0)
+
+        # Si el cajero despedido intenta escribir, es rechazado
+        resp_bloqueado = despachar_mensaje("telegram", "chat_emp_1", "30 mil lomo")
+        self.assertIn("Tu cuenta aún no está vinculada", resp_bloqueado)
+
+    def test_landing_page_anonima_y_dashboard_autenticado(self):
+        """Visitante anónimo ve Landing Page con Bre-B; usuario autenticado ve el dashboard."""
+        # 1. Anónimo
+        resp_anon = self.client.get("/")
+        self.assertEqual(resp_anon.status_code, 200)
+        self.assertContains(resp_anon, "Bre-B Banco de la República")
+        self.assertContains(resp_anon, "No le regale el 3%")
+
+        # 2. Autenticado
+        self.client.force_login(self.user_pedro)
+        resp_auth = self.client.get("/")
+        self.assertEqual(resp_auth.status_code, 200)
+        self.assertContains(resp_auth, "Carnicería Don Pedro")
+

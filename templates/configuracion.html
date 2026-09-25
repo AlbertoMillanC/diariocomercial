@@ -1,108 +1,335 @@
 {% extends "base.html" %}
 {% block title %}Configuración{% endblock %}
 {% block content %}
-<h2>Configuración del establecimiento</h2>
-<p class="lead">Al iniciar labores se registran las actividades CIIU (puede tener varias) y los motivos de venta prestablecidos. Aquí también se administran los usuarios del negocio.</p>
-
-<div class="panel" style="margin-bottom:16px;">
-  <h2 style="font-size:16px;">Correo del asesor contable</h2>
-  <form method="post">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="correo">
-    <label>Correo para los reportes</label>
-    <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}">
-    <p></p>
-    <button class="btn btn-primary" type="submit">Guardar correo</button>
-  </form>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+  <div>
+    <h2>Configuración del establecimiento</h2>
+    <p class="lead" style="margin:0;">Administre su asistente móvil por Telegram, usuarios, códigos CIIU y correo contable.</p>
+  </div>
+  <div>
+    <span class="tag" style="background:#e0f2fe; color:#0369a1; font-weight:bold; padding:6px 12px; border-radius:8px;">
+      📍 {{ establecimiento.municipio.nombre|default:"Tunja" }} ({{ establecimiento.municipio.codigo_dane|default:"15001" }})
+    </span>
+  </div>
 </div>
 
-<div class="panel" style="margin-bottom:16px;">
-  <h2 style="font-size:16px;">Usuarios del negocio</h2>
-  <div class="tabla-wrap">
-  <table>
-    <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
-    <tbody>
-      {% for p in usuarios %}
-      <tr>
-        <td>{{ p.user.get_full_name|default:p.user.username }}</td>
-        <td>{{ p.user.username }}</td>
-        <td>{{ p.get_rol_display }}</td>
-        <td>{% if p.user.is_active %}activo{% else %}inactivo{% endif %}</td>
-        <td>
-          <form method="post" style="display:inline;">
+<!-- TABS NAVEGACIÓN -->
+<div style="display:flex; gap:8px; border-bottom:2px solid var(--line); margin-bottom:18px; overflow-x:auto;">
+  <button type="button" class="tab-btn activo" onclick="cambiarTab(event, 'tab-asistente')">🤖 Asistente Móvil</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-usuarios')">👥 Usuarios ({{ usuarios|length }})</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-tributario')">🏷️ Actividades CIIU</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-correo')">📧 Correo Contador</button>
+</div>
+
+<style>
+  .tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover {
+    color: var(--navy);
+  }
+  .tab-btn.activo {
+    color: var(--teal);
+    border-bottom: 3px solid var(--teal);
+    font-weight: 800;
+  }
+  .tab-content {
+    display: none;
+  }
+  .tab-content.activo {
+    display: block;
+  }
+  .pin-box {
+    background: #0f172a;
+    color: #4ade80;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: clamp(32px, 6vw, 48px);
+    font-weight: 900;
+    letter-spacing: 8px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    text-align: center;
+    border: 3px solid #334155;
+    margin: 12px 0;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+  }
+</style>
+
+<!-- TAB 1: ASISTENTE MOVIL -->
+<div id="tab-asistente" class="tab-content activo">
+  
+  <!-- TARJETA PRINCIPAL VINCULACION -->
+  <div class="panel" style="margin-bottom:20px; border-left: 6px solid var(--teal);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h3 style="margin:0 0 6px; font-size:18px; color:var(--navy);">📱 Conectar Telegram y WhatsApp a su Negocio</h3>
+        <p style="margin:0; color:var(--muted); font-size:14px;">
+          Registre ventas por voz, consulte existencias y reciba alertas de pagos Bre-B directamente en el chat.
+        </p>
+      </div>
+      <div>
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="generar_token_movil">
+          <button class="btn btn-primary" type="submit">🔄 Generar Nuevo Código PIN</button>
+        </form>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:20px;">
+      
+      <!-- COLUMNA A: METODO 1 (BOTON ENLACE) -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px;">
+        <span class="tag" style="background:#dcfce7; color:#166534; font-weight:bold;">MÉTODO 1 (RECOMENDADO)</span>
+        <h4 style="margin:8px 0; font-size:16px;">Conexión directa en 1 toque</h4>
+        <p style="font-size:13px; color:#64748b; margin-bottom:16px;">
+          Si está en su celular, toque el botón para abrir Telegram. Se iniciará sesión de forma inmediata.
+        </p>
+        {% if deep_link %}
+          <a href="{{ deep_link }}" target="_blank" class="btn btn-primary" style="background:#0088cc; display:block; text-align:center; font-size:16px; padding:12px;">
+            ✈️ Conectar con Telegram Ahora
+          </a>
+        {% else %}
+          <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="user_id" value="{{ p.pk }}">
-            {% if p.user.is_active %}
-            <input type="hidden" name="accion" value="desactivar">
-            <button class="btn btn-ghost" type="submit">Desactivar</button>
-            {% else %}
-            <input type="hidden" name="accion" value="activar">
-            <button class="btn btn-primary" type="submit">Activar</button>
-            {% endif %}
+            <input type="hidden" name="accion" value="generar_token_movil">
+            <button class="btn btn-primary" type="submit" style="background:#0088cc; width:100%;">
+              ✈️ Activar Botón de Conexión
+            </button>
           </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% endif %}
+      </div>
+
+      <!-- COLUMNA B: METODO 2 (PIN 6 DIGITOS) -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px;">
+        <span class="tag" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">MÉTODO 2 (CÓDIGO MANUAL)</span>
+        <h4 style="margin:8px 0; font-size:16px;">O envíe este PIN al bot</h4>
+        <p style="font-size:13px; color:#64748b; margin-bottom:6px;">
+          Abra <strong>@DiarioComercial_bot</strong> en Telegram y envíe este número:
+        </p>
+        <div class="pin-box">
+          {{ pin_6|default:"GENERE PIN" }}
+        </div>
+        <small style="color:#64748b; display:block; text-align:center;">
+          {% if token_activo %}
+            Válido hasta las {{ token_activo.expira|date:"H:i" }} (se renueva automáticamente)
+          {% else %}
+            Presione «Generar Nuevo Código PIN» arriba para activarlo.
+          {% endif %}
+        </small>
+      </div>
+
+    </div>
   </div>
-  <form method="post" style="margin-top:12px;">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="usuario">
-    {{ form_usuario.as_p }}
-    <button class="btn btn-primary" type="submit">Crear usuario</button>
-  </form>
+
+  <!-- DISPOSITIVOS VINCULADOS & KILL-SWITCH -->
+  <div class="panel" style="margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:16px;">📲 Dispositivos y Canales Conectados Actualmente</h3>
+      
+      <!-- KILL-SWITCH EXIGIDO POR EL CLIENTE ACIDO -->
+      <form method="post" onsubmit="return confirm('⚠️ ATENCIÓN: Esta acción desconectará INMEDIATAMENTE todos los celulares y bots vinculados a este negocio. ¿Desea proceder?');">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="revocar_sesiones_moviles">
+        <button class="btn btn-danger btn-sm" type="submit" style="background:#dc2626;">
+          🛑 Revocar Todas las Sesiones Móviles (Kill-Switch)
+        </button>
+      </form>
+    </div>
+
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Canal</th>
+            <th>Usuario</th>
+            <th>ID Externo</th>
+            <th>Nombre / Alias</th>
+            <th>Fecha Conexión</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vinculos_activos %}
+          <tr>
+            <td>
+              <span class="tag" style="background:{% if v.canal == 'telegram' %}#0088cc{% else %}#25d366{% endif %}; color:#fff; font-weight:bold;">
+                {{ v.canal|upper }}
+              </span>
+            </td>
+            <td><strong>{{ v.usuario.username }}</strong> ({{ v.usuario.perfil.get_rol_display|default:"Dependiente" }})</td>
+            <td class="mono">{{ v.identificador_externo }}</td>
+            <td>{{ v.nombre_remitente|default:v.username_externo|default:"Mostrador" }}</td>
+            <td>{{ v.fecha_creacion|date:"d/m/Y H:i" }}</td>
+            <td>
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="desvincular_canal">
+                <input type="hidden" name="vinculo_id" value="{{ v.pk }}">
+                <button class="btn btn-ghost btn-sm" type="submit" onclick="return confirm('¿Desconectar este dispositivo?');">
+                  Desvincular
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" style="text-align:center; padding:20px; color:#64748b;">
+              No hay celulares vinculados todavía. Genere un PIN o presione «Conectar con Telegram».
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- APENDICE WHATSAPP BUSINESS API -->
+  <div class="panel" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+    <div style="display:flex; gap:16px; align-items:center;">
+      <div style="font-size:36px;">💬</div>
+      <div>
+        <h4 style="margin:0 0 4px; color:#166534; font-size:16px;">Módulo de WhatsApp Business Cloud API</h4>
+        <p style="margin:0; font-size:13px; color:#15803d;">
+          Webhook de recepción de mensajes y pedidos listo en: <code>/webhook/whatsapp/</code>. Soporta despacho de recibos digitales UTILITY y catálogo vecinal.
+        </p>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="panel" style="margin-bottom:16px;">
-  <h2 style="font-size:16px;">Actividades CIIU</h2>
-  <div class="tabla-wrap">
-  <table>
-    <thead><tr><th>Código</th><th>Descripción</th><th>Tarifa ICA</th></tr></thead>
-    <tbody>
-      {% for a in actividades %}
-      <tr>
-        <td>{{ a.codigo }}</td>
-        <td>{{ a.descripcion }}</td>
-        <td>{{ a.tarifa_x_mil }} x mil</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="3">Todavía no hay actividades. Agréguelas abajo.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- TAB 2: USUARIOS -->
+<div id="tab-usuarios" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <h3 style="font-size:16px; margin-top:0;">Usuarios y Dependientes del Negocio</h3>
+    <div class="tabla-wrap">
+    <table>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acción</th></tr></thead>
+      <tbody>
+        {% for p in usuarios %}
+        <tr>
+          <td>{{ p.user.get_full_name|default:p.user.username }}</td>
+          <td>{{ p.user.username }}</td>
+          <td>
+            <span class="tag" style="background:{% if p.es_propietario %}#fef3c7; color:#92400e;{% else %}#f1f5f9; color:#475569;{% endif %}">
+              {{ p.get_rol_display }}
+            </span>
+          </td>
+          <td>{% if p.user.is_active %}<span class="tag" style="background:#dcfce7; color:#166534;">activo</span>{% else %}<span class="tag" style="background:#fee2e2; color:#991b1b;">inactivo</span>{% endif %}</td>
+          <td>
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ p.pk }}">
+              {% if p.user.is_active %}
+              <input type="hidden" name="accion" value="desactivar">
+              <button class="btn btn-ghost btn-sm" type="submit">Desactivar</button>
+              {% else %}
+              <input type="hidden" name="accion" value="activar">
+              <button class="btn btn-primary btn-sm" type="submit">Activar</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <form method="post" style="margin-top:16px;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="usuario">
+      <h4 style="margin:12px 0 6px;">Crear nuevo usuario / dependiente:</h4>
+      {{ form_usuario.as_p }}
+      <button class="btn btn-primary" type="submit">Crear usuario</button>
+    </form>
   </div>
-  <form method="post" style="margin-top:12px;">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="ciiu">
-    {{ form_ciiu.as_p }}
-    <button class="btn btn-primary" type="submit">Agregar CIIU</button>
-  </form>
 </div>
 
-<div class="panel">
-  <h2 style="font-size:16px;">Motivos de venta prestablecidos</h2>
-  <div class="tabla-wrap">
-  <table>
-    <thead><tr><th>CIIU</th><th>Motivo</th><th>Por defecto</th></tr></thead>
-    <tbody>
-      {% for m in motivos %}
-      <tr>
-        <td>{{ m.actividad.codigo }}</td>
-        <td>{{ m.nombre }}</td>
-        <td>{% if m.es_predeterminado %}Sí{% else %}No{% endif %}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="3">Sin motivos. Si es carnicería, cree «Venta de carne».</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- TAB 3: CIIU Y MOTIVOS -->
+<div id="tab-tributario" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <h3 style="font-size:16px; margin-top:0;">Actividades CIIU (Tarifas ICA de Tunja)</h3>
+    <div class="tabla-wrap">
+    <table>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Tarifa ICA</th></tr></thead>
+      <tbody>
+        {% for a in actividades %}
+        <tr>
+          <td><strong>{{ a.codigo }}</strong></td>
+          <td>{{ a.descripcion }}</td>
+          <td><span class="tag">{{ a.tarifa_x_mil }} x mil</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">Todavía no hay actividades. Agréguelas abajo.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <form method="post" style="margin-top:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="ciiu">
+      {{ form_ciiu.as_p }}
+      <button class="btn btn-primary" type="submit">Agregar CIIU</button>
+    </form>
   </div>
-  <form method="post" style="margin-top:12px;">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="motivo">
-    {{ form_motivo.as_p }}
-    <button class="btn btn-primary" type="submit">Agregar motivo</button>
-  </form>
+
+  <div class="panel">
+    <h3 style="font-size:16px; margin-top:0;">Motivos de venta prestablecidos</h3>
+    <div class="tabla-wrap">
+    <table>
+      <thead><tr><th>CIIU</th><th>Motivo</th><th>Por defecto</th></tr></thead>
+      <tbody>
+        {% for m in motivos %}
+        <tr>
+          <td>{{ m.actividad.codigo }}</td>
+          <td>{{ m.nombre }}</td>
+          <td>{% if m.es_predeterminado %}Sí{% else %}No{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">Sin motivos. Ejemplo: «Venta de carne», «Bebidas».</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <form method="post" style="margin-top:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="motivo">
+      {{ form_motivo.as_p }}
+      <button class="btn btn-primary" type="submit">Agregar motivo</button>
+    </form>
+  </div>
 </div>
+
+<!-- TAB 4: CORREO CONTADOR -->
+<div id="tab-correo" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <h3 style="font-size:16px; margin-top:0;">Correo del Asesor Contable</h3>
+    <p class="lead" style="font-size:14px;">El sistema enviará los consolidados mensuales en Excel y los borradores de ICA a esta dirección.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="correo">
+      <label>Correo para los reportes:</label>
+      <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}" style="width:100%; max-width:400px; padding:8px; border-radius:6px; border:1px solid #cbd5e1; display:block; margin:6px 0 12px;">
+      <button class="btn btn-primary" type="submit">Guardar correo</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  function cambiarTab(evt, tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('activo'));
+    evt.currentTarget.classList.add('activo');
+    document.getElementById(tabId).classList.add('activo');
+  }
+</script>
+
 {% endblock %}

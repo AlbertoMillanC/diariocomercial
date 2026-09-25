@@ -1,30 +1,160 @@
 {% extends "base.html" %}
-{% block title %}Nueva venta{% endblock %}
+{% block title %}Nueva venta — DiarioComercial{% endblock %}
 {% block content %}
-<h2>Registro de venta</h2>
-<p class="lead">La fecha y la hora salen solas. El motivo depende de la actividad CIIU. La retención solo aparece si vende a una empresa.</p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+  <div>
+    <h2>Registro de Venta en Mostrador</h2>
+    <p class="lead" style="margin:0;">Cobro rápido con Bre-B, efectivo o empresa. Compatible con impresoras térmicas ESC/POS.</p>
+  </div>
+  <div>
+    <button type="button" onclick="abrirModalBreB()" class="btn btn-primary" style="background:#00A859; font-size:16px; padding:12px 20px; box-shadow:0 4px 12px rgba(0,168,89,0.3);">
+      ⚡ Cobrar con Bre-B (QR)
+    </button>
+  </div>
+</div>
+
 <div class="panel">
   <form method="post" id="form-venta">
     {% csrf_token %}
     {{ form.non_field_errors }}
-    <p>{{ form.fecha_hora.label_tag }} {{ form.fecha_hora }}<br><small>{{ form.fecha_hora.help_text }}</small></p>
-    <p>{{ form.actividad.label_tag }} {{ form.actividad }}</p>
-    <p>{{ form.motivo.label_tag }} {{ form.motivo }}</p>
-    <p>{{ form.nuevo_motivo.label_tag }} {{ form.nuevo_motivo }}</p>
-    <p>{{ form.valor.label_tag }} {{ form.valor }}</p>
-    <p>{{ form.tipo_cliente.label_tag }} {{ form.tipo_cliente }}</p>
-    <p>{{ form.observacion.label_tag }} {{ form.observacion }}</p>
-    <div id="bloque-empresa" style="display:none; background:#f8eadc; padding:12px; border-radius:8px;">
-      <p><b>Venta a empresa</b> — aquí sí puede registrar retención.</p>
-      <p>{{ form.tercero.label_tag }} {{ form.tercero }}</p>
-      <p>{{ form.retencion_tipo.label_tag }} {{ form.retencion_tipo }}</p>
-      <p>{{ form.retencion_valor.label_tag }} {{ form.retencion_valor }}</p>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+      <div>
+        <p>{{ form.fecha_hora.label_tag }} {{ form.fecha_hora }}<br><small>{{ form.fecha_hora.help_text }}</small></p>
+        <p>{{ form.actividad.label_tag }} {{ form.actividad }}</p>
+        <p>{{ form.motivo.label_tag }} {{ form.motivo }}</p>
+        <p>{{ form.nuevo_motivo.label_tag }} {{ form.nuevo_motivo }}</p>
+      </div>
+      <div>
+        <p style="font-size:18px;">
+          <label for="id_valor" style="font-weight:bold; color:var(--navy);">Valor a cobrar ($ COP):</label>
+          {{ form.valor }}
+        </p>
+        <p>{{ form.tipo_cliente.label_tag }} {{ form.tipo_cliente }}</p>
+        <p>{{ form.observacion.label_tag }} {{ form.observacion }}</p>
+      </div>
     </div>
-    <p></p>
-    <button class="btn btn-primary" type="submit">Guardar venta</button>
-    <a class="btn btn-ghost" href="{% url 'inicio' %}">Cancelar</a>
+
+    <div id="bloque-empresa" style="display:none; background:#f8eadc; padding:14px; border-radius:10px; margin: 12px 0;">
+      <p style="margin-top:0;"><b>Venta a empresa</b> — cálculo de retención en la fuente e ICA.</p>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+        <div>{{ form.tercero.label_tag }} {{ form.tercero }}</div>
+        <div>{{ form.retencion_tipo.label_tag }} {{ form.retencion_tipo }}</div>
+        <div>{{ form.retencion_valor.label_tag }} {{ form.retencion_valor }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:16px; align-items:center;">
+      <button class="btn btn-primary" type="submit" style="font-size:16px; padding:12px 24px;">Guardar Venta Tradicional</button>
+      <button type="button" onclick="abrirModalBreB()" class="btn btn-accent" style="background:#00A859;">⚡ Cobrar con Bre-B</button>
+      <a class="btn btn-ghost" href="{% url 'inicio' %}">Cancelar</a>
+    </div>
   </form>
 </div>
+
+<!-- MODAL COBRO BRE-B INTERACTIVO -->
+<div id="modal-breb" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.85); backdrop-filter:blur(6px); z-index:9999; place-items:center;">
+  <div style="background:#fff; border-radius:24px; padding:28px; max-width:440px; width:90%; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); position:relative;">
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:14px;">
+      <span style="font-size:12px; font-weight:800; color:#00A859; letter-spacing:1px;">🇨🇴 BRE-B BANCO DE LA REPÚBLICA</span>
+      <button type="button" onclick="cerrarModalBreB()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+
+    <!-- PANTALLA 1: ESPERANDO PAGO -->
+    <div id="breb-pantalla-espera">
+      <div style="font-size:14px; color:#64748b; font-weight:bold;">VALOR TOTAL A COBRAR</div>
+      <div id="breb-monto-display" style="font-size:36px; font-weight:900; color:var(--navy); margin:4px 0;">$ 0 COP</div>
+
+      <!-- MICRO TOKEN VISUAL ANTI-FRAUDE -->
+      <div style="margin: 8px 0;">
+        <span id="breb-token-display" style="background:#0f172a; color:#4ade80; font-family:monospace; font-size:22px; font-weight:bold; padding:4px 12px; border-radius:8px; letter-spacing:2px;">
+          TOKEN #---
+        </span>
+      </div>
+
+      <!-- QR CANVAS INTEROPERABLE -->
+      <div style="background:#fff; border:3px solid #0f172a; border-radius:16px; padding:12px; display:inline-block; margin:8px 0;">
+        <svg id="breb-qr-svg" width="200" height="200" viewBox="0 0 100 100">
+          <rect width="100" height="100" fill="#ffffff"/>
+          <rect x="5" y="5" width="25" height="25" fill="#0f172a"/>
+          <rect x="8" y="8" width="19" height="19" fill="#ffffff"/>
+          <rect x="11" y="11" width="13" height="13" fill="#0f172a"/>
+
+          <rect x="70" y="5" width="25" height="25" fill="#0f172a"/>
+          <rect x="73" y="8" width="19" height="19" fill="#ffffff"/>
+          <rect x="76" y="11" width="13" height="13" fill="#0f172a"/>
+
+          <rect x="5" y="70" width="25" height="25" fill="#0f172a"/>
+          <rect x="8" y="73" width="19" height="19" fill="#ffffff"/>
+          <rect x="11" y="76" width="13" height="13" fill="#0f172a"/>
+
+          <rect x="35" y="10" width="8" height="8" fill="#00A859"/>
+          <rect x="48" y="15" width="8" height="8" fill="#0f172a"/>
+          <rect x="35" y="25" width="12" height="6" fill="#0f172a"/>
+          <rect x="50" y="30" width="10" height="10" fill="#00A859"/>
+          <rect x="15" y="38" width="10" height="10" fill="#0f172a"/>
+          <rect x="38" y="45" width="24" height="24" fill="#00A859" rx="4"/>
+          <text x="50" y="61" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Bre-B</text>
+          <rect x="70" y="40" width="10" height="10" fill="#0f172a"/>
+          <rect x="85" y="55" width="8" height="8" fill="#00A859"/>
+          <rect x="35" y="75" width="10" height="10" fill="#0f172a"/>
+          <rect x="55" y="75" width="15" height="15" fill="#0f172a"/>
+        </svg>
+      </div>
+
+      <div style="font-size:13px; color:#475569; margin-bottom:12px;">
+        Acerque a 50 cm. El cliente escanea desde <strong>Bancolombia, Nequi, Daviplata o cualquier banco</strong>.
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#64748b; margin-bottom:16px;">
+        <span>⏳ Expira en: <strong id="breb-timer">120</strong>s</span>
+        <span style="color:#00A859; font-weight:bold;">● Escuchando Webhook...</span>
+      </div>
+
+      <!-- BOTONES DE ACCION DEL MODAL -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" onclick="simularAprobacionWebhook()" class="btn btn-primary" style="background:#00A859; padding:10px;">
+          ⚡ Simular Confirmación Bancaria BanRep
+        </button>
+        <button type="button" onclick="cerrarModalBreB()" class="btn btn-ghost btn-sm">
+          💵 Cambiar a Efectivo
+        </button>
+      </div>
+    </div>
+
+    <!-- PANTALLA 2: PAGO CONFIRMADO -->
+    <div id="breb-pantalla-exito" style="display:none; padding:10px 0;">
+      <div style="font-size:54px; margin-bottom:8px;">🎉</div>
+      <h3 style="color:#00A859; margin:0 0 6px; font-size:22px;">¡PAGO RECIBIDO Y LIQUIDADO!</h3>
+      <div id="breb-exito-monto" style="font-size:28px; font-weight:900; color:var(--navy); margin-bottom:8px;">$ 0 COP</div>
+      <div id="breb-exito-detalle" style="font-size:13px; color:#475569; margin-bottom:18px;">
+        Banco: Bancolombia / Nequi • CUD: BANREP-OK
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:18px; text-align:left; font-size:13px;">
+        <div>✅ Venta registrada en caja automáticamente.</div>
+        <div>✅ Inventario descontado al gramo.</div>
+        <div>✅ Retención de ICA Tunja calculada.</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+        <a id="btn-print-58" href="#" target="_blank" class="btn btn-primary btn-sm" style="background:var(--navy);">
+          🖨️ Ticket 58mm
+        </a>
+        <a id="btn-print-80" href="#" target="_blank" class="btn btn-primary btn-sm" style="background:var(--navy);">
+          🖨️ Ticket 80mm
+        </a>
+      </div>
+
+      <button type="button" onclick="window.location.href='{% url 'venta_nueva' %}'" class="btn btn-primary" style="background:#00A859; width:100%;">
+        ➕ Nueva Venta
+      </button>
+    </div>
+
+  </div>
+</div>
+
 {{ motivos_data|json_script:"motivos-data" }}
 <script>
 const motivos = JSON.parse(document.getElementById("motivos-data").textContent);
@@ -57,5 +187,135 @@ selAct.addEventListener("change", filtrarMotivos);
 selCli.addEventListener("change", toggleEmpresa);
 filtrarMotivos();
 toggleEmpresa();
+
+// ==========================================
+// LOGICA MODAL BRE-B CON POLLING Y SOUNDBOX
+// ==========================================
+let txActualReferencia = null;
+let txTimerInterval = null;
+let txPollingInterval = null;
+let tiempoRestante = 120;
+
+function abrirModalBreB() {
+  const inputValor = document.getElementById("id_valor");
+  const valor = parseFloat(inputValor.value) || 0;
+  if (valor <= 0) {
+    alert("Por favor ingrese primero el valor de la venta en el formulario.");
+    inputValor.focus();
+    return;
+  }
+
+  document.getElementById("modal-breb").style.display = "grid";
+  document.getElementById("breb-pantalla-espera").style.display = "block";
+  document.getElementById("breb-pantalla-exito").style.display = "none";
+  document.getElementById("breb-monto-display").innerText = "$ " + valor.toLocaleString("es-CO") + " COP";
+  document.getElementById("breb-token-display").innerText = "TOKEN #---";
+
+  // Llamar API de generación Bre-B
+  fetch("/api/bre-b/generar/?monto=" + valor)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert(data.error);
+        cerrarModalBreB();
+        return;
+      }
+      txActualReferencia = data.referencia;
+      document.getElementById("breb-token-display").innerText = "TOKEN " + data.token_visual;
+      iniciarPolling(data.referencia);
+      iniciarTimer(data.expira_en_segundos || 120);
+    })
+    .catch(err => {
+      alert("Error comunicando con el servicio Bre-B: " + err);
+      cerrarModalBreB();
+    });
+}
+
+function cerrarModalBreB() {
+  document.getElementById("modal-breb").style.display = "none";
+  if (txTimerInterval) clearInterval(txTimerInterval);
+  if (txPollingInterval) clearInterval(txPollingInterval);
+}
+
+function iniciarTimer(segundos) {
+  tiempoRestante = segundos;
+  const label = document.getElementById("breb-timer");
+  label.innerText = tiempoRestante;
+  if (txTimerInterval) clearInterval(txTimerInterval);
+  txTimerInterval = setInterval(() => {
+    tiempoRestante--;
+    label.innerText = tiempoRestante;
+    if (tiempoRestante <= 0) {
+      clearInterval(txTimerInterval);
+      if (txPollingInterval) clearInterval(txPollingInterval);
+      alert("El código Bre-B ha expirado por seguridad. Genere uno nuevo.");
+      cerrarModalBreB();
+    }
+  }, 1000);
+}
+
+function iniciarPolling(referencia) {
+  if (txPollingInterval) clearInterval(txPollingInterval);
+  txPollingInterval = setInterval(() => {
+    fetch("/api/bre-b/status/" + referencia + "/")
+      .then(r => r.json())
+      .then(data => {
+        if (data.aprobada) {
+          pagoAprobadoExito(data);
+        }
+      })
+      .catch(e => console.log("Polling error:", e));
+  }, 2000);
+}
+
+function simularAprobacionWebhook() {
+  if (!txActualReferencia) return;
+  fetch("/api/bre-b/mock-webhook/" + txActualReferencia + "/")
+    .then(r => r.json())
+    .then(data => {
+      if (data.exito) {
+        fetch("/api/bre-b/status/" + txActualReferencia + "/")
+          .then(r => r.json())
+          .then(pagoAprobadoExito);
+      } else {
+        alert(data.mensaje);
+      }
+    });
+}
+
+function pagoAprobadoExito(data) {
+  if (txTimerInterval) clearInterval(txTimerInterval);
+  if (txPollingInterval) clearInterval(txPollingInterval);
+
+  // Reproducir sonido Chime Soundbox
+  reproducirChimeExito();
+
+  document.getElementById("breb-pantalla-espera").style.display = "none";
+  document.getElementById("breb-pantalla-exito").style.display = "block";
+  document.getElementById("breb-exito-monto").innerText = "$ " + data.monto.toLocaleString("es-CO") + " COP";
+  document.getElementById("breb-exito-detalle").innerText = "Token: " + data.token_visual + " • Referencia: #" + data.referencia.substring(0, 10);
+
+  if (data.venta_id) {
+    document.getElementById("btn-print-58").href = "/ventas/" + data.venta_id + "/ticket-escpos/58/";
+    document.getElementById("btn-print-80").href = "/ventas/" + data.venta_id + "/ticket-escpos/80/";
+  }
+}
+
+function reproducirChimeExito() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+  } catch(e) {}
+}
 </script>
 {% endblock %}

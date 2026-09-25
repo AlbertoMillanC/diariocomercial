@@ -17,4 +17,15 @@ urlpatterns = [
     path("pedidos/", views.pedidos_lista, name="pedidos"),
     path("pedidos/<int:pk>/<str:accion>/", views.pedido_cambiar_estado, name="pedido_cambiar_estado"),
     path("instrucciones/", views.instrucciones, name="instrucciones"),
+    # Cobro rápido Bre-B & ESC/POS
+    path("api/bre-b/generar/", views.api_generar_cobro_bre_b, name="api_generar_cobro_bre_b"),
+    path("api/bre-b/status/<str:referencia>/", views.api_status_bre_b, name="api_status_bre_b"),
+    path("api/bre-b/mock-webhook/<str:referencia>/", views.api_mock_webhook_bre_b, name="api_mock_webhook_bre_b"),
+    path("ventas/<int:pk>/ticket-escpos/<int:ancho>/", views.imprimir_ticket_escpos, name="ticket_escpos"),
+    # Tributario ICA Tunja (Acuerdo 0032/2020)
+    path("tributario/ica/", views.declaracion_sugerida_ica_view, name="declaracion_ica"),
+    path("tributario/ica/exportar/", views.exportar_declaracion_ica, name="exportar_ica"),
+    # Super-Admin Dashboard SaaS
+    path("superadmin/", views.superadmin_dashboard, name="superadmin_dashboard"),
+    path("superadmin/establecimiento/<int:pk>/toggle-estado/", views.superadmin_toggle_estado, name="superadmin_toggle_estado"),
 ]

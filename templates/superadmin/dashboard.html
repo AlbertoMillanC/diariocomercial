@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Super-Administrador SaaS — DiarioComercial{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2>👑 Panel de Super-Administrador SaaS</h2>
+    <p class="lead" style="margin:0;">Monitoreo en tiempo real de comercios, suscripciones, volumen transaccional y red de contadores en Boyacá.</p>
+  </div>
+  <div>
+    <span class="tag" style="background:#0f172a; color:#4ade80; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:8px;">
+      MODO SUPERVISOR • {{ hoy|date:"d/m/Y" }}
+    </span>
+  </div>
+</div>
+
+<!-- FILA SUPERIOR: METRICAS SAAS EN VIVO -->
+<div class="cards cards-5" style="grid-template-columns: repeat(6, 1fr); margin-bottom:20px;">
+  <div class="card">
+    <span>Comercios Totales</span>
+    <strong>{{ total_comercios }}</strong>
+  </div>
+  <div class="card" style="border-left:4px solid #10b981;">
+    <span>Comercios Activos</span>
+    <strong style="color:#059669;">{{ comercios_activos }}</strong>
+  </div>
+  <div class="card" style="border-left:4px solid #0284c7;">
+    <span>Plan $0 Lanzamiento</span>
+    <strong style="color:#0284c7;">{{ comercios_plan_cero }}</strong>
+  </div>
+  <div class="card" style="border-left:4px solid #ef4444;">
+    <span>En Mora / Riesgo</span>
+    <strong style="color:#dc2626;">{{ comercios_mora }}</strong>
+  </div>
+  <div class="card" style="border-left:4px solid var(--orange);">
+    <span>Ventas Hoy (COP)</span>
+    <strong style="font-size:18px;">$ {{ volumen_hoy|floatformat:0 }}</strong>
+  </div>
+  <div class="card" style="border-left:4px solid var(--navy);">
+    <span>Total ICA Estimado</span>
+    <strong style="font-size:18px; color:var(--navy);">$ {{ total_ica_estimado|floatformat:0 }}</strong>
+  </div>
+</div>
+
+<!-- TABLA DE COMERCIOS MULTI-TENANT -->
+<div class="panel" style="margin-bottom:20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:17px; color:var(--navy);">🏪 Directorio de Establecimientos Registrados</h3>
+    <small style="color:var(--muted);">Gestión de acceso, vigencia y suspensión</small>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre del Negocio</th>
+          <th>Municipio (DANE)</th>
+          <th>Plan Suscripción</th>
+          <th>Vigencia Restante</th>
+          <th>Contador Asignado</th>
+          <th>Estado</th>
+          <th style="text-align:center;">Acción Rápida</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in comercios %}
+        <tr>
+          <td class="mono">{{ c.obj.pk }}</td>
+          <td><strong>{{ c.obj.nombre }}</strong><br><small class="mono">NIT: {{ c.obj.nit|default:"Sin NIT" }}</small></td>
+          <td>{{ c.obj.municipio.nombre|default:"Tunja" }} ({{ c.obj.municipio.codigo_dane|default:"15001" }})</td>
+          <td>
+            <span class="tag" style="background:{% if c.obj.plan_suscripcion == 'lanzamiento_cero' %}#e0f2fe; color:#0369a1;{% elif c.obj.plan_suscripcion == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
+              {{ c.obj.get_plan_suscripcion_display|default:c.obj.plan_suscripcion }}
+            </span>
+          </td>
+          <td>
+            {% if c.en_riesgo %}
+              <strong style="color:#dc2626;">⚠️ {{ c.dias_restantes }} días</strong>
+            {% else %}
+              <span style="color:#059669;">{{ c.dias_restantes }} días</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if c.obj.correo_reportes %}
+              <span style="font-size:13px;">📧 {{ c.obj.correo_reportes }}</span>
+            {% else %}
+              <span style="color:#94a3b8; font-size:12px;">Sin contador</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="tag" style="background:{% if c.obj.estado == 'activo' %}#dcfce7; color:#166534;{% else %}#fee2e2; color:#991b1b;{% endif %}">
+              {{ c.obj.estado|upper }}
+            </span>
+          </td>
+          <td style="text-align:center;">
+            <a href="{% url 'superadmin_toggle_estado' c.obj.pk %}" class="btn {% if c.obj.estado == 'activo' %}btn-danger{% else %}btn-primary{% endif %} btn-sm" onclick="return confirm('¿Cambiar estado de {{ c.obj.nombre }}?');">
+              {% if c.obj.estado == 'activo' %}Suspender{% else %}Reactivar{% endif %}
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:20px; color:#64748b;">
+            No hay comercios registrados en la base de datos.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- RED DE CONTADORES ALIADOS -->
+<div class="panel">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h3 style="margin:0; font-size:17px; color:var(--navy);">🤝 Red de Contadores Públicos Aliados</h3>
+    <small style="color:var(--muted);">El canal de distribución B2B2C número 1</small>
+  </div>
+
+  <div class="tabla-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Correo Electrónico del Contador</th>
+          <th style="text-align:center;">Tiendas Asignadas</th>
+          <th style="text-align:center;">Reportes Oficiales Generados</th>
+          <th>Estado de la Alianza</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cont in contadores %}
+        <tr>
+          <td><strong>{{ cont.correo_reportes }}</strong></td>
+          <td style="text-align:center;"><span class="tag">{{ cont.total_clientes }} comercios</span></td>
+          <td style="text-align:center; font-weight:bold;">{{ cont.total_descargas }} descargas</td>
+          <td><span class="tag" style="background:#dcfce7; color:#166534;">Contador Activo</span></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center; padding:20px; color:#64748b;">
+            Aún no hay contadores enlazados por correo de reportes.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

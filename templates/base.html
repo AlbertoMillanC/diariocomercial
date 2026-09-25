@@ -32,9 +32,13 @@
     <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>
     <a href="{% url 'instrucciones' %}" class="{% if request.resolver_match.url_name == 'instrucciones' %}activo{% endif %}">📖 Guía Bot</a>
     {% if user.perfil.es_propietario %}
+    <a href="{% url 'declaracion_ica' %}" class="{% if request.resolver_match.url_name == 'declaracion_ica' %}activo{% endif %}" style="background:rgba(0,168,89,0.2); border:1px solid #10b981; color:#a7f3d0;">🏛️ ICA Tunja</a>
     <a href="{% url 'enviar_reporte' %}" class="{% if request.resolver_match.url_name == 'enviar_reporte' %}activo{% endif %}">Enviar</a>
     <a href="{% url 'auditoria' %}" class="{% if request.resolver_match.url_name == 'auditoria' %}activo{% endif %}">Auditoría</a>
     <a href="{% url 'configuracion' %}" class="{% if request.resolver_match.url_name == 'configuracion' %}activo{% endif %}">Configuración</a>
+    {% endif %}
+    {% if user.is_staff %}
+    <a href="{% url 'superadmin_dashboard' %}" class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}activo{% endif %}" style="background:#0f172a; border:1px solid #4ade80; color:#4ade80;">👑 SuperAdmin</a>
     {% endif %}
     <form class="logout" method="post" action="{% url 'logout' %}">
       {% csrf_token %}
