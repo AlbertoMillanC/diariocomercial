@@ -361,6 +361,24 @@ def despachar_mensaje(
             _cachear_respuesta(canal, identificador_mensaje, resp)
             return (resp, venta, None) if return_adjuntos else resp
         elif not texto.startswith("/"):
+            # 1. Si el usuario responde indicando tipo 31 o NIT (sin número)
+            es_solo_31_o_nit = bool(re.search(r"^(?:(?:tipo|dian|codigo)\s+)?(31|nit)$", t_norm))
+            if es_solo_31_o_nit:
+                datos_doc["tipo_doc_dian_pendiente"] = "31"
+                datos_doc["es_factura_nit"] = True
+                _guardar_pendiente_documento(key_sesion, datos_doc)
+                resp = (
+                    "🧾 *Has indicado NIT (Tipo 31 DIAN) - Requiere Factura Electrónica DIAN*\n\n"
+                    "Para emitir la Factura Electrónica oficial de esta venta, por favor indica:\n"
+                    "• *NIT* (con o sin dígito de verificación, ej: `900123456-1`)\n"
+                    "• *Razón Social* o Nombre de la Empresa\n"
+                    "• *Correo electrónico* (donde la DIAN enviará la factura)\n\n"
+                    "👉 *Ejemplo:* `900123456-1 Inversiones Boyacá contabilidad@empresa.com`\n\n"
+                    "_(O escribe `ticket 900123456-1` si solo deseas ticket POS ordinario)_"
+                )
+                _cachear_respuesta(canal, identificador_mensaje, resp)
+                return (resp, None, None) if return_adjuntos else resp
+
             # Extraer tipo de documento DIAN y número
             match_dian = re.search(r"\b(11|12|13|21|22|31|41|42|47)\s+(\d{5,12}(?:-\d)?)\b", texto)
             if match_dian:
@@ -421,6 +439,10 @@ def despachar_mensaje(
             res_inv = procesar_salida_inventario(
                 establecimiento, datos_doc["texto_inventario"], valor_ingresado=datos_doc["valor_ingresado"]
             )
+            if getattr(res_inv, "bloqueado_sin_stock", False):
+                _cachear_respuesta(canal, identificador_mensaje, res_inv.motivo_bloqueo)
+                return (res_inv.motivo_bloqueo, None, None) if return_adjuntos else res_inv.motivo_bloqueo
+
             prod = res_inv.producto
             val_final = res_inv.valor_final
             actividad = establecimiento.actividades.first()
@@ -449,6 +471,42 @@ def despachar_mensaje(
             else:
                 stock_fmt = ""
             hora_str = timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')
+
+            # Si es NIT (Tipo 31 DIAN), verificar si requiere Factura Electrónica
+            solicita_solo_ticket = bool(re.search(r"\b(ticket|pos)\b", t_norm))
+            tiene_email = bool(re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", texto))
+            if (tipo_doc == "31" or datos_doc.get("es_factura_nit")) and not solicita_solo_ticket:
+                if tiene_email:
+                    resp_fe = _emitir_factura_electronica_bot(
+                        establecimiento=establecimiento,
+                        usuario=usuario,
+                        texto=texto,
+                        venta=venta,
+                        canal_sesion=key_sesion,
+                    )
+                    resp = f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {datos_doc['badge_pago']}{stock_fmt}\n\n" + resp_fe
+                    _cachear_respuesta(canal, identificador_mensaje, resp)
+                    return (resp, venta, None) if return_adjuntos else resp
+                else:
+                    _VENTAS_PENDIENTES_FACTURA[key_sesion] = {
+                        "venta_id": venta.pk,
+                        "monto": venta.valor,
+                        "concepto": venta.concepto,
+                        "fecha": timezone.now(),
+                    }
+                    resp = (
+                        f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {datos_doc['badge_pago']}{stock_fmt}\n"
+                        f"🧾 Ticket #{venta.pk} | {hora_str}\n"
+                        f"👤 *Cliente NIT:* {cliente.nombre} (NIT {cliente.nit_cedula})\n\n"
+                        f"🧾 *Iniciando Factura Electrónica DIAN*\n"
+                        f"Para emitir la factura electrónica oficial ante la DIAN, falta indicar el *Correo electrónico*.\n\n"
+                        f"👉 Por favor responde con: `correo@empresa.com` (o `Nombre_Empresa correo@empresa.com`)\n"
+                        f"_(O escribe `cancelar` para dejarla solo como ticket ordinario)_"
+                    )
+                    if res_inv.info_formateada:
+                        resp += f"\n{res_inv.info_formateada}"
+                    _cachear_respuesta(canal, identificador_mensaje, resp)
+                    return (resp, venta, None) if return_adjuntos else resp
 
             if cliente.nombre and not cliente.nombre.startswith(("Cliente ", "CC ", "NIT ", "CE ")) and cliente.nombre != cliente.nit_cedula:
                 cli_det = f"{cliente.nombre} ({prefix} {cliente.nit_cedula}{sufijo_dian})"
@@ -667,11 +725,21 @@ def _registrar_venta(
         medio_pago = "transferencia"
         badge_pago = "🏦 Transferencia"
 
+    # 0. Verificación preventiva de stock si el producto fue detectado
+    prod_check = buscar_producto_en_texto(establecimiento, texto_para_inventario)
+    if prod_check and prod_check.stock_kilos <= Decimal("0"):
+        u_desc = "unidades" if prod_check.es_unidad() else ("Lt" if prod_check.es_liquido() else "Kg")
+        return (
+            f"🚫 *Venta rechazada:* *{prod_check.nombre}* está AGOTADO (0 {u_desc} disponibles).\n"
+            f"No es posible venderlo ni cobrarlo.",
+            None,
+        )
+
     # Si pidió registrar documento para el ticket pero omitió el número, PAUSAR y NO generar ticket todavía
     if pide_documento_sin_num:
         val_est = val
         if not val_est or val_est <= 0:
-            prod_temp = buscar_producto_en_texto(establecimiento, texto_para_inventario)
+            prod_temp = prod_check or buscar_producto_en_texto(establecimiento, texto_para_inventario)
             if prod_temp:
                 val_est = prod_temp.precio_kilo
 
@@ -698,7 +766,17 @@ def _registrar_venta(
         val_fmt = f"${val:,.0f}".replace(",", ".") if val else ""
         monto_tag = f" (Monto: {val_fmt})" if val_fmt else ""
 
-        if tipo_doc_dian_pendiente:
+        if tipo_doc_dian_pendiente == "31":
+            prompt = (
+                f"🧾 *Has indicado NIT (Tipo 31 DIAN) - Requiere Factura Electrónica DIAN*{monto_tag}\n\n"
+                f"Para emitir la Factura Electrónica oficial de esta venta, por favor indica:\n"
+                f"• *NIT* (con o sin dígito de verificación, ej: `900123456-1`)\n"
+                f"• *Razón Social* o Nombre de la Empresa\n"
+                f"• *Correo electrónico* (donde la DIAN enviará la factura)\n\n"
+                f"👉 *Ejemplo:* `900123456-1 Inversiones Boyacá contabilidad@empresa.com`\n\n"
+                f"_(O escribe `ticket 900123456-1` si solo deseas ticket POS ordinario, u `omitir` para consumidor final)_"
+            )
+        elif tipo_doc_dian_pendiente:
             nombre_tipo = DIAN_TIPOS_DOC.get(tipo_doc_dian_pendiente, f"Tipo {tipo_doc_dian_pendiente}")
             prompt = (
                 f"✍️ *Por favor escribe el número de {nombre_tipo} (Tipo {tipo_doc_dian_pendiente} DIAN) para generar el ticket:*{monto_tag}\n\n"
@@ -708,7 +786,7 @@ def _registrar_venta(
             prompt = (
                 f"✍️ *Para generar el ticket con documento, por favor indica el tipo y el número:*{monto_tag}\n\n"
                 f"• Cédula: escribe `13` seguido del número (ej: `13 7178367`)\n"
-                f"• NIT: escribe `31` seguido del número (ej: `31 901234567-1`)\n"
+                f"• NIT (Factura Electrónica): escribe `31` (ej: `31 900123456-1 Inversiones Boyacá contabilidad@empresa.com`)\n"
                 f"• Tarjeta de Identidad: escribe `12`\n"
                 f"• Cédula de Extranjería: escribe `22`\n"
                 f"• Pasaporte: escribe `41`\n\n"
@@ -720,6 +798,8 @@ def _registrar_venta(
     res_inv = procesar_salida_inventario(
         establecimiento, texto_para_inventario, valor_ingresado=val
     )
+    if getattr(res_inv, "bloqueado_sin_stock", False):
+        return (res_inv.motivo_bloqueo, None)
     prod = res_inv.producto
     val_final = res_inv.valor_final
     info_inv = res_inv.info_formateada

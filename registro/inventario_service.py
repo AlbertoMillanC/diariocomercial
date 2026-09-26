@@ -139,6 +139,8 @@ class ResultadoSalidaInventario(tuple):
     cantidad: Decimal
     unidad_medida: str
     concepto_ticket: str
+    bloqueado_sin_stock: bool
+    motivo_bloqueo: str
 
     def __new__(
         cls,
@@ -150,6 +152,8 @@ class ResultadoSalidaInventario(tuple):
         cantidad: Decimal = Decimal("0"),
         unidad_medida: str = "und",
         concepto_ticket: str = "",
+        bloqueado_sin_stock: bool = False,
+        motivo_bloqueo: str = "",
     ):
         obj = super().__new__(cls, (prod, cantidad_descontada, detalle_secundario, valor_final, info_formateada))
         obj.producto = prod
@@ -160,6 +164,8 @@ class ResultadoSalidaInventario(tuple):
         obj.cantidad = cantidad
         obj.unidad_medida = unidad_medida
         obj.concepto_ticket = concepto_ticket
+        obj.bloqueado_sin_stock = bloqueado_sin_stock
+        obj.motivo_bloqueo = motivo_bloqueo
         return obj
 
 
@@ -470,6 +476,23 @@ def procesar_salida_inventario(
                 cantidad=Decimal("0"), unidad_medida="g", concepto_ticket=prod.nombre
             )
 
+        if prod.stock_kilos <= Decimal("0"):
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="g", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* *{prod.nombre}* está AGOTADO (0 Kg disponibles). No se puede vender ni cobrar."
+            )
+
+        if kilos > prod.stock_kilos:
+            kilos_disp = f"{prod.stock_kilos:.3f}".rstrip("0").rstrip(".")
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="g", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* Stock insuficiente de *{prod.nombre}*. Solicitaste {kilos:.3f} Kg pero solo quedan {kilos_disp} Kg en inventario."
+            )
+
         with transaction.atomic():
             prod = Producto.objects.select_for_update().get(pk=prod.pk)
             prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
@@ -531,6 +554,23 @@ def procesar_salida_inventario(
                 cantidad=Decimal("0"), unidad_medida="ml", concepto_ticket=prod.nombre
             )
 
+        if prod.stock_kilos <= Decimal("0"):
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="ml", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* *{prod.nombre}* está AGOTADO (0 Lt disponibles). No se puede vender ni cobrar."
+            )
+
+        if litros > prod.stock_kilos:
+            litros_disp = f"{prod.stock_kilos:.3f}".rstrip("0").rstrip(".")
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="ml", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* Stock insuficiente de *{prod.nombre}*. Solicitaste {litros:.3f} Lt pero solo quedan {litros_disp} Lt en inventario."
+            )
+
         with transaction.atomic():
             prod = Producto.objects.select_for_update().get(pk=prod.pk)
             prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - litros)
@@ -590,6 +630,24 @@ def procesar_salida_inventario(
             return ResultadoSalidaInventario(
                 prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
                 cantidad=Decimal("0"), unidad_medida="und", concepto_ticket=prod.nombre
+            )
+
+        if prod.stock_kilos <= Decimal("0"):
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="und", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* *{prod.nombre}* está AGOTADO (0 unidades disponibles). No se puede registrar la venta ni cobrar."
+            )
+
+        if cant_und > prod.stock_kilos:
+            cant_int = int(cant_und) if cant_und % 1 == 0 else f"{cant_und:.1f}"
+            disp = int(prod.stock_kilos) if prod.stock_kilos % 1 == 0 else f"{prod.stock_kilos:.1f}"
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="und", concepto_ticket=prod.nombre,
+                bloqueado_sin_stock=True,
+                motivo_bloqueo=f"🚫 *Venta rechazada:* Stock insuficiente de *{prod.nombre}*. Solicitaste {cant_int} {u_nom} pero solo quedan {disp} disponibles en inventario."
             )
 
         with transaction.atomic():

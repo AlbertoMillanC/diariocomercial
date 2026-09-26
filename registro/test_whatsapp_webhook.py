@@ -113,3 +113,45 @@ class WhatsAppWebhookTests(TestCase):
         # Verificar descuento de inventario
         self.prod_carne.refresh_from_db()
         self.assertEqual(self.prod_carne.stock_kilos, Decimal("48.400"))
+
+    def test_bloqueo_venta_sin_stock(self):
+        """Verifica que un producto con stock 0 no se pueda vender ni cobrar."""
+        from registro.bot_service import despachar_mensaje
+        from registro.models import Producto
+
+        prod_pan = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Pan rollo artesanal",
+            categoria="panaderia",
+            unidad_medida="und",
+            precio_kilo=Decimal("500"),
+            stock_kilos=Decimal("0"),
+        )
+
+        resp, venta, _ = despachar_mensaje("whatsapp", "573146922087", "2 mil de pan", return_adjuntos=True)
+        self.assertIsNone(venta)
+        self.assertIn("Venta rechazada", resp)
+        self.assertIn("AGOTADO", resp)
+
+    def test_nit_31_dispara_proceso_factura_electronica(self):
+        """Verifica que el código DIAN 31 (NIT) inicia el proceso de Factura Electrónica."""
+        from registro.bot_service import despachar_mensaje
+
+        # Paso 1: Pide venta con 31 (NIT)
+        resp1, v1, _ = despachar_mensaje("whatsapp", "573146922087", "40 mil carne 31", return_adjuntos=True)
+        self.assertIsNone(v1)
+        self.assertIn("Requiere Factura Electrónica DIAN", resp1)
+        self.assertIn("NIT", resp1)
+
+        # Paso 2: Responde con datos completos (NIT, Razón Social y Correo)
+        resp2, v2, _ = despachar_mensaje(
+            "whatsapp", "573146922087", "900123456-1 Empresa Boyaca contabilidad@empresa.com", return_adjuntos=True
+        )
+        self.assertIsNotNone(v2)
+        self.assertTrue(v2.solicita_factura_electronica)
+        self.assertEqual(v2.estado_dian, "aprobada")
+        self.assertEqual(v2.cliente.tipo_documento, "31")
+        self.assertEqual(v2.cliente.nit_cedula, "900123456-1")
+        self.assertIn("Factura Electrónica Emitida", resp2)
+        self.assertIn("FE-", resp2)
+
