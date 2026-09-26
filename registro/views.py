@@ -2227,12 +2227,14 @@ def superadmin_dashboard(request):
     form_nuevo_pago = RegistrarPagoSuscripcionForm()
     municipios_con_comercios = Municipio.objects.filter(establecimientos__isnull=False).distinct()
     cfg_saas = ConfiguracionPlataformaSaaS.get_solo()
+    onboarding_comercio = request.session.pop("onboarding_comercio", None)
 
     import json
     return render(
         request,
         "superadmin/dashboard.html",
         {
+            "onboarding_comercio": onboarding_comercio,
             "total_comercios": total_comercios,
             "comercios_activos": comercios_activos,
             "comercios_plan_cero": comercios_plan_cero,
@@ -2301,12 +2303,17 @@ def superadmin_comercio_crear(request):
             fecha_fin = hoy + timedelta(days=dias)
 
             # 1. Crear el Establecimiento
+            tipo_negocio = data.get("tipo_negocio", "otro")
             est = Establecimiento.objects.create(
                 nombre=data["nombre"].strip(),
+                tipo_negocio=tipo_negocio,
                 nit=data["nit"].strip(),
+                telefono_contacto=data.get("telefono_negocio", "").strip(),
                 municipio=data["municipio"],
                 direccion=data["direccion"].strip(),
                 correo_reportes=data.get("correo_reportes", "").strip(),
+                reportes_automaticos_activos=data.get("reportes_automaticos_activos", True),
+                frecuencia_reporte_automatico=data.get("frecuencia_reporte_automatico", "diario"),
                 llave_bre_b=data.get("llave_bre_b", "").strip(),
                 tipo_llave_bre_b=data.get("tipo_llave_bre_b", "celular"),
                 banco_receptor_bre_b=data.get("banco_receptor_bre_b", "").strip(),
@@ -2321,17 +2328,25 @@ def superadmin_comercio_crear(request):
             if data.get("crear_nuevo_usuario"):
                 username = data["username_propietario"].strip()
                 password = data["password_propietario"].strip()
-                email = data.get("correo_reportes", "")
+                email = data.get("correo_propietario", "").strip() or data.get("correo_reportes", "").strip()
+                nombre_completo = data.get("nombre_propietario", "").strip()
+                partes = nombre_completo.split(maxsplit=1)
+                first_name = partes[0] if partes else data["nombre"][:30]
+                last_name = partes[1] if len(partes) > 1 else ""
+
                 user_prop = User.objects.create_user(
                     username=username,
                     email=email,
                     password=password,
-                    first_name=data["nombre"][:30],
+                    first_name=first_name[:30],
+                    last_name=last_name[:30],
                 )
                 Perfil.objects.create(
                     user=user_prop,
                     establecimiento=est,
                     rol="propietario",
+                    telefono=data.get("celular_propietario", "").strip(),
+                    documento_identidad=data.get("documento_propietario", "").strip(),
                 )
                 est.propietario_creador = user_prop
                 est.save(update_fields=["propietario_creador"])
@@ -2343,41 +2358,149 @@ def superadmin_comercio_crear(request):
                 perfil_exist = getattr(user_existente, "perfil", None)
                 if perfil_exist:
                     perfil_exist.rol = "empresario"
-                    perfil_exist.save(update_fields=["rol"])
+                    if not perfil_exist.telefono and data.get("celular_propietario"):
+                        perfil_exist.telefono = data.get("celular_propietario", "").strip()
+                    if not perfil_exist.documento_identidad and data.get("documento_propietario"):
+                        perfil_exist.documento_identidad = data.get("documento_propietario", "").strip()
+                    perfil_exist.save(update_fields=["rol", "telefono", "documento_identidad"])
                 else:
                     Perfil.objects.create(
                         user=user_existente,
                         establecimiento=est,
                         rol="propietario",
+                        telefono=data.get("celular_propietario", "").strip(),
+                        documento_identidad=data.get("documento_propietario", "").strip(),
                     )
                 info_usuario = f"Asignado al propietario existente '{user_existente.username}'."
 
-            # 3. Crear Actividad CIIU por defecto (Comercio 4711)
-            ActividadCIIU.objects.create(
+            # 3. Configuración automática de Actividad CIIU y Motivo de Venta según Tipo de Negocio
+            MAPA_CIIU = {
+                "carniceria": ("4722", "Comercio al por menor de carnes y productos cárnicos", Decimal("7.00"), "Venta Carne y Charcutería"),
+                "minimarket": ("4711", "Comercio al por menor en establecimientos no especializados (Víveres)", Decimal("6.00"), "Venta Víveres y Abarrotes"),
+                "drogueria": ("4773", "Comercio al por menor de medicamentos y productos farmacéuticos", Decimal("5.00"), "Venta Medicamentos y Farmacia"),
+                "panaderia": ("1081", "Elaboración de productos de panadería y molinería", Decimal("7.00"), "Venta Panadería y Cafetería"),
+                "restaurante": ("5611", "Expendio a la mesa de comidas preparadas en restaurantes", Decimal("8.00"), "Consumo Restaurante y Alimentos"),
+                "ferreteria": ("4752", "Comercio al por menor de artículos de ferretería, pinturas y vidrio", Decimal("6.00"), "Venta Ferretería y Herramientas"),
+                "servicios": ("9609", "Otras actividades de servicios personales n.c.p.", Decimal("10.00"), "Servicios Profesionales / Técnicos"),
+                "otro": ("4719", "Comercio al por menor en establecimientos no especializados", Decimal("6.00"), "Venta Mostrador General"),
+            }
+            ciiu_codigo, ciiu_desc, ciiu_tarifa, motivo_nom = MAPA_CIIU.get(tipo_negocio, MAPA_CIIU["otro"])
+            actividad = ActividadCIIU.objects.create(
                 establecimiento=est,
-                codigo="4711",
-                descripcion="Comercio al por menor en establecimientos no especializados",
-                tarifa_x_mil=Decimal("5.00"),
+                codigo=ciiu_codigo,
+                descripcion=ciiu_desc,
+                tarifa_x_mil=ciiu_tarifa,
+            )
+            MotivoVenta.objects.create(
+                establecimiento=est,
+                actividad=actividad,
+                nombre=motivo_nom,
+                es_predeterminado=True,
             )
 
-            # 4. Token inicial de vinculación
-            usuario_para_token = user_prop if data.get("crear_nuevo_usuario") else user_existente
-            generar_token_vinculacion(usuario_para_token, est)
+            # 4. Precargar catálogo inicial demo si fue solicitado
+            total_productos_seed = 0
+            if data.get("cargar_semilla_demo"):
+                MAPA_PRODUCTOS = {
+                    "carniceria": [
+                        ("Lomo de Res de Primera", "carnes", "7701001001", False, "kg", Decimal("28000"), Decimal("36000"), 45),
+                        ("Costilla de Cerdo Especial", "carnes", "7701001002", False, "kg", Decimal("21000"), Decimal("27000"), 35),
+                        ("Pechuga de Pollo Fresca", "carnes", "7701001003", False, "kg", Decimal("17000"), Decimal("22000"), 50),
+                        ("Chorizo Casero Santarrosano", "carnes", "7701001004", False, "kg", Decimal("18000"), Decimal("24000"), 20),
+                    ],
+                    "minimarket": [
+                        ("Arroz Diana Premium 1kg", "abarrotes", "7701002001", False, "und", Decimal("3800"), Decimal("4800"), 100),
+                        ("Aceite Vegetal Premier 900ml", "abarrotes", "7701002002", False, "und", Decimal("7600"), Decimal("9500"), 40),
+                        ("Panal Huevos AA x30", "lacteos", "7701002003", False, "und", Decimal("15000"), Decimal("18500"), 30),
+                        ("Leche Alquería Entera 1L", "lacteos", "7701002004", False, "und", Decimal("3300"), Decimal("4200"), 60),
+                    ],
+                    "drogueria": [
+                        ("Acetaminofén 500mg Caja x100", "otros", "7701003001", False, "und", Decimal("15000"), Decimal("25000"), 30),
+                        ("Alcohol Antiséptico 70% 500ml", "aseo", "7701003002", False, "und", Decimal("4000"), Decimal("6500"), 50),
+                        ("Suero Oral Electrolit 500ml", "bebidas", "7701003003", False, "und", Decimal("5500"), Decimal("8500"), 40),
+                        ("Ibuprofeno 800mg Caja x30", "otros", "7701003004", False, "und", Decimal("11000"), Decimal("18000"), 25),
+                    ],
+                    "panaderia": [
+                        ("Pan Rollo Tradicional x10", "otros", "7701004001", False, "und", Decimal("4000"), Decimal("6000"), 50),
+                        ("Croissant de Queso y Mantequilla", "otros", "7701004002", False, "und", Decimal("1800"), Decimal("3000"), 40),
+                        ("Café Colombiano Tinto / Pintado", "bebidas", "7701004003", True, "und", Decimal("800"), Decimal("1800"), 200),
+                        ("Torta Casera Porción", "otros", "7701004004", False, "und", Decimal("2500"), Decimal("4500"), 30),
+                    ],
+                    "restaurante": [
+                        ("Almuerzo Ejecutivo del Día", "otros", "7701005001", False, "und", Decimal("10000"), Decimal("15000"), 80),
+                        ("Sopa Especial del Día", "otros", "7701005002", False, "und", Decimal("5000"), Decimal("8000"), 40),
+                        ("Jugo Natural en Fruta", "bebidas", "7701005003", False, "und", Decimal("2500"), Decimal("5000"), 60),
+                        ("Porción Proteína Extra", "carnes", "7701005004", False, "und", Decimal("6000"), Decimal("9500"), 30),
+                    ],
+                    "ferreteria": [
+                        ("Cemento Gris Tolteca/Argos 50kg", "otros", "7701006001", False, "und", Decimal("27000"), Decimal("33000"), 50),
+                        ("Disco Corte Metal 4 1/2", "otros", "7701006002", False, "und", Decimal("3500"), Decimal("6000"), 60),
+                        ("Pintura Vinilo Tipo 1 Galón", "otros", "7701006003", False, "und", Decimal("38000"), Decimal("52000"), 20),
+                        ("Cinta Teflón 3/4 Pulgada", "otros", "7701006004", False, "und", Decimal("1500"), Decimal("3000"), 80),
+                    ],
+                    "servicios": [
+                        ("Servicio Técnico / Mano de Obra Hora", "servicios", "7701007001", True, "servicio", Decimal("15000"), Decimal("35000"), 100),
+                        ("Diagnóstico y Revisión General", "servicios", "7701007002", True, "servicio", Decimal("0"), Decimal("20000"), 100),
+                        ("Mantenimiento Preventivo Básico", "servicios", "7701007003", True, "servicio", Decimal("20000"), Decimal("45000"), 100),
+                    ],
+                    "otro": [
+                        ("Artículo Mostrador General A", "otros", "7701008001", False, "und", Decimal("7000"), Decimal("10000"), 50),
+                        ("Artículo Mostrador General B", "otros", "7701008002", False, "und", Decimal("14000"), Decimal("20000"), 30),
+                        ("Servicio General de Atención", "servicios", "7701008003", True, "servicio", Decimal("0"), Decimal("15000"), 100),
+                    ],
+                }
+                seeds = MAPA_PRODUCTOS.get(tipo_negocio, MAPA_PRODUCTOS["otro"])
+                for p_nom, p_cat, p_cod, p_es_serv, p_und, p_costo, p_precio, p_stock in seeds:
+                    Producto.objects.create(
+                        establecimiento=est,
+                        nombre=p_nom,
+                        categoria=p_cat,
+                        codigo_barras=p_cod,
+                        es_servicio=p_es_serv,
+                        unidad_medida=p_und,
+                        costo_unitario=p_costo,
+                        precio_kilo=p_precio,
+                        stock_kilos=p_stock,
+                        estado="activo",
+                    )
+                    total_productos_seed += 1
 
-            # 5. Auditoría
+            # 5. Token inicial de vinculación
+            usuario_para_token = user_prop if data.get("crear_nuevo_usuario") else user_existente
+            token_str = generar_token_vinculacion(usuario_para_token, est)
+
+            # 6. Auditoría
             _audit(
                 request.user,
                 "Establecimiento",
                 est,
                 "crear_superadmin",
                 "",
-                f"Nombre={est.nombre}, NIT={est.nit}, Plan={est.plan_suscripcion}",
+                f"Nombre={est.nombre}, NIT={est.nit}, Plan={est.plan_suscripcion}, Tipo={est.tipo_negocio}",
                 motivo="Alta directa de comercio desde panel de Super-Administrador",
             )
 
+            # 7. Guardar ficha de onboarding en sesión para bienvenida y entrega
+            request.session["onboarding_comercio"] = {
+                "nombre": est.nombre,
+                "tipo_negocio": est.get_tipo_negocio_display(),
+                "nit": est.nit,
+                "telefono_negocio": est.telefono_contacto or "(Sin registrar)",
+                "municipio": est.municipio.nombre,
+                "direccion": est.direccion,
+                "usuario": usuario_para_token.username,
+                "password": data.get("password_propietario") if data.get("crear_nuevo_usuario") else "(Conservó clave previa)",
+                "llave_bre_b": est.llave_bre_b or "(Sin registrar)",
+                "banco_bre_b": est.banco_receptor_bre_b or "(Sin registrar)",
+                "correo_reportes": est.correo_reportes or "(Sin registrar)",
+                "frecuencia_reporte": est.get_frecuencia_reporte_automatico_display(),
+                "token_telegram": token_str or "",
+                "productos_seed": total_productos_seed,
+            }
+
             messages.success(
                 request,
-                f"✅ ¡Comercio '{est.nombre}' registrado con éxito! {info_usuario}"
+                f"✅ ¡Comercio '{est.nombre}' registrado y preconfigurado con éxito! {info_usuario}"
             )
             return redirect("superadmin_dashboard")
     else:

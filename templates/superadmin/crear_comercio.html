@@ -1,132 +1,253 @@
 {% extends "base.html" %}
 {% block title %}Registrar Nuevo Comercio — Super-Administrador SaaS{% endblock %}
 {% block content %}
-<div style="max-width:760px; margin:0 auto;">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+<div style="max-width:860px; margin:0 auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
     <div>
-      <h2>➕ Registrar Nuevo Comercio (Tenant)</h2>
-      <p class="lead" style="margin:0;">Dar de alta una nueva tienda, configurar sus credenciales y activar su periodo de servicio.</p>
+      <h2 style="margin:0 0 4px 0;">➕ Registrar Nuevo Comercio (Tenant)</h2>
+      <p class="lead" style="margin:0;">Alta masiva, preconfiguración operativa, medios de pago Bre-B y despacho automático de reportes contables.</p>
     </div>
     <a href="{% url 'superadmin_dashboard' %}" class="btn btn-secondary">← Volver al Panel</a>
   </div>
 
-  <form method="post" class="panel" style="padding:24px;">
+  <form method="post" class="panel" style="padding:26px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.05);">
     {% csrf_token %}
 
-    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; margin-bottom:20px;">
-      <h3 style="margin-top:0; color:var(--navy); font-size:16px;">🏪 1. Datos del Comercio</h3>
+    {% if form.non_field_errors %}
+      <div style="background:#fee2e2; border-left:4px solid #ef4444; color:#991b1b; padding:12px 16px; border-radius:6px; margin-bottom:18px;">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <!-- 1. IDENTIDAD Y UBICACIÓN -->
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; color:var(--navy); font-size:16px;">🏪 1. Identidad y Ubicación del Negocio</h3>
+        <span style="font-size:11px; background:#e2e8f0; color:#475569; padding:3px 8px; border-radius:12px; font-weight:bold;">PASO OBLIGATORIO</span>
+      </div>
       
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Nombre del Negocio *</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Nombre Comercial de la Tienda *</label>
           {{ form.nombre }}
           {% if form.nombre.errors %}<div style="color:red; font-size:12px;">{{ form.nombre.errors }}</div>{% endif %}
         </div>
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">NIT o Cédula *</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Tipo de Negocio / Giro Comercial *</label>
+          {{ form.tipo_negocio }}
+          <small style="color:#64748b; font-size:11px;">Preconfigura el CIIU, impuestos ICA y catálogo de prueba.</small>
+          {% if form.tipo_negocio.errors %}<div style="color:red; font-size:12px;">{{ form.tipo_negocio.errors }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">NIT o Cédula Comercial del Negocio *</label>
           {{ form.nit }}
           {% if form.nit.errors %}<div style="color:red; font-size:12px;">{{ form.nit.errors }}</div>{% endif %}
         </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Teléfono / WhatsApp de la Tienda</label>
+          {{ form.telefono_negocio }}
+          {% if form.telefono_negocio.errors %}<div style="color:red; font-size:12px;">{{ form.telefono_negocio.errors }}</div>{% endif %}
+        </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
         <div>
           <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Municipio (DANE - 1.122 Ciudades) *</label>
-          <input type="text" id="filtro-municipios" placeholder="🔍 Escribe para filtrar (ej: Tunja, Bogotá, Cali)..." style="font-size:12px; padding:5px 8px; width:100%; border:1px solid #94a3b8; border-radius:6px; margin-bottom:6px; box-sizing:border-box;">
+          <input type="text" id="filtro-municipios" placeholder="🔍 Escribe para filtrar (ej: Tunja, Bogotá, Cali, Duitama)..." style="font-size:12px; padding:6px 10px; width:100%; border:1px solid #94a3b8; border-radius:6px; margin-bottom:6px; box-sizing:border-box;">
           {{ form.municipio }}
+          {% if form.municipio.errors %}<div style="color:red; font-size:12px;">{{ form.municipio.errors }}</div>{% endif %}
         </div>
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Dirección Física *</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Dirección Física del Local *</label>
           {{ form.direccion }}
+          {% if form.direccion.errors %}<div style="color:red; font-size:12px;">{{ form.direccion.errors }}</div>{% endif %}
         </div>
-      </div>
-
-      <div>
-        <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Correo para Envío de Reportes / Contador</label>
-        {{ form.correo_reportes }}
       </div>
     </div>
 
-    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:16px; margin-bottom:20px;">
-      <h3 style="margin-top:0; color:#166534; font-size:16px;">⚡ 2. Medios Electrónicos de Pago del Comercio (Bre-B / BanRep)</h3>
-      <p style="font-size:12px; color:#15803d; margin:0 0 10px 0;">Configure la llave donde este negocio recibirá pagos instantáneos de sus clientes sin datáfono.</p>
+    <!-- 2. MEDIOS DE PAGO BRE-B -->
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:18px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h3 style="margin:0; color:#166534; font-size:16px;">⚡ 2. Pagos Inmediatos Bre-B (BanRep - Cero Datáfonos)</h3>
+        <span style="font-size:11px; background:#dcfce7; color:#15803d; padding:3px 8px; border-radius:12px; font-weight:bold;">INTEROPERABLE 24/7</span>
+      </div>
+      <p style="font-size:12px; color:#15803d; margin:0 0 12px 0;">
+        Recibe pagos directos desde cualquier app bancaria colombiana (Nequi, Daviplata, Bancolombia, Nu, etc.) en menos de 2 segundos.
+      </p>
       
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+      <div style="display:grid; grid-template-columns:1fr 1.2fr 1fr; gap:14px; margin-bottom:10px;">
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Tipo de Llave</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Tipo de Llave Bre-B</label>
           {{ form.tipo_llave_bre_b }}
         </div>
         <div>
           <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Llave (Celular / NIT / Alias)</label>
           {{ form.llave_bre_b }}
+          {% if form.llave_bre_b.errors %}<div style="color:red; font-size:12px;">{{ form.llave_bre_b.errors }}</div>{% endif %}
         </div>
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Banco Receptor</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Banco Receptor de Fondos</label>
           {{ form.banco_receptor_bre_b }}
+          {% if form.banco_receptor_bre_b.errors %}<div style="color:red; font-size:12px;">{{ form.banco_receptor_bre_b.errors }}</div>{% endif %}
         </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span style="font-size:11px; color:#166534;">Copiar rápido a la llave Bre-B:</span>
+        <button type="button" onclick="copiarCelularTienda()" style="font-size:11px; background:#dcfce7; border:1px solid #86efac; color:#166534; padding:2px 8px; border-radius:4px; cursor:pointer;">
+          📱 Usar Teléfono Tienda
+        </button>
+        <button type="button" onclick="copiarCelularDuenio()" style="font-size:11px; background:#dcfce7; border:1px solid #86efac; color:#166534; padding:2px 8px; border-radius:4px; cursor:pointer;">
+          👤 Usar Celular Propietario
+        </button>
       </div>
     </div>
 
-    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; margin-bottom:20px;">
-      <h3 style="margin-top:0; color:var(--navy); font-size:16px;">👤 3. Propietario / Dueño de la Cuenta</h3>
+    <!-- 3. REPORTES AUTOMÁTICOS EN EXCEL -->
+    <div style="background:#fefce8; border:1px solid #fef08a; border-radius:10px; padding:18px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h3 style="margin:0; color:#854d0e; font-size:16px;">📊 3. Despacho Automático de Reportes en Excel (.xlsx)</h3>
+        <span style="font-size:11px; background:#fef9c3; color:#a16207; padding:3px 8px; border-radius:12px; font-weight:bold;">RESPALDO CONTABLE</span>
+      </div>
+      <p style="font-size:12px; color:#854d0e; margin:0 0 12px 0;">
+        El sistema genera y envía automáticamente los libros de caja, ventas, compras y retenciones de ICA al correo del contador o del dueño.
+      </p>
+
+      <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:14px; margin-bottom:12px;">
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Correo para Envío de Reportes / Contador</label>
+          {{ form.correo_reportes }}
+          {% if form.correo_reportes.errors %}<div style="color:red; font-size:12px;">{{ form.correo_reportes.errors }}</div>{% endif %}
+        </div>
+        <div>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Frecuencia del Reporte Automático</label>
+          {{ form.frecuencia_reporte_automatico }}
+          {% if form.frecuencia_reporte_automatico.errors %}<div style="color:red; font-size:12px;">{{ form.frecuencia_reporte_automatico.errors }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:bold; font-size:13px; cursor:pointer; color:#713f12;">
+          {{ form.reportes_automaticos_activos }}
+          <span>Activar despacho periódico automático en Excel (.xlsx) por correo</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 4. PROPIETARIO / ACCESOS -->
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; color:var(--navy); font-size:16px;">👤 4. Propietario / Administrador de la Cuenta</h3>
+        <span style="font-size:11px; background:#e2e8f0; color:#475569; padding:3px 8px; border-radius:12px; font-weight:bold;">CREDENCIALES</span>
+      </div>
       
-      <div style="margin-bottom:12px;">
-        <label style="display:flex; align-items:center; gap:8px; font-weight:bold; cursor:pointer;">
+      <div style="margin-bottom:14px; background:#fff; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0;">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:bold; cursor:pointer; margin:0;">
           {{ form.crear_nuevo_usuario }}
-          <span>Crear un nuevo usuario y contraseña para el comerciante</span>
+          <span>Crear un nuevo usuario y credenciales para el comerciante</span>
         </label>
       </div>
 
-      <div id="bloque-nuevo-usuario" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
-        <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Usuario (Login) *</label>
-          {{ form.username_propietario }}
-          {% if form.username_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.username_propietario.errors }}</div>{% endif %}
+      <div id="bloque-nuevo-usuario">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Nombre Completo del Dueño / Representante</label>
+            {{ form.nombre_propietario }}
+            {% if form.nombre_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.nombre_propietario.errors }}</div>{% endif %}
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Cédula de Ciudadanía del Dueño</label>
+            {{ form.documento_propietario }}
+            {% if form.documento_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.documento_propietario.errors }}</div>{% endif %}
+          </div>
         </div>
-        <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Contraseña Temporal *</label>
-          {{ form.password_propietario }}
-          {% if form.password_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.password_propietario.errors }}</div>{% endif %}
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Celular Personal / WhatsApp del Dueño</label>
+            {{ form.celular_propietario }}
+            {% if form.celular_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.celular_propietario.errors }}</div>{% endif %}
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Correo Electrónico Personal del Dueño</label>
+            {{ form.correo_propietario }}
+            <small style="color:#64748b; font-size:11px;">Para inicio de sesión y recuperación de contraseña.</small>
+            {% if form.correo_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.correo_propietario.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Usuario de Acceso (Login) *</label>
+            {{ form.username_propietario }}
+            {% if form.username_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.username_propietario.errors }}</div>{% endif %}
+          </div>
+          <div>
+            <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Contraseña Temporal *</label>
+            {{ form.password_propietario }}
+            {% if form.password_propietario.errors %}<div style="color:red; font-size:12px;">{{ form.password_propietario.errors }}</div>{% endif %}
+          </div>
         </div>
       </div>
 
       <div id="bloque-usuario-existente" style="display:none; margin-top:10px;">
         <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Seleccionar Propietario Existente (Empresario Multi-Tienda)</label>
         {{ form.usuario_existente }}
+        <small style="color:#64748b; font-size:11px;">Se le concederá el rol de Empresario para alternar entre todas sus tiendas.</small>
         {% if form.usuario_existente.errors %}<div style="color:red; font-size:12px;">{{ form.usuario_existente.errors }}</div>{% endif %}
       </div>
     </div>
 
-    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:16px; margin-bottom:20px;">
-      <h3 style="margin-top:0; color:#1e40af; font-size:16px;">💼 4. Plan SaaS y Facturación Electrónica DIAN</h3>
+    <!-- 5. PLAN SAAS, FACTURACIÓN ELECTRÓNICA & CATÁLOGO DEMO -->
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:18px; margin-bottom:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; color:#1e40af; font-size:16px;">💼 5. Plan SaaS, Facturación Electrónica DIAN y Catálogo Demo</h3>
+        <span style="font-size:11px; background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:12px; font-weight:bold;">PRECONFIGURACIÓN</span>
+      </div>
       
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Plan Inicial</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Plan Inicial de Suscripción</label>
           {{ form.plan_suscripcion }}
         </div>
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Días de Vigencia</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Días de Vigencia del Periodo</label>
           {{ form.dias_vigencia }}
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Prefijo Factura Electrónica</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Prefijo Facturación Electrónica DIAN</label>
           {{ form.prefijo_facturacion }}
         </div>
         <div>
-          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Consecutivo Inicial DIAN</label>
+          <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:4px;">Consecutivo Inicial de Facturación</label>
           {{ form.consecutivo_inicial }}
         </div>
       </div>
+
+      <div style="background:#fff; padding:12px 14px; border-radius:8px; border:1px solid #bfdbfe;">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-weight:bold; font-size:13px; cursor:pointer; color:#1e3a8a; margin:0;">
+          {{ form.cargar_semilla_demo }}
+          <span>
+            🌱 Precargar catálogo inicial sugerido (4 productos con stock y precios según tipo de negocio)
+            <span style="display:block; font-weight:normal; font-size:12px; color:#475569; margin-top:2px;">
+              Permite poner el comercio a prueba de inmediato en el mostrador, probar el bot de Telegram o cobrar con QR Bre-B sin tener que digitar el inventario manualmente.
+            </span>
+          </span>
+        </label>
+      </div>
     </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:10px;">
-      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-secondary">Cancelar</a>
-      <button type="submit" class="btn btn-primary" style="background:#059669; font-weight:bold; font-size:14px; padding:10px 24px;">
-        ✅ Guardar y Dar de Alta Comercio
+    <!-- BOTONES DE ACCIÓN -->
+    <div style="display:flex; justify-content:flex-end; gap:12px; align-items:center;">
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-secondary" style="padding:10px 18px;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="background:#059669; font-weight:bold; font-size:15px; padding:12px 28px; border-radius:8px; box-shadow:0 3px 10px rgba(5,150,105,0.3);">
+        🚀 Crear, Preconfigurar y Activar Comercio
       </button>
     </div>
   </form>
@@ -139,7 +260,7 @@ const bExistente = document.getElementById("bloque-usuario-existente");
 
 function toggleUsuarioTipo() {
   if (checkCrearNuevo && checkCrearNuevo.checked) {
-    if (bNuevo) bNuevo.style.display = "grid";
+    if (bNuevo) bNuevo.style.display = "block";
     if (bExistente) bExistente.style.display = "none";
   } else {
     if (bNuevo) bNuevo.style.display = "none";
@@ -152,7 +273,23 @@ if (checkCrearNuevo) {
   toggleUsuarioTipo();
 }
 
-// Filtro en tiempo real para 1.122 municipios DANE
+function copiarCelularTienda() {
+  const tel = document.getElementById("id_telefono_negocio");
+  const llave = document.getElementById("id_llave_bre_b");
+  if (tel && llave && tel.value.trim()) {
+    llave.value = tel.value.trim();
+  }
+}
+
+function copiarCelularDuenio() {
+  const cel = document.getElementById("id_celular_propietario");
+  const llave = document.getElementById("id_llave_bre_b");
+  if (cel && llave && cel.value.trim()) {
+    llave.value = cel.value.trim();
+  }
+}
+
+// Filtro instantáneo para 1.122 municipios DANE
 const filtroMun = document.getElementById("filtro-municipios");
 const selectMun = document.getElementById("id_municipio");
 if (filtroMun && selectMun) {

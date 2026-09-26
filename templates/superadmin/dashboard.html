@@ -22,6 +22,91 @@
   </div>
 </div>
 
+{% if onboarding_comercio %}
+<!-- FICHA DE ONBOARDING Y BIENVENIDA DEL NUEVO COMERCIO PRECONFIGURADO -->
+<div class="panel" style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%); color:#fff; padding:22px; border-radius:12px; margin-bottom:20px; box-shadow:0 8px 25px rgba(6,78,59,0.25); border:1px solid #10b981;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+    <div>
+      <span style="background:#10b981; color:#064e3b; font-size:11px; font-weight:bold; padding:3px 10px; border-radius:12px; text-transform:uppercase;">
+        🎉 COMERCIO REGISTRADO Y PRECONFIGURADO CON ÉXITO
+      </span>
+      <h3 style="margin:6px 0 2px 0; font-size:22px; color:#f0fdf4;">
+        {{ onboarding_comercio.nombre }} <span style="font-size:14px; font-weight:normal; opacity:0.85;">({{ onboarding_comercio.tipo_negocio }})</span>
+      </h3>
+      <p style="margin:0; font-size:13px; color:#a7f3d0;">
+        📍 {{ onboarding_comercio.municipio }} • {{ onboarding_comercio.direccion }} • NIT: {{ onboarding_comercio.nit }}
+      </p>
+    </div>
+    <button onclick="copiarFichaEntrega()" class="btn" style="background:#f59e0b; color:#1e1b4b; font-weight:bold; font-size:13px; padding:8px 16px; border-radius:8px; border:none; cursor:pointer;">
+      📋 Copiar Mensaje de Bienvenida para WhatsApp
+    </button>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; background:rgba(0,0,0,0.2); padding:14px; border-radius:8px; margin-bottom:14px;">
+    <div>
+      <span style="font-size:11px; text-transform:uppercase; color:#6ee7b7; display:block;">Credenciales Web</span>
+      <strong style="font-size:14px; color:#fff;">Usuario: {{ onboarding_comercio.usuario }}</strong><br>
+      <small style="color:#d1fae5; font-size:12px;">Clave: {{ onboarding_comercio.password }}</small>
+    </div>
+    <div>
+      <span style="font-size:11px; text-transform:uppercase; color:#6ee7b7; display:block;">Pagos Bre-B (BanRep)</span>
+      <strong style="font-size:14px; color:#fff;">Llave: {{ onboarding_comercio.llave_bre_b }}</strong><br>
+      <small style="color:#d1fae5; font-size:12px;">Banco: {{ onboarding_comercio.banco_bre_b }}</small>
+    </div>
+    <div>
+      <span style="font-size:11px; text-transform:uppercase; color:#6ee7b7; display:block;">Reportes Contables Excel</span>
+      <strong style="font-size:14px; color:#fff;">{{ onboarding_comercio.frecuencia_reporte }}</strong><br>
+      <small style="color:#d1fae5; font-size:12px;">Destino: {{ onboarding_comercio.correo_reportes }}</small>
+    </div>
+    <div>
+      <span style="font-size:11px; text-transform:uppercase; color:#6ee7b7; display:block;">Preconfiguración Inicial</span>
+      <strong style="font-size:14px; color:#fff;">{{ onboarding_comercio.productos_seed }} productos cargados</strong><br>
+      <small style="color:#d1fae5; font-size:12px;">CIIU e ICA listos para prueba</small>
+    </div>
+  </div>
+
+  {% if onboarding_comercio.token_telegram %}
+  <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:rgba(255,255,255,0.1); padding:10px 14px; border-radius:8px;">
+    <div style="font-size:13px; color:#e0e7ff;">
+      🤖 <strong>Asistente Telegram listo para vincular:</strong> Envía este link al tendero o ábrelo en su teléfono para activar el bot de ventas al instante:
+      <span style="font-family:monospace; background:#042f2e; padding:3px 8px; border-radius:4px; margin-left:6px; color:#5eead4;">
+        https://t.me/DiarioComercial_bot?start={{ onboarding_comercio.token_telegram }}
+      </span>
+    </div>
+    <a href="https://t.me/DiarioComercial_bot?start={{ onboarding_comercio.token_telegram }}" target="_blank" class="btn" style="background:#0284c7; color:#fff; font-size:12px; font-weight:bold; padding:6px 12px; text-decoration:none; border-radius:6px;">
+      Abrir Telegram Bot ↗
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function copiarFichaEntrega() {
+  const texto = `¡Hola! Bienvenido a DiarioComercial 🚀
+Tu negocio *{{ onboarding_comercio.nombre }}* ya está registrado y listo para operar:
+
+🌐 *Acceso Web / Mostrador:* http://127.0.0.1:8001/
+👤 *Usuario:* {{ onboarding_comercio.usuario }}
+🔑 *Clave:* {{ onboarding_comercio.password }}
+
+⚡ *Cobros Inmediatos Bre-B:*
+📱 Llave: {{ onboarding_comercio.llave_bre_b }} ({{ onboarding_comercio.banco_bre_b }})
+
+📊 *Reportes Contables en Excel:*
+📧 Se enviarán con frecuencia {{ onboarding_comercio.frecuencia_reporte }} a: {{ onboarding_comercio.correo_reportes }}
+
+🤖 *Asistente Móvil Telegram (Ventas rápidas por voz o texto):*
+👉 https://t.me/DiarioComercial_bot?start={{ onboarding_comercio.token_telegram }}`;
+
+  navigator.clipboard.writeText(texto).then(() => {
+    alert("✅ ¡Mensaje de bienvenida copiado al portapapeles! Ya puedes pegarlo y enviarlo por WhatsApp al dueño del negocio.");
+  }).catch(() => {
+    alert("Por favor selecciona y copia el texto manualmente.");
+  });
+}
+</script>
+{% endif %}
+
 <!-- BARRA DE FILTRO POR MUNICIPIO / CONSOLIDADO NACIONAL -->
 <div class="panel" style="padding:12px 18px; margin-bottom:16px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
   <div style="display:flex; align-items:center; gap:10px;">

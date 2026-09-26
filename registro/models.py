@@ -36,7 +36,24 @@ class Establecimiento(models.Model):
         Municipio, on_delete=models.SET_NULL, null=True, blank=True, related_name="establecimientos"
     )
     direccion = models.CharField(max_length=160, blank=True)
+    telefono_contacto = models.CharField(max_length=30, blank=True, help_text="Teléfono o celular de contacto del establecimiento")
     actividad_economica = models.CharField(max_length=80, blank=True)
+    tipo_negocio = models.CharField(
+        max_length=40,
+        blank=True,
+        default="minimarket",
+        choices=(
+            ("carniceria", "Carnicería / Fama"),
+            ("minimarket", "Minimarket / Supermercado / Abarrotes"),
+            ("drogueria", "Droguería / Farmacia"),
+            ("panaderia", "Panadería / Cafetería"),
+            ("restaurante", "Restaurante / Bar"),
+            ("ferreteria", "Ferretería / Eléctricos"),
+            ("servicios", "Servicios Profesionales / Técnicos"),
+            ("otro", "Otro Comercio"),
+        ),
+        help_text="Giro o tipo de negocio para preconfiguración contable y catálogo",
+    )
     correo_reportes = models.EmailField(blank=True)
     estado = models.CharField(max_length=12, default="activo")
     
@@ -191,6 +208,8 @@ class Perfil(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE)
     rol = models.CharField(max_length=20, choices=ROLES, default="dependiente")
+    telefono = models.CharField(max_length=30, blank=True, help_text="Teléfono o celular personal / WhatsApp")
+    documento_identidad = models.CharField(max_length=30, blank=True, help_text="Cédula de ciudadanía o documento")
 
     def __str__(self):
         return f"{self.user.username} ({self.rol})"

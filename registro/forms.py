@@ -675,49 +675,148 @@ class NuevaTiendaSedeForm(forms.ModelForm):
 
 
 class SuperadminNuevoComercioForm(forms.Form):
-    """Formulario para que el Super-Administrador cree nuevos comercios (Tenants) en la plataforma."""
-    # Datos de la Tienda / Comercio
+    """Formulario avanzado para que el Super-Administrador cree y preconfigure comercios (Tenants) a escala."""
+    # 1. Datos de la Tienda / Comercio
     nombre = forms.CharField(
         max_length=120,
-        label="Nombre Comercial del Negocio",
+        label="Nombre Comercial del Negocio *",
         widget=forms.TextInput(attrs={"placeholder": "Ej: Carnicería El Samán, Droguería Central", "class": "form-control"}),
+    )
+    tipo_negocio = forms.ChoiceField(
+        choices=(
+            ("carniceria", "🥩 Carnicería / Fama / Charcutería"),
+            ("minimarket", "🛒 Minimarket / Supermercado / Víveres"),
+            ("drogueria", "💊 Droguería / Farmacia"),
+            ("panaderia", "🥖 Panadería / Cafetería"),
+            ("restaurante", "🍽️ Restaurante / Bar / Comidas"),
+            ("ferreteria", "🔨 Ferretería / Eléctricos"),
+            ("servicios", "💼 Servicios Profesionales / Técnicos"),
+            ("otro", "🏪 Otro Comercio al por menor"),
+        ),
+        required=False,
+        initial="carniceria",
+        label="Tipo de Negocio / Giro Comercial *",
+        help_text="Preconfigura automáticamente el código CIIU oficial y las tarifas tributarias.",
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     nit = forms.CharField(
         max_length=20,
-        label="NIT o Cédula del Comercio",
+        label="NIT o Cédula Comercial del Negocio *",
         widget=forms.TextInput(attrs={"placeholder": "Ej: 901456789-1 o 1049582123", "class": "form-control"}),
+    )
+    telefono_negocio = forms.CharField(
+        required=False,
+        max_length=30,
+        label="Teléfono / WhatsApp de la Tienda",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 3123456789 o (608) 7401234", "class": "form-control"}),
     )
     municipio = forms.ModelChoiceField(
         queryset=Municipio.objects.all(),
-        label="Municipio (DANE)",
+        label="Municipio (DANE - 1.122 Ciudades) *",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
     direccion = forms.CharField(
         max_length=160,
-        label="Dirección Física",
+        label="Dirección Física del Local *",
         widget=forms.TextInput(attrs={"placeholder": "Ej: Carrera 10 # 18-42 Centro, Tunja", "class": "form-control"}),
     )
     correo_reportes = forms.EmailField(
         required=False,
-        label="Correo del Contador o Reportes",
+        label="Correo del Contador o Despacho de Reportes",
+        help_text="Aquí llegarán los balances e informes contables periódicos en Excel (.xlsx)",
         widget=forms.EmailInput(attrs={"placeholder": "contador@estudio.com", "class": "form-control"}),
     )
-    # Medios de Pago Electrónicos del Comercio
+
+    # 2. Reportes Automáticos Periódicos
+    reportes_automaticos_activos = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Activar despacho automático de reportes en Excel (.xlsx) a este correo",
+    )
+    frecuencia_reporte_automatico = forms.ChoiceField(
+        choices=Establecimiento.FRECUENCIAS_REPORTE,
+        required=False,
+        initial="diario",
+        label="Frecuencia del Reporte Automático",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    # 3. Medios de Pago Electrónicos & Bre-B (BanRep)
+    tipo_llave_bre_b = forms.ChoiceField(
+        choices=(
+            ("celular", "📱 Teléfono Celular"),
+            ("nit", "📄 NIT / Cédula"),
+            ("alias", "🏷️ Alias / Nombre Bre-B"),
+        ),
+        initial="celular",
+        label="Tipo de Llave Bre-B",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
     llave_bre_b = forms.CharField(
         required=False,
         max_length=60,
-        label="Celular / Llave Bre-B del Comercio (Para recibir pagos)",
-        help_text="Número de celular, NIT o alias registrado en Bre-B / BanRep",
+        label="Teléfono Celular / Llave Bre-B del Comercio (Para recibir pagos directos)",
+        help_text="Número registrado en el banco para recibir pagos interoperables inmediatos de cualquier entidad",
         widget=forms.TextInput(attrs={"placeholder": "Ej: 3105554321", "class": "form-control"}),
     )
     banco_receptor_bre_b = forms.CharField(
         required=False,
         max_length=80,
-        label="Banco Receptor del Comercio",
-        help_text="Bancolombia, Nequi, Daviplata, Davivienda, etc.",
+        label="Banco Receptor de Fondos Bre-B",
+        help_text="Bancolombia, Nequi, Daviplata, Davivienda, Banco de Bogotá, etc.",
         widget=forms.TextInput(attrs={"placeholder": "Ej: Bancolombia / Nequi", "class": "form-control"}),
     )
-    # Plan SaaS y Licenciamiento
+
+    # 4. Propietario / Administrador de la Cuenta
+    crear_nuevo_usuario = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Crear un nuevo usuario Propietario para esta tienda",
+    )
+    nombre_propietario = forms.CharField(
+        required=False,
+        max_length=120,
+        label="Nombre y Apellidos del Dueño / Representante",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Carlos Alberto Gómez Samán", "class": "form-control"}),
+    )
+    celular_propietario = forms.CharField(
+        required=False,
+        max_length=30,
+        label="Celular Personal / WhatsApp del Dueño",
+        help_text="Para soporte técnico de la plataforma y notificaciones directas",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 3145558899", "class": "form-control"}),
+    )
+    correo_propietario = forms.EmailField(
+        required=False,
+        label="Correo Electrónico Personal del Dueño",
+        help_text="Utilizado para inicio de sesión y recuperación de contraseña",
+        widget=forms.EmailInput(attrs={"placeholder": "carlos.gomez@gmail.com", "class": "form-control"}),
+    )
+    documento_propietario = forms.CharField(
+        required=False,
+        max_length=30,
+        label="Cédula de Ciudadanía del Dueño",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 1049582123", "class": "form-control"}),
+    )
+    username_propietario = forms.CharField(
+        required=False,
+        max_length=150,
+        label="Usuario de Acceso (Login) *",
+        widget=forms.TextInput(attrs={"placeholder": "Ej: don_carlos_saman", "class": "form-control"}),
+    )
+    password_propietario = forms.CharField(
+        required=False,
+        label="Contraseña Temporal *",
+        widget=forms.PasswordInput(attrs={"placeholder": "Mínimo 6 caracteres", "class": "form-control"}),
+    )
+    usuario_existente = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        label="O asociar a Propietario Existente (Empresario Multi-Tienda)",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    # 5. Plan SaaS, Facturación y Semilla de Arranque
     plan_suscripcion = forms.ChoiceField(
         choices=Establecimiento.PLANES_SUSCRIPCION,
         initial="lanzamiento_cero",
@@ -727,10 +826,9 @@ class SuperadminNuevoComercioForm(forms.Form):
     dias_vigencia = forms.IntegerField(
         initial=30,
         label="Días de Vigencia Inicial",
-        help_text="30 días de prueba gratuita para Plan $0, o los días contratados.",
+        help_text="30 días de cortesía en Plan $0, o los días adquiridos.",
         widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
-    # Facturación Electrónica DIAN Inicial
     prefijo_facturacion = forms.CharField(
         initial="FE",
         max_length=10,
@@ -742,32 +840,18 @@ class SuperadminNuevoComercioForm(forms.Form):
         label="Consecutivo Inicial DIAN",
         widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
-    # Propietario / Administrador
-    crear_nuevo_usuario = forms.BooleanField(
+    cargar_semilla_demo = forms.BooleanField(
         required=False,
         initial=True,
-        label="Crear un nuevo usuario Propietario para esta tienda",
-    )
-    username_propietario = forms.CharField(
-        required=False,
-        max_length=150,
-        label="Usuario del Propietario",
-        widget=forms.TextInput(attrs={"placeholder": "Ej: don_carlos_saman", "class": "form-control"}),
-    )
-    password_propietario = forms.CharField(
-        required=False,
-        label="Contraseña Temporal",
-        widget=forms.PasswordInput(attrs={"placeholder": "Mínimo 6 caracteres", "class": "form-control"}),
-    )
-    usuario_existente = forms.ModelChoiceField(
-        queryset=User.objects.all(),
-        required=False,
-        label="O asociar a Propietario Existente (Empresario)",
-        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Precargar catálogo inicial con productos sugeridos y códigos de barra listos para prueba",
     )
 
     def clean(self):
         cleaned_data = super().clean()
+        if not cleaned_data.get("tipo_negocio"):
+            cleaned_data["tipo_negocio"] = "carniceria"
+        if not cleaned_data.get("frecuencia_reporte_automatico"):
+            cleaned_data["frecuencia_reporte_automatico"] = "diario"
         crear_nuevo = cleaned_data.get("crear_nuevo_usuario")
         if crear_nuevo:
             user = cleaned_data.get("username_propietario")

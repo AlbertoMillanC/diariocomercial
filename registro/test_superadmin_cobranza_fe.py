@@ -73,15 +73,19 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         )
 
     def test_superadmin_crear_comercio(self):
-        """Verifica que el SuperAdmin pueda crear un nuevo comercio y su dueño."""
+        """Verifica que el SuperAdmin pueda crear un nuevo comercio y su dueño con preconfiguración completa."""
         self.client.force_login(self.superadmin)
         url = reverse("superadmin_comercio_crear")
         resp = self.client.post(url, {
             "nombre": "Droguería San Jerónimo",
+            "tipo_negocio": "drogueria",
             "nit": "900555666",
+            "telefono_negocio": "3119998877",
             "municipio": self.municipio.pk,
             "direccion": "Av. Colón # 12-40",
             "correo_reportes": "drogueria@correo.com",
+            "reportes_automaticos_activos": True,
+            "frecuencia_reporte_automatico": "semanal",
             "llave_bre_b": "3201112233",
             "tipo_llave_bre_b": "celular",
             "banco_receptor_bre_b": "Daviplata",
@@ -90,14 +94,29 @@ class SuperadminCobranzaFacturacionTests(TestCase):
             "prefijo_facturacion": "FE",
             "consecutivo_inicial": 1,
             "crear_nuevo_usuario": True,
+            "nombre_propietario": "Jerónimo Gómez",
+            "celular_propietario": "3201112233",
+            "correo_propietario": "jeronimo@drogueria.co",
+            "documento_propietario": "1049582123",
             "username_propietario": "drogueria_sanjeronimo",
             "password_propietario": "clave_segura_123",
+            "cargar_semilla_demo": True,
         })
         self.assertEqual(resp.status_code, 302)
         nuevo_est = Establecimiento.objects.filter(nombre="Droguería San Jerónimo").first()
         self.assertIsNotNone(nuevo_est)
+        self.assertEqual(nuevo_est.tipo_negocio, "drogueria")
+        self.assertEqual(nuevo_est.telefono_contacto, "3119998877")
         self.assertEqual(nuevo_est.llave_bre_b, "3201112233")
+        self.assertEqual(nuevo_est.frecuencia_reporte_automatico, "semanal")
         self.assertTrue(User.objects.filter(username="drogueria_sanjeronimo").exists())
+        user_creado = User.objects.get(username="drogueria_sanjeronimo")
+        self.assertEqual(user_creado.perfil.telefono, "3201112233")
+        self.assertEqual(user_creado.perfil.documento_identidad, "1049582123")
+        # CIIU 4773 para droguería preconfigurado
+        self.assertEqual(nuevo_est.actividades.first().codigo, "4773")
+        # Semilla inicial demo precargada con productos
+        self.assertGreaterEqual(nuevo_est.productos.count(), 3)
 
     def test_superadmin_cobrar_y_asentar_pago_suscripcion(self):
         """Verifica el flujo de cobranza SaaS: cobro registrado extiende vigencia."""
