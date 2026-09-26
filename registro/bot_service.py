@@ -519,6 +519,9 @@ def _emitir_factura_electronica_bot(
     tipo_doc = "31" if es_nit else "13"
     tipo_pers = "juridica" if es_nit else "natural"
 
+    mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
+    dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
+
     cliente = Cliente.objects.filter(establecimiento=establecimiento, nit_cedula=doc_cliente).first()
     if not cliente:
         cliente = Cliente.objects.create(
@@ -529,8 +532,8 @@ def _emitir_factura_electronica_bot(
             tipo_persona=tipo_pers,
             correo_electronico=email_cliente,
             telefono=tel_cliente,
-            municipio_nombre=establecimiento.municipio.nombre,
-            departamento_nombre=establecimiento.municipio.departamento,
+            municipio_nombre=mun_nom,
+            departamento_nombre=dep_nom,
         )
     else:
         actualizar = []

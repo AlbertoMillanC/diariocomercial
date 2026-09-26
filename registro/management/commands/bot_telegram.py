@@ -71,7 +71,11 @@ class TelegramClient:
             return {"ok": False, "error": str(e)}
 
     def send_message(self, chat_id, text):
-        return self.post_json("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+        res = self.post_json("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+        if not res.get("ok"):
+            # Fallback a texto plano si falla por entidades de Markdown
+            res = self.post_json("sendMessage", {"chat_id": chat_id, "text": text})
+        return res
 
     def send_document(self, chat_id, file_bytes, filename, caption=""):
         boundary = "----TelegramFormBoundary" + hex(int(time.time() * 1000))[2:]
