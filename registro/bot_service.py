@@ -260,16 +260,17 @@ def despachar_mensaje(
                         dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
                         tipo_doc = "31" if ("-" in doc_num or (len(doc_num.split("-")[0]) == 9 and doc_num.startswith(("8", "9")))) else "13"
                         tipo_pers = "juridica" if tipo_doc == "31" else "natural"
+                        prefix = "NIT" if tipo_doc == "31" else "CC"
                         cliente = Cliente.objects.create(
                             establecimiento=establecimiento,
-                            nombre=nombre_limpio or f"Cliente CC {doc_num}",
+                            nombre=nombre_limpio or f"{prefix} {doc_num}",
                             tipo_documento=tipo_doc,
                             nit_cedula=doc_num,
                             tipo_persona=tipo_pers,
                             municipio_nombre=mun_nom,
                             departamento_nombre=dep_nom,
                         )
-                    elif nombre_limpio and cliente.nombre != nombre_limpio and not cliente.nombre.startswith("Cliente CC"):
+                    elif nombre_limpio and cliente.nombre != nombre_limpio and not cliente.nombre.startswith(("Cliente CC", "CC ", "NIT ")):
                         cliente.nombre = nombre_limpio
                         cliente.save(update_fields=["nombre"])
 
@@ -287,10 +288,15 @@ def despachar_mensaje(
                         motivo="Asignación de documento de cliente para ticket de venta",
                     )
 
+                    if cliente.nombre and not cliente.nombre.startswith(("Cliente CC", "CC ", "NIT ")) and cliente.nombre != cliente.nit_cedula:
+                        cli_det = f"{cliente.nombre} (CC {cliente.nit_cedula})"
+                    else:
+                        prefix = "NIT" if ("-" in cliente.nit_cedula or (len(cliente.nit_cedula) == 9 and cliente.nit_cedula.startswith(("8", "9")))) else "CC"
+                        cli_det = f"{prefix} {cliente.nit_cedula}"
+
                     resp = (
                         f"✅ *Documento Asignado al Ticket #{venta_pend.pk}:*\n"
-                        f"• *Cliente:* {cliente.nombre}\n"
-                        f"• *Documento:* `{cliente.nit_cedula}` ({cliente.get_tipo_documento_display()})\n"
+                        f"• *Cliente:* {cli_det}\n"
                         f"📄 Registro tributario actualizado correctamente."
                     )
                     _cachear_respuesta(canal, identificador_mensaje, resp)
@@ -402,6 +408,7 @@ def _registrar_venta(
         re.IGNORECASE,
     )
     doc_cliente_directo = match_doc_con_num.group(1) if match_doc_con_num else None
+    nombre_cliente_directo = ""
 
     # ¿Pidió documento pero no escribió el número? (ej: 40 mil carne con documento, 40 mil carne documento)
     pide_documento_sin_num = bool(
@@ -412,9 +419,17 @@ def _registrar_venta(
 
     # Limpiar el documento o la solicitud de documento del texto para no alterar concepto ni inventario
     if match_doc_con_num:
-        texto_para_inventario = (
-            texto_sin_factura[:match_doc_con_num.start()] + " " + texto_sin_factura[match_doc_con_num.end():]
-        )
+        idx_ini = match_doc_con_num.start()
+        idx_fin = match_doc_con_num.end()
+        resto_post = texto_sin_factura[idx_fin:].strip()
+        resto_limpio_nombre = re.sub(
+            r"\b(nequi|daviplata|bre-b|breb|bancolombia|transferencia|efectivo)\b", "", resto_post, flags=re.IGNORECASE
+        ).strip()
+        if resto_limpio_nombre and not re.search(r"\d", resto_limpio_nombre):
+            nombre_cliente_directo = resto_limpio_nombre
+            texto_para_inventario = texto_sin_factura[:idx_ini] + " " + texto_sin_factura[idx_fin:].replace(resto_limpio_nombre, " ")
+        else:
+            texto_para_inventario = texto_sin_factura[:idx_ini] + " " + texto_sin_factura[idx_fin:]
     elif pide_documento_sin_num:
         texto_para_inventario = re.sub(
             r"\b(con\s+documento|con\s+doc|documento|doc|cedula|cliente)\b", " ", texto_sin_factura, flags=re.IGNORECASE
@@ -463,18 +478,22 @@ def _registrar_venta(
 
     if doc_cliente_directo:
         cliente_ticket = Cliente.objects.filter(establecimiento=establecimiento, nit_cedula=doc_cliente_directo).first()
+        tipo_doc = "31" if ("-" in doc_cliente_directo or (len(doc_cliente_directo.split("-")[0]) == 9 and doc_cliente_directo.startswith(("8", "9")))) else "13"
+        tipo_pers = "juridica" if tipo_doc == "31" else "natural"
+        prefix = "NIT" if tipo_doc == "31" else "CC"
         if not cliente_ticket:
-            tipo_doc = "31" if ("-" in doc_cliente_directo or (len(doc_cliente_directo.split("-")[0]) == 9 and doc_cliente_directo.startswith(("8", "9")))) else "13"
-            tipo_pers = "juridica" if tipo_doc == "31" else "natural"
             cliente_ticket = Cliente.objects.create(
                 establecimiento=establecimiento,
-                nombre=f"Cliente CC {doc_cliente_directo}",
+                nombre=nombre_cliente_directo or f"{prefix} {doc_cliente_directo}",
                 tipo_documento=tipo_doc,
                 nit_cedula=doc_cliente_directo,
                 tipo_persona=tipo_pers,
                 municipio_nombre=mun_nom,
                 departamento_nombre=dep_nom,
             )
+        elif nombre_cliente_directo and cliente_ticket.nombre != nombre_cliente_directo and cliente_ticket.nombre.startswith(("CC ", "NIT ", "Cliente CC")):
+            cliente_ticket.nombre = nombre_cliente_directo
+            cliente_ticket.save(update_fields=["nombre"])
     else:
         cliente_ticket = Cliente.obtener_consumidor_final(establecimiento)
 
@@ -555,7 +574,11 @@ def _registrar_venta(
 
     # 3. Venta Normal de Mostrador (Ticket con identificación de documento o ventas menores 222222222222)
     if doc_cliente_directo:
-        cli_line = f"👤 *Cliente:* {cliente_ticket.nombre} (`{cliente_ticket.nit_cedula}`)"
+        if cliente_ticket.nombre and not cliente_ticket.nombre.startswith(("Cliente CC", "CC ", "NIT ")) and cliente_ticket.nombre != cliente_ticket.nit_cedula:
+            cli_line = f"👤 *Cliente:* {cliente_ticket.nombre} (CC {cliente_ticket.nit_cedula})"
+        else:
+            prefix = "NIT" if ("-" in cliente_ticket.nit_cedula or (len(cliente_ticket.nit_cedula) == 9 and cliente_ticket.nit_cedula.startswith(("8", "9")))) else "CC"
+            cli_line = f"👤 *Cliente:* {prefix} {cliente_ticket.nit_cedula}"
     else:
         cli_line = "👤 *Cliente:* Consumidor Final (222222222222)"
 

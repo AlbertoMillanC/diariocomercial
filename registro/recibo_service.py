@@ -204,7 +204,13 @@ def generar_pdf_recibo_venta(venta: Venta) -> bytes:
     linea(f"Fecha: {hora_str}", size=8)
     cajero = venta.usuario.get_full_name() or venta.usuario.username if venta.usuario else "Cajero"
     linea(f"Atendido por: {cajero}", size=8)
-    cli_str = f"{venta.cliente.nombre} ({venta.cliente.nit_cedula})" if venta.cliente else "Consumidor Final (222222222222)"
+    if not venta.cliente or venta.cliente.es_consumidor_final:
+        cli_str = "Consumidor Final (222222222222)"
+    elif venta.cliente.nombre and not venta.cliente.nombre.startswith(("Cliente CC", "CC ", "NIT ")) and venta.cliente.nombre != venta.cliente.nit_cedula:
+        cli_str = f"{venta.cliente.nombre} (CC {venta.cliente.nit_cedula})"
+    else:
+        prefix = "NIT" if ("-" in venta.cliente.nit_cedula or (len(venta.cliente.nit_cedula) == 9 and venta.cliente.nit_cedula.startswith(("8", "9")))) else "CC"
+        cli_str = f"{prefix} {venta.cliente.nit_cedula}"
     linea(f"Cliente: {cli_str[:35]}", size=8)
 
     divisor()
