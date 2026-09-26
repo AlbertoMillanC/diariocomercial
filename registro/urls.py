@@ -79,4 +79,6 @@ urlpatterns = [
     path("superadmin/probar-smtp/", views.superadmin_probar_smtp, name="superadmin_probar_smtp"),
     # API Métricas en Tiempo Real para Dashboard SuperAdmin
     path("api/superadmin/metricas-tiempo-real/", views.superadmin_metricas_tiempo_real, name="superadmin_metricas_tiempo_real"),
+    # Webhook Oficial WhatsApp Cloud API (Meta)
+    path("webhook/whatsapp/", views.webhook_whatsapp, name="webhook_whatsapp"),
 ]

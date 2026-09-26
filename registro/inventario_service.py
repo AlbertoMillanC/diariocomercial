@@ -270,6 +270,13 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
     # Ordenar por longitud de nombre descendente para priorizar "carne molida" sobre "carne"
     productos.sort(key=lambda p: len(p.nombre), reverse=True)
 
+    # 0. Búsqueda prioritaria por Código Rápido / Código de Barras / SKU (ej: 2311412413 o 101)
+    for p in productos:
+        if p.codigo_barras:
+            cb_norm = normalizar_texto(p.codigo_barras)
+            if cb_norm and re.search(rf"\b{re.escape(cb_norm)}\b", t):
+                return p
+
     # 1. Búsqueda exacta del nombre en el texto o del texto en el nombre
     for p in productos:
         p_norm = normalizar_texto(p.nombre)

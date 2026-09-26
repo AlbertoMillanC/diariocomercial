@@ -319,24 +319,24 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertEqual(v.cliente.nit_cedula, "7178367")
 
     def test_bot_venta_pide_documento_conversacional(self):
-        """Verifica que si escribe 'con documento' sin número, el bot lo pide y lo vincula al ticket."""
+        """Verifica que si escribe 'con documento' sin número, el bot lo pide y no genera venta hasta recibirlo."""
         from registro.models import VinculoCanal
         from registro.bot_service import despachar_mensaje
 
         VinculoCanal.objects.create(
             canal="telegram", identificador_externo="33221100", usuario=self.dueno, establecimiento=self.est
         )
-        # Paso 1: Pide documento
+        # Paso 1: Pide documento (no crea venta ni descuenta inventario todavía)
         resp1, v1, _ = despachar_mensaje("telegram", "33221100", "30 mil lomo con documento", return_adjuntos=True)
-        self.assertIn("Por favor escribe el número de documento", resp1)
+        self.assertIsNone(v1)
+        self.assertIn("Para generar el ticket con documento", resp1)
 
-        # Paso 2: Envía el documento
-        resp2 = despachar_mensaje("telegram", "33221100", "7178367 Pedro Pérez")
-        self.assertIn("Documento Asignado al Ticket", resp2)
+        # Paso 2: Envía el documento (ahora sí genera la venta y ticket)
+        resp2, v2, _ = despachar_mensaje("telegram", "33221100", "7178367 Pedro Pérez", return_adjuntos=True)
+        self.assertIsNotNone(v2)
+        self.assertIn("Venta Registrada", resp2)
         self.assertIn("7178367", resp2)
-
-        v1.refresh_from_db()
-        self.assertEqual(v1.cliente.nit_cedula, "7178367")
+        self.assertEqual(v2.cliente.nit_cedula, "7178367")
 
     def test_bot_venta_menores_consumidor_final_por_defecto(self):
         """Verifica que sin documento sale asignado a 222222222222 (Consumidor Final para ventas menores)."""
@@ -400,18 +400,46 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         VinculoCanal.objects.create(
             canal="telegram", identificador_externo="77889900", usuario=self.dueno, establecimiento=self.est
         )
-        # Paso 1: Venta con 'poner 13'
+        # Paso 1: Venta con 'poner 13' -> NO genera ticket todavía
         resp1, v1, _ = despachar_mensaje("telegram", "77889900", "40 mil carne poner 13", return_adjuntos=True)
+        self.assertIsNone(v1)
         self.assertIn("Cédula de Ciudadanía (Tipo 13 DIAN)", resp1)
 
-        # Paso 2: Responde con el número de cédula
-        resp2 = despachar_mensaje("telegram", "77889900", "7178367")
-        self.assertIn("Documento Asignado al Ticket", resp2)
-        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp2)
+        # Paso 2: Responde con el número de cédula -> AHORA SÍ genera venta y ticket
+        resp2, v2, _ = despachar_mensaje("telegram", "77889900", "7178367", return_adjuntos=True)
+        self.assertIsNotNone(v2)
+        self.assertIn("Ticket #", resp2)
+        self.assertIn("CC 7178367", resp2)
+        self.assertIn("Tipo 13 DIAN", resp2)
+        self.assertEqual(v2.cliente.nit_cedula, "7178367")
+        self.assertEqual(v2.cliente.tipo_documento, "13")
 
-        v1.refresh_from_db()
-        self.assertEqual(v1.cliente.nit_cedula, "7178367")
-        self.assertEqual(v1.cliente.tipo_documento, "13")
+    def test_bot_venta_con_codigo_barras_producto_y_dian(self):
+        """Verifica venta por código rápido de producto (ej: 40 mil 2311412413 13 7178367)."""
+        from registro.models import Producto, VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        p_pan = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Pan campesino",
+            codigo_barras="2311412413",
+            categoria="abarrotes",
+            unidad_medida="und",
+            precio_kilo=Decimal("500"),
+            stock_kilos=Decimal("100.0"),
+        )
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="barcode_user_1", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "barcode_user_1", "40 mil 2311412413 13 7178367", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.producto, p_pan)
+        self.assertEqual(v.cantidad, Decimal("80.000"))
+        self.assertEqual(v.unidad_medida, "und")
+        self.assertEqual(v.cliente.nit_cedula, "7178367")
+        self.assertEqual(v.cliente.tipo_documento, "13")
+        self.assertIn("Pan campesino (80 und)", v.concepto)
+        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp)
 
     def test_bot_venta_13_mil_no_es_codigo_dian(self):
         """Verifica que '13 mil carne' se interprete como $13.000 COP y no como código DIAN 13."""

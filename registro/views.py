@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from decimal import Decimal
 import urllib.parse
@@ -22,6 +23,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.views.decorators.csrf import csrf_exempt
 
 from .forms import (
     ActividadCIIUForm,
@@ -3705,6 +3707,78 @@ def venta_emitir_factura_electronica(request, pk):
             "clientes": clientes,
         },
     )
+
+
+# ============================================================================
+# WEBHOOK OFICIAL WHATSAPP BUSINESS CLOUD API (META GRAPH API v20.0)
+# ============================================================================
+
+@csrf_exempt
+def webhook_whatsapp(request):
+    """
+    Webhook oficial para WhatsApp Business Cloud API de Meta.
+    - GET: Handshake de verificación de Meta (hub.challenge y hub.verify_token).
+    - POST: Recepción de mensajes en tiempo real y respuesta automática.
+    """
+    if request.method == "GET":
+        mode = request.GET.get("hub.mode")
+        token = request.GET.get("hub.verify_token")
+        challenge = request.GET.get("hub.challenge")
+        verify_token_esperado = getattr(
+            settings, "META_WHATSAPP_VERIFY_TOKEN", os.environ.get("META_WHATSAPP_VERIFY_TOKEN", "diariocomercial_token_2026")
+        )
+        if mode == "subscribe" and token == verify_token_esperado:
+            return HttpResponse(challenge, content_type="text/plain", status=200)
+        return HttpResponse("Token de verificación inválido", status=403)
+
+    if request.method == "POST":
+        try:
+            import json
+            data = json.loads(request.body.decode("utf-8"))
+            entries = data.get("entry", [])
+            for entry in entries:
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    messages_list = value.get("messages", [])
+                    contacts = value.get("contacts", [])
+                    nombre_remitente = ""
+                    if contacts:
+                        nombre_remitente = contacts[0].get("profile", {}).get("name", "")
+
+                    for msg in messages_list:
+                        tipo = msg.get("type")
+                        de_telefono = msg.get("from")
+                        msg_id = msg.get("id")
+                        cuerpo_texto = ""
+
+                        if tipo == "text":
+                            cuerpo_texto = msg.get("text", {}).get("body", "")
+                        elif tipo == "interactive":
+                            interactive = msg.get("interactive", {})
+                            cuerpo_texto = (
+                                interactive.get("button_reply", {}).get("id", "")
+                                or interactive.get("list_reply", {}).get("id", "")
+                            )
+
+                        if de_telefono and cuerpo_texto:
+                            from .bot_service import despachar_mensaje
+                            from .notification_service import enviar_mensaje_whatsapp_meta
+                            resp, venta, _ = despachar_mensaje(
+                                canal="whatsapp",
+                                identificador_externo=de_telefono,
+                                texto_mensaje=cuerpo_texto,
+                                identificador_mensaje=msg_id,
+                                nombre_remitente=nombre_remitente,
+                                return_adjuntos=True,
+                            )
+                            enviar_mensaje_whatsapp_meta(de_telefono, resp)
+
+            return HttpResponse("EVENT_RECEIVED", status=200)
+        except Exception as e:
+            return HttpResponse(f"Error procesando webhook: {e}", status=200)
+
+    return HttpResponse("Método no permitido", status=405)
+
 
 
 

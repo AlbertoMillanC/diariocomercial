@@ -99,3 +99,52 @@ def registrar_o_actualizar_cliente_desde_venta(
         cliente.save()
 
     return cliente
+
+
+def enviar_mensaje_whatsapp_meta(
+    telefono_destinatario: str,
+    texto_mensaje: str,
+    token_acceso: str = "",
+    phone_number_id: str = "",
+) -> bool:
+    """
+    Envía un mensaje saliente a WhatsApp usando Meta Cloud API (v20.0).
+    """
+    import os
+    import json
+    import logging
+    import urllib.request
+
+    token = token_acceso or getattr(settings, "META_WHATSAPP_TOKEN", os.environ.get("META_WHATSAPP_TOKEN", ""))
+    phone_id = phone_number_id or getattr(settings, "META_WHATSAPP_PHONE_ID", os.environ.get("META_WHATSAPP_PHONE_ID", ""))
+    if not token or not phone_id:
+        return False
+
+    tel_limpio = "".join(c for c in str(telefono_destinatario) if c.isdigit())
+    if len(tel_limpio) == 10:
+        tel_limpio = f"57{tel_limpio}"
+
+    url = f"https://graph.facebook.com/v20.0/{phone_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": tel_limpio,
+        "type": "text",
+        "text": {"preview_url": False, "body": texto_mensaje},
+    }
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status in (200, 201)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Aviso enviando WhatsApp Meta a %s: %s", tel_limpio, e)
+        return False
+
