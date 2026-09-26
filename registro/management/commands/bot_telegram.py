@@ -24,6 +24,7 @@ import urllib.request
 from datetime import date
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -226,13 +227,18 @@ class Command(BaseCommand):
         es_auth = bool(re.search(r"auth_[A-Za-z0-9_-]+", texto_limpio) or re.search(r"\b\d{6}\b", texto_limpio) or cmd.startswith("/start"))
 
         if not est and not es_auth:
+            base_url = getattr(settings, "BASE_URL", os.environ.get("BASE_URL", "http://127.0.0.1:8001")).rstrip("/")
+            link_activar = f"{base_url}/configuracion/"
+            link_web = f"{base_url}/"
             client.send_message(
                 chat_id,
                 "⚠️ *Tu cuenta de Telegram aún no está vinculada a ningún comercio.*\n\n"
-                "Para vincularla de forma segura en 1 clic:\n"
-                "1. Ingresa a la plataforma web de tu comercio.\n"
-                "2. Ve a *Configuración ➔ Asistente Móvil*.\n"
-                "3. Genera tu código de 6 dígitos y envíalo en este chat (ej: `849201`)."
+                "👉 *Para activarla y conectarla en 1 solo clic:*\n"
+                f"1. Abre directamente este enlace: {link_activar}\n"
+                "2. Inicia sesión en tu cuenta de comercio.\n"
+                "3. En la pestaña *Asistente Móvil*, toca el botón *\"Conectar con Telegram Ahora\"* o escribe aquí el código PIN de 6 dígitos que te muestra en pantalla.\n\n"
+                f"🌐 *¿Aún no tienes cuenta?* Conoce la plataforma y regístrate en: {link_web}\n\n"
+                "_(Si ya tienes tu código PIN de 6 dígitos, digítalo y envíalo directamente en este chat)_."
             )
             return
 

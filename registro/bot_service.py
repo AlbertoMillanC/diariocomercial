@@ -4,11 +4,13 @@ Motor central agnóstico de mensajería (Telegram / WhatsApp / Mostrador)
 con resolución Multi-Tenant estricta, RBAC (Propietario vs Dependiente),
 idempotencia anti-duplicados y modo Carrito/Ticket Abierto.
 """
+import os
 import re
 import secrets
 from decimal import Decimal
 from typing import Optional, Tuple, Dict, Any
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
@@ -135,16 +137,21 @@ def despachar_mensaje(
             _cachear_respuesta(canal, identificador_mensaje, resp)
             return (resp, None, None) if return_adjuntos else resp
 
-    # Si no está vinculado, rechazo amable con instrucciones
+    # Si no está vinculado, rechazo amable con instrucciones y enlaces directos
     if not vinculo:
+        base_url = getattr(settings, "BASE_URL", os.environ.get("BASE_URL", "http://127.0.0.1:8001")).rstrip("/")
+        link_activar = f"{base_url}/configuracion/"
+        link_web = f"{base_url}/"
         resp = (
             "👋 *¡Hola! Bienvenido a DiarioComercial.*\n\n"
             "Tu cuenta aún no está vinculada a ningún comercio.\n\n"
-            "👉 Para conectar este canal en 1 toque:\n"
-            "1. Inicia sesión en la plataforma web de tu negocio.\n"
-            "2. Ve a *Configuración* ➔ *Asistente Móvil*.\n"
-            "3. Pulsa el botón *Conectar Telegram / WhatsApp*.\n\n"
-            "_(Si tienes un código de acceso, envíalo directamente aquí)_."
+            "👉 *Para conectar este canal en 1 toque:*\n"
+            f"1. Abre directamente este enlace: {link_activar}\n"
+            "2. Inicia sesión con tus credenciales de tienda.\n"
+            "3. En la pestaña *Asistente Móvil*, pulsa el botón *\"Conectar con Telegram Ahora\"* (o copia el código PIN de 6 dígitos y envíalo aquí).\n\n"
+            f"🌐 *¿Aún no tienes cuenta en DiarioComercial?*\n"
+            f"Conoce la plataforma y regístrate aquí: {link_web}\n\n"
+            "_(Si ya tienes un código PIN de 6 dígitos, escríbelo directamente en este chat para activarlo al instante)_."
         )
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
