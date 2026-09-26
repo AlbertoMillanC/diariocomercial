@@ -108,6 +108,31 @@ class Establecimiento(models.Model):
         default=False, help_text="Indica si completó el asistente inicial de declaración renglón a renglón"
     )
 
+    # Configuración de Envío Automático Periódico de Reportes en Excel
+    FRECUENCIAS_REPORTE = (
+        ("desactivado", "Desactivado"),
+        ("hora", "Cada Hora"),
+        ("turno", "Cada Medio Día / Turno (12 horas)"),
+        ("diario", "Diario (Cierre del día)"),
+        ("semanal", "Semanal (Cierre de semana)"),
+        ("mensual", "Mensual (Cierre de mes)"),
+    )
+    reportes_automaticos_activos = models.BooleanField(
+        default=False,
+        help_text="Activa el envío periódico automático de reportes en Excel al correo registrado"
+    )
+    frecuencia_reporte_automatico = models.CharField(
+        max_length=20,
+        choices=FRECUENCIAS_REPORTE,
+        default="diario",
+        help_text="Frecuencia periódica de generación y despacho de reportes en Excel"
+    )
+    ultimo_reporte_automatico = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha y hora de la última ejecución automática de despacho de reporte"
+    )
+
     def siguiente_consecutivo_factura(self):
         from django.db import transaction
         with transaction.atomic():

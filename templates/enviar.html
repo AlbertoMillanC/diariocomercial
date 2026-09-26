@@ -34,10 +34,67 @@
     <input type="hidden" name="hasta" value="{{ hasta|date:'Y-m-d' }}">
     <button class="btn btn-accent" type="submit">Enviar ahora</button>
   </form>
+  <a class="btn" style="background:#107c41; color:#fff;" href="?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&formato=excel">📊 Descargar Excel (.xlsx)</a>
   <a class="btn btn-ghost" href="?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&formato=pdf">Descargar PDF</a>
   <a class="btn btn-ghost" href="?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}&formato=csv">Descargar CSV</a>
   <a href="{% url 'inicio' %}">Cancelar</a>
 </div>
+
+<div class="panel" style="margin-top: 24px; margin-bottom: 24px; border-left: 4px solid #107c41; background: #fafdfa; padding: 20px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h2 style="font-size:18px; margin:0 0 6px 0; color:#107c41; display:flex; align-items:center; gap:8px;">
+        <span style="font-size:22px;">🤖</span> Envío Automático Periódico a tu Correo (Excel .xlsx)
+      </h2>
+      <p style="margin:0; font-size:14px; color:#555; max-width:650px;">
+        Recibe periódicamente en tu correo electrónico un archivo Excel multi-pestaña completo con 
+        <b>Cierre de Caja y Medios de Pago</b>, <b>Ventas detalladas</b>, <b>Compras y Gastos</b> e <b>Inventario Valorado</b>.
+      </p>
+    </div>
+    {% if establecimiento.reportes_automaticos_activos %}
+      <span class="badge" style="background:#d4edda; color:#155724; padding:6px 12px; border-radius:20px; font-weight:600; font-size:13px;">
+        🟢 Activo ({{ establecimiento.get_frecuencia_reporte_automatico_display }})
+      </span>
+    {% else %}
+      <span class="badge" style="background:#f8d7da; color:#721c24; padding:6px 12px; border-radius:20px; font-weight:600; font-size:13px;">
+        ⚪ Inactivo
+      </span>
+    {% endif %}
+  </div>
+
+  <form method="post" style="margin-top: 18px;">
+    {% csrf_token %}
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px; align-items:end;">
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:4px; font-size:13px;">Correo Destino del Comerciante / Contador</label>
+        {{ form_automatico.correo_reportes }}
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:4px; font-size:13px;">Periodicidad de Entrega</label>
+        {{ form_automatico.frecuencia_reporte_automatico }}
+      </div>
+      <div style="padding-bottom:8px;">
+        <label style="display:flex; align-items:center; cursor:pointer; font-weight:600; font-size:14px;">
+          {{ form_automatico.reportes_automaticos_activos }}
+          <span>Activar despacho automático</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <button type="submit" name="accion" value="guardar_programacion" class="btn btn-primary" style="background:#107c41; border-color:#107c41;">
+        💾 Guardar Programación
+      </button>
+      <button type="submit" name="accion" value="probar_envio_ahora" class="btn btn-ghost" style="border-color:#107c41; color:#107c41;">
+        ⚡ Enviar Reporte Excel de Prueba Ahora Mismo
+      </button>
+      <small style="color:#777; margin-left:auto;">
+        Último despacho: <b>{{ establecimiento.ultimo_reporte_automatico|default:"Ninguno registrado aún" }}</b>
+      </small>
+    </div>
+  </form>
+</div>
+
 <div class="panel">
   <h2 style="font-size:16px;">Envíos anteriores</h2>
   <div class="tabla-wrap">

@@ -44,6 +44,7 @@ from .forms import (
     ConfiguracionPlataformaSaaSForm,
     ConfiguracionSaaSMunicipioForm,
     ProbarSmtpForm,
+    ConfigurarReporteAutomaticoForm,
 )
 from .models import (
     ActividadCIIU,
@@ -95,6 +96,8 @@ from .recibo_service import (
     generar_pdf_etiqueta_qr_producto,
     generar_pdf_etiquetas_qr_masivo,
 )
+from .reporte_excel_service import generar_excel_reporte_periodico
+
 
 
 class LoginDiario(LoginView):
@@ -961,49 +964,139 @@ def enviar_reporte(request):
         por_ciiu = _ica_por_ciiu(est, desde, hasta)
 
     formato = request.GET.get("formato")
-    if formato in ("pdf", "csv") and not rango_malo:
+    if formato in ("pdf", "csv", "excel") and not rango_malo:
+        if formato == "excel":
+            excel_bytes, filename = generar_excel_reporte_periodico(
+                est, desde, hasta, f"Reporte {est.nombre} {desde} a {hasta}"
+            )
+            response = HttpResponse(
+                excel_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
         args = (est, desde, hasta, ingresos, egresos, retenciones, ica, neto, por_ciiu)
         if formato == "pdf":
             return respuesta_pdf(*args)
         return respuesta_csv(*args)
 
-    if request.method == "POST" and not rango_malo:
-        destino = est.correo_reportes
-        if not destino:
-            messages.error(request, "Primero configure el correo en Configuración.")
-            return redirect("configuracion")
-        cuerpo = texto_consolidado(
-            est, desde, hasta, ingresos, egresos, retenciones, ica, neto, por_ciiu
-        )
-        try:
-            send_mail(
-                f"Consolidado {est.nombre} {desde} - {hasta}",
-                cuerpo,
-                None,
-                [destino],
-            )
-            estado = "enviado"
-            messages.success(request, f"Reporte enviado a {destino}.")
-        except Exception as e:
-            estado = "fallido"
-            messages.error(
-                request,
-                f"No se pudo enviar: {e}. Puede reintentar o descargar el PDF/CSV.",
-            )
-        EnvioReporte.objects.create(
-            establecimiento=est,
-            usuario=request.user,
-            periodo_inicio=desde,
-            periodo_fin=hasta,
-            correo_destino=destino,
-            estado_envio=estado,
-            total_ingresos=ingresos,
-            total_egresos=egresos,
-            total_retenciones=retenciones,
-            total_ica=ica,
-        )
-        return redirect("enviar_reporte")
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        if accion == "guardar_programacion":
+            form_auto = ConfigurarReporteAutomaticoForm(request.POST, instance=est)
+            if form_auto.is_valid():
+                form_auto.save()
+                messages.success(
+                    request,
+                    f"Programación actualizada con éxito: {est.get_frecuencia_reporte_automatico_display()} a {est.correo_reportes}.",
+                )
+            else:
+                messages.error(request, "Error al guardar la configuración: verifique el correo y los campos.")
+            return redirect("enviar_reporte")
 
+        elif accion == "probar_envio_ahora":
+            destino = (est.correo_reportes or request.POST.get("correo_reportes", "")).strip()
+            if not destino:
+                messages.error(request, "Debe configurar un correo electrónico para despachar el reporte.")
+                return redirect("enviar_reporte")
+
+            excel_bytes, filename = generar_excel_reporte_periodico(
+                est, desde, hasta, f"Reporte {est.nombre} {desde} a {hasta}"
+            )
+            asunto = f"📊 Reporte Periódico Excel: {est.nombre} ({desde} al {hasta})"
+            mensaje_texto = (
+                f"Reporte periódico de {est.nombre}\n"
+                f"Periodo: {desde} a {hasta}\n\n"
+                f"Resumen Ejecutivo:\n"
+                f"- Ventas e Ingresos: ${ingresos:,.0f} COP\n"
+                f"- Compras y Gastos: ${egresos:,.0f} COP\n"
+                f"- Retenciones: ${retenciones:,.0f} COP\n"
+                f"- ICA Estimado: ${ica:,.0f} COP\n"
+                f"- Base Neta: ${neto:,.0f} COP\n\n"
+                f"Adjunto se encuentra el archivo Excel '{filename}' con las hojas de trabajo:\n"
+                f"1. Cierre y Medios de Pago (Efectivo, Nequi, Daviplata, Bre-B, etc.)\n"
+                f"2. Detalle de Ventas\n"
+                f"3. Compras y Gastos\n"
+                f"4. Inventario Valorado y Márgenes\n\n"
+                f"Generado automáticamente por DiarioComercial."
+            )
+            adjuntos = [(filename, excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+            try:
+                ok = enviar_correo_plataforma(asunto, mensaje_texto, [destino], adjuntos=adjuntos)
+                err = None
+            except Exception as e:
+                ok = False
+                err = str(e)
+
+            estado = "prueba" if ok else "fallido"
+            if ok:
+                est.ultimo_reporte_automatico = timezone.now()
+                est.save(update_fields=["ultimo_reporte_automatico"])
+                messages.success(request, f"¡Reporte Excel de prueba enviado exitosamente a {destino}!")
+            else:
+                messages.error(request, f"No se pudo enviar el correo de prueba: {err}")
+
+            EnvioReporte.objects.create(
+                establecimiento=est,
+                usuario=request.user,
+                periodo_inicio=desde,
+                periodo_fin=hasta,
+                correo_destino=destino,
+                estado_envio=estado,
+                total_ingresos=ingresos,
+                total_egresos=egresos,
+                total_retenciones=retenciones,
+                total_ica=ica,
+            )
+            return redirect("enviar_reporte")
+
+        elif not rango_malo:
+            destino = est.correo_reportes
+            if not destino:
+                messages.error(request, "Primero configure el correo en la sección de reportes.")
+                return redirect("enviar_reporte")
+
+            excel_bytes, filename = generar_excel_reporte_periodico(
+                est, desde, hasta, f"Consolidado {est.nombre} {desde} a {hasta}"
+            )
+            cuerpo = texto_consolidado(
+                est, desde, hasta, ingresos, egresos, retenciones, ica, neto, por_ciiu
+            )
+            adjuntos = [(filename, excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+            try:
+                ok = enviar_correo_plataforma(
+                    f"Consolidado {est.nombre} {desde} - {hasta}",
+                    cuerpo,
+                    [destino],
+                    adjuntos=adjuntos,
+                )
+                err = None
+            except Exception as e:
+                ok = False
+                err = str(e)
+            estado = "enviado" if ok else "fallido"
+            if ok:
+                messages.success(request, f"Reporte consolidado con Excel adjunto enviado a {destino}.")
+            else:
+                messages.error(
+                    request,
+                    f"No se pudo enviar: {err}. Puede descargar el Excel, PDF o CSV.",
+                )
+            EnvioReporte.objects.create(
+                establecimiento=est,
+                usuario=request.user,
+                periodo_inicio=desde,
+                periodo_fin=hasta,
+                correo_destino=destino,
+                estado_envio=estado,
+                total_ingresos=ingresos,
+                total_egresos=egresos,
+                total_retenciones=retenciones,
+                total_ica=ica,
+            )
+            return redirect("enviar_reporte")
+
+    form_automatico = ConfigurarReporteAutomaticoForm(instance=est)
     envios = EnvioReporte.objects.filter(establecimiento=est).order_by("-fecha_envio")[:12]
     return render(
         request,
@@ -1019,6 +1112,7 @@ def enviar_reporte(request):
             "neto": neto,
             "por_ciiu": por_ciiu,
             "envios": envios,
+            "form_automatico": form_automatico,
         },
     )
 

@@ -12,9 +12,11 @@ from .models import ConfiguracionPlataformaSaaS
 logger = logging.getLogger("diariocomercial.email")
 
 
-def enviar_correo_plataforma(asunto, mensaje, destinatarios, html_message=None):
+def enviar_correo_plataforma(asunto, mensaje, destinatarios, html_message=None, adjuntos=None):
     """
     Despacha un correo electrónico seguro con reintentos y tolerancia a fallos.
+    Permite adjuntar archivos (por ejemplo reportes en Excel .xlsx).
+    Cada adjunto puede ser una tupla: (nombre_archivo, contenido_bytes, mime_type).
     Retorna True si se envió correctamente o False en caso de error.
     """
     if not destinatarios:
@@ -49,6 +51,14 @@ def enviar_correo_plataforma(asunto, mensaje, destinatarios, html_message=None):
         if html_message:
             email.content_subtype = "html"
             email.body = html_message
+
+        if adjuntos:
+            for adj in adjuntos:
+                if isinstance(adj, (tuple, list)) and len(adj) >= 2:
+                    nombre = adj[0]
+                    contenido = adj[1]
+                    mimetype = adj[2] if len(adj) > 2 else "application/octet-stream"
+                    email.attach(nombre, contenido, mimetype)
 
         resultado = email.send(fail_silently=False)
         logger.info(f"Correo enviado exitosamente a {destinatarios} (Asunto: {asunto})")

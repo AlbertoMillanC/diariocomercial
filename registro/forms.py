@@ -900,5 +900,35 @@ class ProbarSmtpForm(forms.Form):
     )
 
 
+class ConfigurarReporteAutomaticoForm(forms.ModelForm):
+    """Configuración para el comerciante del despacho periódico automático de reportes en Excel."""
+    class Meta:
+        model = Establecimiento
+        fields = [
+            "correo_reportes",
+            "reportes_automaticos_activos",
+            "frecuencia_reporte_automatico",
+        ]
+        labels = {
+            "correo_reportes": "Correo Electrónico de Recepción",
+            "reportes_automaticos_activos": "Activar Envíos Automáticos Periódicos",
+            "frecuencia_reporte_automatico": "Frecuencia de Despacho",
+        }
+        widgets = {
+            "correo_reportes": forms.EmailInput(attrs={
+                "class": "form-control",
+                "placeholder": "mi-negocio@gmail.com o contador@empresa.com",
+                "required": True,
+            }),
+            "reportes_automaticos_activos": forms.CheckboxInput(attrs={
+                "class": "form-check-input",
+                "style": "transform: scale(1.3); margin-right: 8px;",
+            }),
+            "frecuencia_reporte_automatico": forms.Select(attrs={
+                "class": "form-control",
+            }),
+        }
+
+
 
 
