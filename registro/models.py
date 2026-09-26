@@ -604,9 +604,12 @@ class Cliente(models.Model):
     la identificación individual de clientes con sus requisitos tributarios.
     """
     TIPOS_DOC = (
+        ("11", "Registro Civil"),
+        ("12", "Tarjeta de Identidad"),
         ("13", "Cédula de Ciudadanía (CC)"),
-        ("31", "NIT (Número de Identificación Tributaria)"),
+        ("21", "Tarjeta de Extranjería"),
         ("22", "Cédula de Extranjería (CE)"),
+        ("31", "NIT (Número de Identificación Tributaria)"),
         ("41", "Pasaporte"),
         ("42", "Documento de Identificación Extranjero"),
         ("47", "Permiso por Protección Temporal (PPT)"),

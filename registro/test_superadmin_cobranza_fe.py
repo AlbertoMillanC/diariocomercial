@@ -352,3 +352,78 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         v.refresh_from_db()
         self.assertEqual(v.cliente.nit_cedula, "222222222222")
         self.assertTrue(v.cliente.es_consumidor_final)
+
+    def test_bot_venta_con_codigo_dian_directo_13_cedula(self):
+        """Verifica venta directa con código DIAN 13 (ej: 40 mil carne 13 7178367)."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="55667788", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "55667788", "40 mil carne 13 7178367", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("40000"))
+        self.assertIn("Ticket #", resp)
+        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp)
+
+        v.refresh_from_db()
+        self.assertIsNotNone(v.cliente)
+        self.assertEqual(v.cliente.nit_cedula, "7178367")
+        self.assertEqual(v.cliente.tipo_documento, "13")
+
+    def test_bot_venta_con_codigo_dian_directo_31_nit(self):
+        """Verifica venta directa con código DIAN 31 (ej: 50 mil carne 31 901234567-1)."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="66778899", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "66778899", "50 mil carne 31 901234567-1 Inversiones Boyacá", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("50000"))
+        self.assertIn("Ticket #", resp)
+        self.assertIn("NIT 901234567-1", resp)
+        self.assertIn("Tipo 31 DIAN", resp)
+
+        v.refresh_from_db()
+        self.assertIsNotNone(v.cliente)
+        self.assertEqual(v.cliente.nit_cedula, "901234567-1")
+        self.assertEqual(v.cliente.tipo_documento, "31")
+
+    def test_bot_venta_codigo_dian_conversacional_poner_13(self):
+        """Verifica que si escribe 'poner 13' o '13' sin documento, pide la cédula y la asigna."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="77889900", usuario=self.dueno, establecimiento=self.est
+        )
+        # Paso 1: Venta con 'poner 13'
+        resp1, v1, _ = despachar_mensaje("telegram", "77889900", "40 mil carne poner 13", return_adjuntos=True)
+        self.assertIn("Cédula de Ciudadanía (Tipo 13 DIAN)", resp1)
+
+        # Paso 2: Responde con el número de cédula
+        resp2 = despachar_mensaje("telegram", "77889900", "7178367")
+        self.assertIn("Documento Asignado al Ticket", resp2)
+        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp2)
+
+        v1.refresh_from_db()
+        self.assertEqual(v1.cliente.nit_cedula, "7178367")
+        self.assertEqual(v1.cliente.tipo_documento, "13")
+
+    def test_bot_venta_13_mil_no_es_codigo_dian(self):
+        """Verifica que '13 mil carne' se interprete como $13.000 COP y no como código DIAN 13."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="88990011", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "88990011", "13 mil carne", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("13000"))
+        self.assertIn("Consumidor Final (222222222222)", resp)
+        self.assertNotIn("Tipo 13 DIAN", resp)
+
