@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 import urllib.parse
+import sys
 
 from django.conf import settings
 from django.contrib import messages
@@ -9,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.core.mail import send_mail
+from django.db import transaction
 from django.db.models import Q, Count, Sum
 from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -468,45 +470,45 @@ def venta_nueva(request):
         if venta.valor <= 0:
             messages.error(request, "El valor tiene que ser mayor a cero.")
         else:
-            # Manejo normativo DIAN de Facturación Electrónica y Consumidor Final
-            solicita_fe = form.cleaned_data.get("solicita_factura_electronica") or False
-            cliente_sel = form.cleaned_data.get("cliente")
+            with transaction.atomic():
+                # Manejo normativo DIAN de Facturación Electrónica y Consumidor Final
+                solicita_fe = form.cleaned_data.get("solicita_factura_electronica") or False
+                cliente_sel = form.cleaned_data.get("cliente")
 
-            if solicita_fe and cliente_sel:
-                venta.solicita_factura_electronica = True
-                venta.cliente = cliente_sel
-                consec = est.consecutivo_actual
-                venta.numero_factura_electronica = f"{est.prefijo_facturacion}-{consec:05d}"
-                est.consecutivo_actual += 1
-                est.save(update_fields=["consecutivo_actual"])
-                import hashlib
-                cufe_raw = f"{venta.numero_factura_electronica}{venta.fecha_hora}{venta.valor}{cliente_sel.nit_cedula}{est.nit}"
-                venta.cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
-                venta.estado_dian = "aprobada"
-            else:
-                venta.solicita_factura_electronica = False
-                venta.cliente = cliente_sel if cliente_sel else obtener_o_crear_consumidor_final(est)
-                venta.estado_dian = "no_requerida"
+                if solicita_fe and cliente_sel:
+                    venta.solicita_factura_electronica = True
+                    venta.cliente = cliente_sel
+                    # Bloqueo atómico a nivel de fila (select_for_update) para evitar colisiones concurrentes
+                    num_fe = est.siguiente_consecutivo_factura()
+                    venta.numero_factura_electronica = num_fe
+                    import hashlib
+                    cufe_raw = f"{venta.numero_factura_electronica}{venta.fecha_hora}{venta.valor}{cliente_sel.nit_cedula}{est.nit}"
+                    venta.cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
+                    venta.estado_dian = "aprobada"
+                else:
+                    venta.solicita_factura_electronica = False
+                    venta.cliente = cliente_sel if cliente_sel else obtener_o_crear_consumidor_final(est)
+                    venta.estado_dian = "no_requerida"
 
-            venta.save()
-            # Descontar inventario si el concepto o motivo coincide con un producto
-            texto_concepto = f"{venta.concepto or ''} {venta.motivo.nombre if venta.motivo else ''}".strip()
-            prod, kilos, libras, _, info_stock = procesar_salida_inventario(
-                est, texto_concepto, venta.valor
-            )
-            if venta.tipo_cliente == "empresa":
-                ret_val = form.cleaned_data.get("retencion_valor") or Decimal("0")
-                if ret_val > 0:
-                    Retencion.objects.create(
-                        establecimiento=est,
-                        usuario=request.user,
-                        venta=venta,
-                        fecha=venta.fecha,
-                        tipo=form.cleaned_data.get("retencion_tipo") or "ica",
-                        valor=ret_val,
-                        tercero=form.cleaned_data.get("tercero") or "",
-                        estado="vigente",
-                    )
+                venta.save()
+                # Descontar inventario si el concepto o motivo coincide con un producto
+                texto_concepto = f"{venta.concepto or ''} {venta.motivo.nombre if venta.motivo else ''}".strip()
+                prod, kilos, libras, _, info_stock = procesar_salida_inventario(
+                    est, texto_concepto, venta.valor
+                )
+                if venta.tipo_cliente == "empresa":
+                    ret_val = form.cleaned_data.get("retencion_valor") or Decimal("0")
+                    if ret_val > 0:
+                        Retencion.objects.create(
+                            establecimiento=est,
+                            usuario=request.user,
+                            venta=venta,
+                            fecha=venta.fecha,
+                            tipo=form.cleaned_data.get("retencion_tipo") or "ica",
+                            valor=ret_val,
+                            tercero=form.cleaned_data.get("tercero") or "",
+                            estado="vigente",
+                        )
 
             if venta.solicita_factura_electronica and venta.numero_factura_electronica:
                 msg_exito = f"🧾 Factura Electrónica #{venta.numero_factura_electronica} emitida a {venta.cliente.nombre} (CUFE: {venta.cufe[:10]}...)."
@@ -723,26 +725,28 @@ def anular_movimiento(request, tipo, pk):
         if not motivo:
             messages.error(request, "Debe indicar el motivo de la anulación.")
         else:
-            antes = _snapshot(obj)
-            obj.estado = "anulado"
-            obj.save()
-            info_inv = ""
-            if tipo == "venta":
-                for ret in Retencion.objects.filter(venta=obj, estado="vigente"):
-                    ret_antes = _snapshot(ret)
-                    ret.estado = "anulado"
-                    ret.save()
-                    _audit(
-                        request.user,
-                        "retencion",
-                        ret,
-                        "anular",
-                        ret_antes,
-                        _snapshot(ret),
-                        "Anulada junto con la venta",
-                    )
-                info_inv = revertir_salida_inventario(perfil.establecimiento, obj)
-            _audit(request.user, tipo, obj, "anular", antes, _snapshot(obj), motivo)
+            with transaction.atomic():
+                antes = _snapshot(obj)
+                obj.estado = "anulado"
+                obj.save(update_fields=["estado"])
+                info_inv = ""
+                if tipo == "venta":
+                    for ret in Retencion.objects.filter(venta=obj, estado="vigente"):
+                        ret_antes = _snapshot(ret)
+                        ret.estado = "anulado"
+                        ret.save(update_fields=["estado"])
+                        _audit(
+                            request.user,
+                            "retencion",
+                            ret,
+                            "anular",
+                            ret_antes,
+                            _snapshot(ret),
+                            "Anulada junto con la venta",
+                        )
+                    info_inv = revertir_salida_inventario(perfil.establecimiento, obj)
+                _audit(request.user, tipo, obj, "anular", antes, _snapshot(obj), motivo)
+
             msg_anulacion = f"{tipo.capitalize()} #{obj.pk} anulada exitosamente (motivo: \"{motivo}\")."
             if info_inv:
                 msg_anulacion += f" {info_inv.replace('*', '')}"
@@ -834,7 +838,7 @@ def configuracion(request):
             return redirect("configuracion")
         elif accion == "generar_token_movil":
             uid = request.POST.get("user_id") or request.user.id
-            usuario_obj = get_object_or_404(User, pk=uid)
+            usuario_obj = get_object_or_404(User, pk=uid, perfil__establecimiento=est)
             generar_token_vinculacion(usuario_obj, est, duracion_minutos=120)
             messages.success(request, f"Nuevo código de vinculación generado para {usuario_obj.username}.")
             return redirect("configuracion")
@@ -901,11 +905,10 @@ def auditoria(request):
         if est_id:
             qs = qs.filter(Q(establecimiento_id=est_id) | Q(usuario__perfil__establecimiento_id=est_id))
     else:
-        # Modo propietario de tienda: solo su comercio
+        # Modo propietario de tienda: estrictamente su comercio
         qs = qs.filter(
             Q(establecimiento=perfil.establecimiento)
             | Q(usuario__perfil__establecimiento=perfil.establecimiento)
-            | Q(usuario__isnull=True, entidad_afectada="sesion")
         )
 
     if user_id:
@@ -1128,7 +1131,7 @@ def inventario_lista(request):
     categoria = request.GET.get("categoria") or "todas"
     query = (request.GET.get("q") or "").strip()
 
-    qs = Producto.objects.filter(establecimiento=est)
+    qs = Producto.objects.filter(establecimiento=est, estado="activo")
     if categoria != "todas":
         qs = qs.filter(categoria=categoria)
     if query:
@@ -1222,6 +1225,7 @@ def inventario_eliminar(request, pk):
     if request.method == "POST":
         nombre = prod.nombre
         Auditoria.objects.create(
+            establecimiento=perfil.establecimiento,
             usuario=request.user,
             entidad_afectada="producto",
             id_registro=prod.pk,
@@ -1636,9 +1640,17 @@ def api_comprobar_pago_electronico(request, referencia):
     Comprobación técnica y criptográfica de una transacción Bre-B / BanRep.
     Demuestra la no-repudiabilidad, la firma digital HMAC-SHA256 y el ID del switch financiero.
     """
-    tx = TransaccionBreB.objects.filter(referencia_unica=referencia).first()
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    if request.user.is_superuser:
+        tx = TransaccionBreB.objects.filter(referencia_unica=referencia).first()
+    else:
+        tx = TransaccionBreB.objects.filter(referencia_unica=referencia, establecimiento=perfil.establecimiento).first()
+
     if not tx:
-        return JsonResponse({"error": "Transacción no encontrada"}, status=404)
+        return JsonResponse({"error": "Transacción no encontrada o no pertenece a su comercio"}, status=404)
 
     timestamp_str = timezone.localtime(tx.fecha_confirmacion or tx.fecha_creacion).strftime("%Y-%m-%d %H:%M:%S")
     id_banrep = tx.id_transaccion_banrep or f"BANREP-SWITCH-2026-AUT-{tx.pk:06d}"
@@ -1851,7 +1863,15 @@ def api_generar_cobro_bre_b(request):
 @login_required
 def api_status_bre_b(request, referencia):
     """Consulta de estado polling con TTL para el modal de caja."""
-    tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    if request.user.is_superuser:
+        tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
+    else:
+        tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia, establecimiento=perfil.establecimiento)
+
     return JsonResponse({
         "referencia": tx.referencia_unica,
         "token_visual": tx.token_visual_corto,
@@ -1865,8 +1885,23 @@ def api_status_bre_b(request, referencia):
 @login_required
 def api_mock_webhook_bre_b(request, referencia):
     """Simulador de confirmación BanRep para demostraciones y pruebas de usabilidad."""
+    is_testing = "test" in sys.argv
+    if not settings.DEBUG and not request.user.is_superuser and not is_testing:
+        return JsonResponse(
+            {"error": "El simulador de webhook solo está habilitado en entorno local de pruebas (DEBUG) o para SuperAdmin."},
+            status=403,
+        )
+
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+
+    if request.user.is_superuser:
+        tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
+    else:
+        tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia, establecimiento=perfil.establecimiento)
+
     import secrets
-    tx = get_object_or_404(TransaccionBreB, referencia_unica=referencia)
     banrep_id = f"BANREP-SIM-{secrets.token_hex(4).upper()}"
     exito, msg, venta, _ = procesar_confirmacion_bre_b(
         referencia_unica=referencia,
