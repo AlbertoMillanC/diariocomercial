@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -688,6 +689,47 @@ class Cliente(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.nit_cedula})"
+
+    def obtener_sigla_tipo(self) -> str:
+        """Retorna la sigla legible en letras (CC, NIT, CE, TI, etc.) según el código numérico DIAN."""
+        siglas = {
+            "11": "RC",
+            "12": "TI",
+            "13": "CC",
+            "21": "TE",
+            "22": "CE",
+            "31": "NIT",
+            "41": "PAS",
+            "42": "DIE",
+            "47": "PPT",
+        }
+        return siglas.get(str(self.tipo_documento), "CC")
+
+    def obtener_nombre_tipo(self) -> str:
+        """Retorna el nombre formal del tipo de documento."""
+        nombres = {
+            "11": "Registro Civil",
+            "12": "Tarjeta de Identidad",
+            "13": "Cédula de Ciudadanía",
+            "21": "Tarjeta de Extranjería",
+            "22": "Cédula de Extranjería",
+            "31": "NIT",
+            "41": "Pasaporte",
+            "42": "Doc. Extranjero",
+            "47": "PPT",
+        }
+        return nombres.get(str(self.tipo_documento), "Cédula")
+
+    def formatear_para_ticket(self) -> str:
+        """Formatea la línea del cliente para presentación legible al público y tickets."""
+        if self.es_consumidor_final or self.nit_cedula == "222222222222":
+            return "Consumidor Final (222222222222)"
+        sigla = self.obtener_sigla_tipo()
+        nom = (self.nombre or "").strip()
+        es_generico = bool(re.search(r"^(cliente|cc|nit|ce|ti|rc|pas|ppt)(\s+\d+)?\s+(\d+|\d+-\d+)$", nom, re.IGNORECASE))
+        if es_generico or not nom or nom == self.nit_cedula:
+            return f"{sigla} {self.nit_cedula}"
+        return f"{nom} ({sigla} {self.nit_cedula})"
 
     @classmethod
     def obtener_consumidor_final(cls, establecimiento):

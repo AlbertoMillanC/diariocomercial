@@ -407,8 +407,7 @@ def despachar_mensaje(
             nombre_limpio = re.sub(r"\s+", " ", nombre_limpio).strip(" :-.,")
 
             tipo_pers = "juridica" if tipo_doc == "31" else "natural"
-            prefix = "NIT" if tipo_doc == "31" else ("CE" if tipo_doc == "22" else "CC")
-            sufijo_dian = f", Tipo {tipo_doc} DIAN"
+            sigla = {"31": "NIT", "13": "CC", "22": "CE", "12": "TI", "11": "RC", "41": "PAS", "47": "PPT"}.get(str(tipo_doc), "CC")
 
             mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
             dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
@@ -417,7 +416,7 @@ def despachar_mensaje(
             if not cliente:
                 cliente = Cliente.objects.create(
                     establecimiento=establecimiento,
-                    nombre=nombre_limpio or f"Cliente {tipo_doc} {doc_num}",
+                    nombre=nombre_limpio or f"{sigla} {doc_num}",
                     tipo_documento=tipo_doc,
                     nit_cedula=doc_num,
                     tipo_persona=tipo_pers,
@@ -496,26 +495,25 @@ def despachar_mensaje(
                     }
                     resp = (
                         f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {datos_doc['badge_pago']}{stock_fmt}\n"
-                        f"🧾 Ticket #{venta.pk} | {hora_str}\n"
-                        f"👤 *Cliente NIT:* {cliente.nombre} (NIT {cliente.nit_cedula})\n\n"
+                        f"🧾 Factura de Venta #{venta.pk} | {hora_str}\n"
+                        f"👤 *Cliente:* {cliente.formatear_para_ticket()}\n\n"
                         f"🧾 *Iniciando Factura Electrónica DIAN*\n"
                         f"Para emitir la factura electrónica oficial ante la DIAN, falta indicar el *Correo electrónico*.\n\n"
                         f"👉 Por favor responde con: `correo@empresa.com` (o `Nombre_Empresa correo@empresa.com`)\n"
-                        f"_(O escribe `cancelar` para dejarla solo como ticket ordinario)_"
+                        f"_(O escribe `cancelar` para dejarla solo como venta ordinaria)_"
                     )
                     if res_inv.info_formateada:
                         resp += f"\n{res_inv.info_formateada}"
                     _cachear_respuesta(canal, identificador_mensaje, resp)
                     return (resp, venta, None) if return_adjuntos else resp
 
-            if cliente.nombre and not cliente.nombre.startswith(("Cliente ", "CC ", "NIT ", "CE ")) and cliente.nombre != cliente.nit_cedula:
-                cli_det = f"{cliente.nombre} ({prefix} {cliente.nit_cedula}{sufijo_dian})"
-            else:
-                cli_det = f"{prefix} {cliente.nit_cedula}{sufijo_dian}"
+            cli_det = cliente.formatear_para_ticket()
+            es_factura = (tipo_doc == "31" or getattr(venta, "solicita_factura_electronica", False))
+            rotulo_doc = f"🧾 Factura de Venta #{venta.pk}" if es_factura else f"🧾 Ticket #{venta.pk}"
 
             resp = (
                 f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {datos_doc['badge_pago']}{stock_fmt}\n"
-                f"🧾 Ticket #{venta.pk} | {hora_str}\n"
+                f"{rotulo_doc} | {hora_str}\n"
                 f"👤 *Cliente:* {cli_det}"
             )
             if res_inv.info_formateada:
@@ -927,23 +925,16 @@ def _registrar_venta(
 
     # 2. Venta Normal de Mostrador (Ticket con identificación de documento o ventas menores 222222222222)
     if doc_cliente_directo:
-        if tipo_doc_dian_directo:
-            sufijo_tipo = f", Tipo {tipo_doc_dian_directo} DIAN"
-            sufijo_solo = f" (Tipo {tipo_doc_dian_directo} DIAN)"
-        else:
-            sufijo_tipo = ""
-            sufijo_solo = ""
-
-        if cliente_ticket.nombre and not cliente_ticket.nombre.startswith(("Cliente CC", "CC ", "NIT ", "CE ")) and cliente_ticket.nombre != cliente_ticket.nit_cedula:
-            cli_line = f"👤 *Cliente:* {cliente_ticket.nombre} ({prefix} {cliente_ticket.nit_cedula}{sufijo_tipo})"
-        else:
-            cli_line = f"👤 *Cliente:* {prefix} {cliente_ticket.nit_cedula}{sufijo_solo}"
+        cli_line = f"👤 *Cliente:* {cliente_ticket.formatear_para_ticket()}"
     else:
         cli_line = "👤 *Cliente:* Consumidor Final (222222222222)"
 
+    es_factura = (cliente_ticket.tipo_documento == "31" or getattr(venta, "solicita_factura_electronica", False))
+    rotulo_doc = f"🧾 Factura de Venta #{venta.pk}" if es_factura else f"🧾 Ticket #{venta.pk}"
+
     resp = (
         f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {badge_pago}{stock_fmt}\n"
-        f"🧾 Ticket #{venta.pk} | {hora_str}\n"
+        f"{rotulo_doc} | {hora_str}\n"
         f"{cli_line}"
     )
     if info_inv:

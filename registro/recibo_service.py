@@ -175,18 +175,23 @@ def generar_pdf_recibo_venta(venta: Venta) -> bytes:
         nit_str += f" - {est.municipio.nombre.upper()}"
     dir_str = est.direccion[:38] if est.direccion else ""
 
-    ticket_num = f"TICKET NÚMERO: #{venta.pk:05d}"
+    es_factura = bool(venta.solicita_factura_electronica or venta.numero_factura_electronica or (venta.cliente and venta.cliente.tipo_documento == "31"))
+    if es_factura:
+        num_doc = venta.numero_factura_electronica or f"FE-{venta.pk:05d}"
+        ticket_num = f"FACTURA ELECTRÓNICA: {num_doc}"
+        tipo_comprobante_titulo = "FACTURA ELECTRÓNICA DE VENTA"
+    else:
+        ticket_num = f"TICKET NÚMERO: #{venta.pk:05d}"
+        tipo_comprobante_titulo = "COMPROBANTE DE PAGO"
+
     hora_str = timezone.localtime(venta.fecha_hora).strftime("%d/%m/%Y  %I:%M %p")
     cajero = venta.usuario.get_full_name() or venta.usuario.username if venta.usuario else "Cajero"
     cajero_str = f"Atendido por: {cajero[:28]}"
 
     if not venta.cliente or venta.cliente.es_consumidor_final:
         cli_str = "Cliente: Consumidor Final (222222222222)"
-    elif venta.cliente.nombre and not venta.cliente.nombre.startswith(("Cliente CC", "CC ", "NIT ")) and venta.cliente.nombre != venta.cliente.nit_cedula:
-        cli_str = f"Cliente: {venta.cliente.nombre[:22]} (CC {venta.cliente.nit_cedula})"
     else:
-        prefix = "NIT" if ("-" in venta.cliente.nit_cedula or (len(venta.cliente.nit_cedula) == 9 and venta.cliente.nit_cedula.startswith(("8", "9")))) else "CC"
-        cli_str = f"Cliente: {prefix} {venta.cliente.nit_cedula}"
+        cli_str = f"Cliente: {venta.cliente.formatear_para_ticket()}"
 
     concepto_str = f"Concepto: {(venta.concepto or 'Venta de mostrador')[:36]}"
     medio_display = venta.get_medio_pago_display() or venta.medio_pago.upper()
@@ -209,7 +214,7 @@ def generar_pdf_recibo_venta(venta: Venta) -> bytes:
         items.append(("text", dir_str, 7, False, True, 9))
     items.append(("line", 0.5, 3, 4))
 
-    items.append(("text", "COMPROBANTE DE PAGO / FACTURA", 8, True, True, 10))
+    items.append(("text", tipo_comprobante_titulo, 8, True, True, 10))
     items.append(("text", ticket_num, 8.5, True, True, 10))
     items.append(("text", f"Fecha: {hora_str}", 7.5, False, False, 9.5))
     items.append(("text", cajero_str, 7.5, False, False, 9.5))

@@ -365,7 +365,8 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertIsNotNone(v)
         self.assertEqual(v.valor, Decimal("40000"))
         self.assertIn("Ticket #", resp)
-        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp)
+        self.assertIn("CC 7178367", resp)
+        self.assertNotIn("Tipo 13 DIAN", resp)
 
         v.refresh_from_db()
         self.assertIsNotNone(v.cliente)
@@ -383,9 +384,10 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         resp, v, _ = despachar_mensaje("telegram", "66778899", "50 mil carne 31 901234567-1 Inversiones Boyacá", return_adjuntos=True)
         self.assertIsNotNone(v)
         self.assertEqual(v.valor, Decimal("50000"))
-        self.assertIn("Ticket #", resp)
+        self.assertIn("Factura de Venta #", resp)
+        self.assertNotIn("Ticket #", resp)
         self.assertIn("NIT 901234567-1", resp)
-        self.assertIn("Tipo 31 DIAN", resp)
+        self.assertNotIn("Tipo 31 DIAN", resp)
 
         v.refresh_from_db()
         self.assertIsNotNone(v.cliente)
@@ -410,7 +412,7 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertIsNotNone(v2)
         self.assertIn("Ticket #", resp2)
         self.assertIn("CC 7178367", resp2)
-        self.assertIn("Tipo 13 DIAN", resp2)
+        self.assertNotIn("Tipo 13 DIAN", resp2)
         self.assertEqual(v2.cliente.nit_cedula, "7178367")
         self.assertEqual(v2.cliente.tipo_documento, "13")
 
@@ -439,7 +441,8 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertEqual(v.cliente.nit_cedula, "7178367")
         self.assertEqual(v.cliente.tipo_documento, "13")
         self.assertIn("Pan campesino (80 und)", v.concepto)
-        self.assertIn("CC 7178367 (Tipo 13 DIAN)", resp)
+        self.assertIn("CC 7178367", resp)
+        self.assertNotIn("Tipo 13 DIAN", resp)
 
     def test_bot_venta_13_mil_no_es_codigo_dian(self):
         """Verifica que '13 mil carne' se interprete como $13.000 COP y no como código DIAN 13."""
