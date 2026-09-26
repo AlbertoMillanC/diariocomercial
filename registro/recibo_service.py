@@ -204,6 +204,8 @@ def generar_pdf_recibo_venta(venta: Venta) -> bytes:
     linea(f"Fecha: {hora_str}", size=8)
     cajero = venta.usuario.get_full_name() or venta.usuario.username if venta.usuario else "Cajero"
     linea(f"Atendido por: {cajero}", size=8)
+    cli_str = f"{venta.cliente.nombre} ({venta.cliente.nit_cedula})" if venta.cliente else "Consumidor Final (222222222222)"
+    linea(f"Cliente: {cli_str[:35]}", size=8)
 
     divisor()
     linea("DETALLE DE LA OPERACIÓN", size=8, bold=True)

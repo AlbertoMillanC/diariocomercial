@@ -299,3 +299,56 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         v.refresh_from_db()
         self.assertFalse(v.solicita_factura_electronica)
         self.assertEqual(v.numero_factura_electronica, "")
+
+    def test_bot_venta_con_documento_directo(self):
+        """Verifica venta con cédula o documento directo en el ticket (ej: 40 mil carne documento 7178367)."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="44332211", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "44332211", "40 mil carne documento 7178367", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("40000"))
+        self.assertIn("Ticket #", resp)
+        self.assertIn("7178367", resp)
+
+        v.refresh_from_db()
+        self.assertIsNotNone(v.cliente)
+        self.assertEqual(v.cliente.nit_cedula, "7178367")
+
+    def test_bot_venta_pide_documento_conversacional(self):
+        """Verifica que si escribe 'con documento' sin número, el bot lo pide y lo vincula al ticket."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="33221100", usuario=self.dueno, establecimiento=self.est
+        )
+        # Paso 1: Pide documento
+        resp1, v1, _ = despachar_mensaje("telegram", "33221100", "30 mil lomo con documento", return_adjuntos=True)
+        self.assertIn("Por favor escribe el número de documento", resp1)
+
+        # Paso 2: Envía el documento
+        resp2 = despachar_mensaje("telegram", "33221100", "7178367 Pedro Pérez")
+        self.assertIn("Documento Asignado al Ticket", resp2)
+        self.assertIn("7178367", resp2)
+
+        v1.refresh_from_db()
+        self.assertEqual(v1.cliente.nit_cedula, "7178367")
+
+    def test_bot_venta_menores_consumidor_final_por_defecto(self):
+        """Verifica que sin documento sale asignado a 222222222222 (Consumidor Final para ventas menores)."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="22110099", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "22110099", "25 mil queso", return_adjuntos=True)
+        self.assertIn("Consumidor Final (222222222222)", resp)
+
+        v.refresh_from_db()
+        self.assertEqual(v.cliente.nit_cedula, "222222222222")
+        self.assertTrue(v.cliente.es_consumidor_final)

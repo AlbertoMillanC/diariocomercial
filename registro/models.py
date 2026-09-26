@@ -653,6 +653,24 @@ class Cliente(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.nit_cedula})"
 
+    @classmethod
+    def obtener_consumidor_final(cls, establecimiento):
+        cli = cls.objects.filter(establecimiento=establecimiento, nit_cedula="222222222222").first()
+        if not cli:
+            mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
+            dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
+            cli = cls.objects.create(
+                establecimiento=establecimiento,
+                nombre="Consumidor Final",
+                nit_cedula="222222222222",
+                tipo_documento="13",
+                tipo_persona="natural",
+                es_consumidor_final=True,
+                municipio_nombre=mun_nom,
+                departamento_nombre=dep_nom,
+            )
+        return cli
+
 
 # ============================================================================
 # FASE 3: BRE-B (PAGOS INTEROPERABLES EN TIEMPO REAL BANREP)

@@ -48,6 +48,10 @@ _TICKETS_ABIERTOS: Dict[Tuple[str, str], Dict[str, Any]] = {}
 # Estructura: {(canal, id_externo): {"venta_id": int, "monto": Decimal, "concepto": str}}
 _VENTAS_PENDIENTES_FACTURA: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
+# Buffer para tickets de mostrador que están esperando número de documento de cliente
+# Estructura: {(canal, id_externo): {"venta_id": int, "fecha": datetime}}
+_VENTAS_PENDIENTES_DOCUMENTO: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
 
 def generar_token_vinculacion(usuario: User, establecimiento: Establecimiento, duracion_minutos: int = 60) -> str:
     """Genera un token de 6 dígitos seguro para vincular un dispositivo en 1 toque."""
@@ -222,6 +226,76 @@ def despachar_mensaje(
             else:
                 _VENTAS_PENDIENTES_FACTURA.pop(key_sesion, None)
 
+    # 4.0.1 Interceptación de Flujo de Documento de Cliente Pendiente para Ticket
+    if key_sesion in _VENTAS_PENDIENTES_DOCUMENTO:
+        if t_norm in ("omitir", "no", "cancelar", "saltar", "final", "consumidor final") or t_norm.startswith("omitir"):
+            _VENTAS_PENDIENTES_DOCUMENTO.pop(key_sesion, None)
+            resp = "✅ Ticket registrado para Consumidor Final (222222222222) para ventas menores y registro tributario."
+            _cachear_respuesta(canal, identificador_mensaje, resp)
+            return (resp, None, None) if return_adjuntos else resp
+
+        val_prueba, _ = parsear_dinero(texto)
+        es_venta_nueva = (
+            val_prueba is not None
+            and val_prueba > 0
+            and any(w in t_norm for w in [" mil", "mil", "lucas", " k", "$"])
+            and not ("@" in texto or "nit" in t_norm or "cedula" in t_norm or "cc" in t_norm or "doc" in t_norm)
+        )
+        if es_venta_nueva:
+            _VENTAS_PENDIENTES_DOCUMENTO.pop(key_sesion, None)
+        elif not texto.startswith("/"):
+            datos_doc = _VENTAS_PENDIENTES_DOCUMENTO.pop(key_sesion, None)
+            venta_pend = Venta.objects.filter(pk=datos_doc["venta_id"], establecimiento=establecimiento).first()
+            if venta_pend:
+                match_num = re.search(r"\b(\d{5,12}(?:-\d)?)\b", texto)
+                if match_num:
+                    doc_num = match_num.group(1)
+                    resto_nombre = texto[:match_num.start()] + " " + texto[match_num.end():]
+                    nombre_limpio = re.sub(r"\b(cc|c\.c\.|nit|cedula|documento|doc|cliente|nombre)\b", " ", resto_nombre, flags=re.IGNORECASE)
+                    nombre_limpio = re.sub(r"\s+", " ", nombre_limpio).strip(" :-.,")
+
+                    cliente = Cliente.objects.filter(establecimiento=establecimiento, nit_cedula=doc_num).first()
+                    if not cliente:
+                        mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
+                        dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
+                        tipo_doc = "31" if ("-" in doc_num or (len(doc_num.split("-")[0]) == 9 and doc_num.startswith(("8", "9")))) else "13"
+                        tipo_pers = "juridica" if tipo_doc == "31" else "natural"
+                        cliente = Cliente.objects.create(
+                            establecimiento=establecimiento,
+                            nombre=nombre_limpio or f"Cliente CC {doc_num}",
+                            tipo_documento=tipo_doc,
+                            nit_cedula=doc_num,
+                            tipo_persona=tipo_pers,
+                            municipio_nombre=mun_nom,
+                            departamento_nombre=dep_nom,
+                        )
+                    elif nombre_limpio and cliente.nombre != nombre_limpio and not cliente.nombre.startswith("Cliente CC"):
+                        cliente.nombre = nombre_limpio
+                        cliente.save(update_fields=["nombre"])
+
+                    venta_pend.cliente = cliente
+                    venta_pend.save(update_fields=["cliente"])
+
+                    Auditoria.objects.create(
+                        establecimiento=establecimiento,
+                        usuario=usuario,
+                        entidad_afectada="Venta",
+                        id_registro=venta_pend.pk,
+                        accion="asignar_cliente_ticket",
+                        valor_anterior="Consumidor Final (222222222222)",
+                        valor_nuevo=f"Cliente={cliente.nombre}, Doc={cliente.nit_cedula}",
+                        motivo="Asignación de documento de cliente para ticket de venta",
+                    )
+
+                    resp = (
+                        f"✅ *Documento Asignado al Ticket #{venta_pend.pk}:*\n"
+                        f"• *Cliente:* {cliente.nombre}\n"
+                        f"• *Documento:* `{cliente.nit_cedula}` ({cliente.get_tipo_documento_display()})\n"
+                        f"📄 Registro tributario actualizado correctamente."
+                    )
+                    _cachear_respuesta(canal, identificador_mensaje, resp)
+                    return (resp, None, None) if return_adjuntos else resp
+
     # 4.1 Comandos Restringidos (Solo Propietario)
     if any(t_norm.startswith(cmd) for cmd in ["/hoy", "cierre de caja", "arqueo", "cierre", "/excel", "/consolidado", "/resumen", "/anular"]):
         if not es_propietario:
@@ -314,14 +388,42 @@ def _registrar_venta(
     """Interpreta y asienta la venta con descuento atómico de inventario e ICA."""
     t_lower = normalizar_texto(texto)
 
-    # Detección si el comerciante o cliente solicita Factura Electrónica formal
+    # 1. Detección si el comerciante o cliente solicita Factura Electrónica formal
     quiere_factura = bool(re.search(r"\b(con\s+factura|factura|facturacion|fe)\b", t_lower))
 
     # Limpiar palabra 'factura' para que no contamine la búsqueda de producto o concepto
     texto_sin_factura = re.sub(r"\b(con\s+factura|factura|facturacion|fe)\b", " ", texto, flags=re.IGNORECASE).strip()
 
-    val, texto_sin_dinero = parsear_dinero(texto_sin_factura)
-    kilos = parsear_peso(texto_sin_factura)
+    # 2. Detección de Documento / Cédula / NIT de Cliente en el texto para el ticket
+    # Ejemplo: 40 mil carne documento 7178367, 40 mil carne cc 7178367, 40 mil carne doc 7178367
+    match_doc_con_num = re.search(
+        r"(?:documento|doc|cc|c\.c\.|cedula|cdula|nit|cliente)[:\s]*(\d{5,12}(?:-\d)?)",
+        texto_sin_factura,
+        re.IGNORECASE,
+    )
+    doc_cliente_directo = match_doc_con_num.group(1) if match_doc_con_num else None
+
+    # ¿Pidió documento pero no escribió el número? (ej: 40 mil carne con documento, 40 mil carne documento)
+    pide_documento_sin_num = bool(
+        not doc_cliente_directo
+        and not quiere_factura
+        and re.search(r"\b(con\s+documento|con\s+doc|documento|doc|cedula|cliente)\b", t_lower)
+    )
+
+    # Limpiar el documento o la solicitud de documento del texto para no alterar concepto ni inventario
+    if match_doc_con_num:
+        texto_para_inventario = (
+            texto_sin_factura[:match_doc_con_num.start()] + " " + texto_sin_factura[match_doc_con_num.end():]
+        )
+    elif pide_documento_sin_num:
+        texto_para_inventario = re.sub(
+            r"\b(con\s+documento|con\s+doc|documento|doc|cedula|cliente)\b", " ", texto_sin_factura, flags=re.IGNORECASE
+        )
+    else:
+        texto_para_inventario = texto_sin_factura
+
+    val, texto_sin_dinero = parsear_dinero(texto_para_inventario)
+    kilos = parsear_peso(texto_para_inventario)
 
     # Detección de medio de pago
     medio_pago = "efectivo"
@@ -341,7 +443,7 @@ def _registrar_venta(
 
     # Procesar inventario
     prod, kg_desc, lb_desc, val_final, info_inv = procesar_salida_inventario(
-        establecimiento, texto_sin_factura, valor_ingresado=val
+        establecimiento, texto_para_inventario, valor_ingresado=val
     )
 
     if not val_final or val_final <= 0:
@@ -355,11 +457,33 @@ def _registrar_venta(
     actividad = establecimiento.actividades.first()
     concepto_venta = prod.nombre if prod else (texto_sin_dinero[:120] or "Venta general")
 
+    # Asignación o resolución del Cliente para la venta
+    mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
+    dep_nom = establecimiento.municipio.departamento if establecimiento.municipio else "Boyacá"
+
+    if doc_cliente_directo:
+        cliente_ticket = Cliente.objects.filter(establecimiento=establecimiento, nit_cedula=doc_cliente_directo).first()
+        if not cliente_ticket:
+            tipo_doc = "31" if ("-" in doc_cliente_directo or (len(doc_cliente_directo.split("-")[0]) == 9 and doc_cliente_directo.startswith(("8", "9")))) else "13"
+            tipo_pers = "juridica" if tipo_doc == "31" else "natural"
+            cliente_ticket = Cliente.objects.create(
+                establecimiento=establecimiento,
+                nombre=f"Cliente CC {doc_cliente_directo}",
+                tipo_documento=tipo_doc,
+                nit_cedula=doc_cliente_directo,
+                tipo_persona=tipo_pers,
+                municipio_nombre=mun_nom,
+                departamento_nombre=dep_nom,
+            )
+    else:
+        cliente_ticket = Cliente.obtener_consumidor_final(establecimiento)
+
     with transaction.atomic():
         venta = Venta.objects.create(
             establecimiento=establecimiento,
             usuario=usuario,
             actividad=actividad,
+            cliente=cliente_ticket,
             fecha=timezone.localdate(),
             fecha_hora=timezone.now(),
             valor=val_final,
@@ -371,6 +495,7 @@ def _registrar_venta(
     valor_fmt = f"${val_final:,.0f}".replace(",", ".")
     concepto_fmt = concepto_venta
     stock_fmt = f" | Quedan {prod.stock_kilos} Kg" if prod else ""
+    hora_str = timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')
 
     # 1. Si solicitó factura electrónica formal DIAN
     if quiere_factura:
@@ -411,10 +536,33 @@ def _registrar_venta(
                 resp += f"\n{info_inv}"
             return resp, venta
 
-    # 2. Venta Normal de Mostrador (Ticket limpio y rápido sin saturar con factura)
+    # 2. Si pidió registrar documento para el ticket pero omitió el número
+    if pide_documento_sin_num:
+        if canal_sesion:
+            _VENTAS_PENDIENTES_DOCUMENTO[canal_sesion] = {
+                "venta_id": venta.pk,
+                "fecha": timezone.now(),
+            }
+        resp = (
+            f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {badge_pago}{stock_fmt}\n"
+            f"🧾 Ticket #{venta.pk} | {hora_str}\n\n"
+            f"✍️ *Por favor escribe el número de documento o cédula del cliente:*\n"
+            f"_(O escribe `omitir` para dejarlo en ventas menores 222222222222)_"
+        )
+        if info_inv:
+            resp += f"\n{info_inv}"
+        return resp, venta
+
+    # 3. Venta Normal de Mostrador (Ticket con identificación de documento o ventas menores 222222222222)
+    if doc_cliente_directo:
+        cli_line = f"👤 *Cliente:* {cliente_ticket.nombre} (`{cliente_ticket.nit_cedula}`)"
+    else:
+        cli_line = "👤 *Cliente:* Consumidor Final (222222222222)"
+
     resp = (
         f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {badge_pago}{stock_fmt}\n"
-        f"🧾 Ticket #{venta.pk} | {timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')}"
+        f"🧾 Ticket #{venta.pk} | {hora_str}\n"
+        f"{cli_line}"
     )
     if info_inv:
         resp += f"\n{info_inv}"
