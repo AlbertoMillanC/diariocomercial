@@ -182,19 +182,37 @@ class FrontendUsabilidadTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Recuperar Contraseña")
 
-        # 2. POST restablecer
+        # 2. POST solicitar enlace
         resp_post = self.client.post("/recuperar-password/", {
             "identificador": "don_ramon",
-            "nueva_password": "nueva_clave_2026",
-            "confirmar_password": "nueva_clave_2026",
         })
-        self.assertEqual(resp_post.status_code, 302)
-        self.assertRedirects(resp_post, "/login/")
+        self.assertEqual(resp_post.status_code, 200)
+        self.assertContains(resp_post, "Instrucciones Despachadas")
 
-        # 3. Iniciar sesión con la nueva clave
+        # 3. Establecer nueva contraseña con token criptográfico válido
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+
+        uidb64 = urlsafe_base64_encode(force_bytes(self.owner.pk))
+        token = default_token_generator.make_token(self.owner)
+        url_confirm = f"/recuperar-password/confirmar/{uidb64}/{token}/"
+
+        resp_conf_get = self.client.get(url_confirm)
+        self.assertEqual(resp_conf_get.status_code, 200)
+        self.assertContains(resp_conf_get, "Nueva Contraseña")
+
+        resp_conf_post = self.client.post(url_confirm, {
+            "nueva_password": "nueva_clave_2026_segura",
+            "confirmar_password": "nueva_clave_2026_segura",
+        })
+        self.assertEqual(resp_conf_post.status_code, 302)
+        self.assertRedirects(resp_conf_post, "/login/")
+
+        # 4. Iniciar sesión con la nueva clave
         resp_login = self.client.post("/login/", {
             "username": "don_ramon",
-            "password": "nueva_clave_2026",
+            "password": "nueva_clave_2026_segura",
         })
         self.assertEqual(resp_login.status_code, 302)
 

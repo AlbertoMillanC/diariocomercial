@@ -216,20 +216,33 @@ class Command(BaseCommand):
         texto_limpio = texto.strip()
         cmd = texto_limpio.lower()
 
+        # Resolver el vínculo multi-tenant del canal
+        vinculo = VinculoCanal.objects.select_related("usuario", "establecimiento").filter(
+            canal="telegram", identificador_externo=str(chat_id), activo=True
+        ).first()
+        est = vinculo.establecimiento if vinculo else None
+
+        # Si el usuario no está vinculado, verificar si es comando de autenticación
+        es_auth = bool(re.search(r"auth_[A-Za-z0-9_-]+", texto_limpio) or re.search(r"\b\d{6}\b", texto_limpio) or cmd.startswith("/start"))
+
+        if not est and not es_auth:
+            client.send_message(
+                chat_id,
+                "⚠️ *Tu cuenta de Telegram aún no está vinculada a ningún comercio.*\n\n"
+                "Para vincularla de forma segura en 1 clic:\n"
+                "1. Ingresa a la plataforma web de tu comercio.\n"
+                "2. Ve a *Configuración ➔ Asistente Móvil*.\n"
+                "3. Genera tu código de 6 dígitos y envíalo en este chat (ej: `849201`)."
+            )
+            return
+
         # 1. Comando /consolidado o /excel -> Envía archivo Excel adjunto (RBAC: Solo Propietario)
         if cmd in ("/consolidado", "consolidado", "/excel", "excel"):
-            vinculo = VinculoCanal.objects.select_related("usuario", "establecimiento").filter(
-                canal="telegram", identificador_externo=str(chat_id), activo=True
-            ).first()
-            if not vinculo:
-                client.send_message(
-                    chat_id,
-                    "⚠️ Tu Telegram aún no está vinculado a ningún comercio.\n"
-                    "Ve a Configuración en la plataforma web para vincularlo en 1 clic."
-                )
+            if not est:
+                client.send_message(chat_id, "⚠️ Debes vincular tu comercio antes de solicitar reportes.")
                 return
 
-            perfil = Perfil.objects.filter(user=vinculo.usuario, establecimiento=vinculo.establecimiento).first()
+            perfil = Perfil.objects.filter(user=vinculo.usuario, establecimiento=est).first()
             if perfil and not perfil.es_propietario():
                 client.send_message(
                     chat_id,
@@ -238,12 +251,85 @@ class Command(BaseCommand):
                 return
 
             client.send_message(chat_id, "⏳ _Generando archivo Excel del consolidado para el contador..._")
-            archivo_bytes, nombre_archivo = self.generar_excel_consolidado(est=vinculo.establecimiento)
-            caption = f"📊 *Consolidado Oficial de DiarioComercial*\nEstablecimiento: {vinculo.establecimiento.nombre}\nPeriodo: {date.today().strftime('%B %Y')}"
+            archivo_bytes, nombre_archivo = self.generar_excel_consolidado(est=est)
+            caption = f"📊 *Consolidado Oficial de DiarioComercial*\nEstablecimiento: {est.nombre}\nPeriodo: {date.today().strftime('%B %Y')}"
             client.send_document(chat_id, archivo_bytes, nombre_archivo, caption)
             return
 
-        # Para todos los demás comandos (ventas, compras, stock, cierre /hoy, cobro Bre-B), delega a bot_service
+        # 2. Comandos de inventario por grupos / departamentos
+        if cmd in ("/inventario", "inventario", "/stock", "stock"):
+            client.send_message(chat_id, generar_resumen_general_categorias(est))
+            return
+
+        if cmd in ("/carnes", "carnes", "/carne", "carne"):
+            client.send_message(chat_id, generar_lista_categoria(est, "carnes"))
+            return
+
+        if cmd in ("/abarrotes", "abarrotes", "/viveres", "viveres", "/granos", "granos"):
+            client.send_message(chat_id, generar_lista_categoria(est, "abarrotes"))
+            return
+
+        if cmd in ("/lacteos", "lacteos", "/huevos", "huevos"):
+            client.send_message(chat_id, generar_lista_categoria(est, "lacteos"))
+            return
+
+        if cmd in ("/fruver", "fruver", "/verduras", "verduras", "/frutas", "frutas"):
+            client.send_message(chat_id, generar_lista_categoria(est, "fruver"))
+            return
+
+        if cmd in ("/bebidas", "bebidas", "/bebida", "bebida"):
+            client.send_message(chat_id, generar_lista_categoria(est, "bebidas"))
+            return
+
+        if cmd in ("/aseo", "aseo", "/limpieza", "limpieza"):
+            client.send_message(chat_id, generar_lista_categoria(est, "aseo"))
+            return
+
+        # 3. Comandos de Compras / Pedido Formal y preguntas de faltantes
+        t_compras = normalizar_texto(texto_limpio).replace("¿", "").replace("?", "").strip()
+        es_consulta_compras = (
+            cmd in ("/comprar", "comprar", "/pedido", "pedido", "/pedidos", "pedidos", "/faltantes", "faltantes")
+            or t_compras in (
+                "que debo comprar", "que hay que comprar", "que se acabo", "que falta",
+                "que falta comprar", "lista de compras", "lista compras", "que compras faltan", "que comprar"
+            )
+            or bool(re.match(r"^(?:que\s+(?:debo|hay\s+que|falta|toca)\s+comprar|que\s+se\s+acabo|lista\s+(?:de\s+)?compras?|pedidos?)$", t_compras))
+        )
+        if es_consulta_compras:
+            client.send_message(chat_id, generar_lista_compras(est))
+            return
+
+        # 4. Consultas en lenguaje natural de inventario
+        if est:
+            resp_consulta = consultar_producto_o_categoria(est, texto_limpio)
+            if resp_consulta:
+                client.send_message(chat_id, resp_consulta)
+                return
+
+        # 5. Comando /ultimas -> Últimos 5 movimientos
+        if cmd in ("/ultimas", "ultimas", "/historial", "historial"):
+            client.send_message(chat_id, self.generar_ultimas(est=est))
+            return
+
+        # 6. Comando /ica -> Información de impuesto ICA
+        if cmd in ("/ica", "ica", "/impuesto", "impuesto"):
+            client.send_message(chat_id, self.generar_informacion_ica(est=est))
+            return
+
+        # 7. Comando /resumen -> Acumulado del mes
+        if cmd in ("/resumen", "resumen", "/saldo", "saldo"):
+            client.send_message(chat_id, self.generar_resumen_mes(est=est))
+            return
+
+        # 8. Comando /anular <id> <motivo>
+        match_anular = re.match(r"^/anular\s+(\d+)\s*(.*)$", texto_limpio, re.IGNORECASE)
+        if match_anular:
+            venta_id = int(match_anular.group(1))
+            motivo = match_anular.group(2).strip() or "Error de digitación en caja"
+            client.send_message(chat_id, self.anular_venta(venta_id, motivo, autor, est=est))
+            return
+
+        # 9. Para todos los demás comandos (ventas, compras, stock, cierre /hoy, cobro Bre-B), delega al motor central
         resultado = bot_service_despachar(
             canal="telegram",
             identificador_externo=str(chat_id),
@@ -257,7 +343,8 @@ class Command(BaseCommand):
         else:
             respuesta, venta_obj, cobro_info = resultado, None, None
 
-        client.send_message(chat_id, respuesta)
+        if respuesta:
+            client.send_message(chat_id, respuesta)
 
         # Si se registró una venta, enviar automáticamente el QR Bre-B y la factura / recibo en PDF
         if venta_obj:
@@ -276,7 +363,7 @@ class Command(BaseCommand):
             try:
                 from registro.recibo_service import generar_imagen_qr_bre_b
                 tx = cobro_info["tx"]
-                est_cobro = cobro_info.get("establecimiento") or Establecimiento.objects.first()
+                est_cobro = cobro_info.get("establecimiento") or est
                 qr_bytes = generar_imagen_qr_bre_b(
                     monto=cobro_info["monto"],
                     establecimiento=est_cobro,
@@ -294,145 +381,7 @@ class Command(BaseCommand):
             except Exception as e_cobro:
                 self.stdout.write(self.style.WARNING(f"Aviso generando QR cobro: {e_cobro}"))
 
-        # 3. Comandos de inventario por grupos / departamentos
-        if cmd in ("/inventario", "inventario", "/stock", "stock"):
-            client.send_message(chat_id, generar_resumen_general_categorias(Establecimiento.objects.first()))
-            return
-
-        if cmd in ("/carnes", "carnes", "/carne", "carne"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "carnes"))
-            return
-
-        if cmd in ("/abarrotes", "abarrotes", "/viveres", "viveres", "/granos", "granos"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "abarrotes"))
-            return
-
-        if cmd in ("/lacteos", "lacteos", "/huevos", "huevos"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "lacteos"))
-            return
-
-        if cmd in ("/fruver", "fruver", "/verduras", "verduras", "/frutas", "frutas"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "fruver"))
-            return
-
-        if cmd in ("/bebidas", "bebidas", "/bebida", "bebida"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "bebidas"))
-            return
-
-        if cmd in ("/aseo", "aseo", "/limpieza", "limpieza"):
-            client.send_message(chat_id, generar_lista_categoria(Establecimiento.objects.first(), "aseo"))
-            return
-
-        # 4. Comandos de Compras / Pedido Formal y preguntas de faltantes
-        # /comprar, /pedido, /pedidos, /faltantes o "¿qué debo comprar?", "¿qué se acabó?", "¿qué falta?"
-        t_compras = normalizar_texto(texto_limpio).replace("¿", "").replace("?", "").strip()
-        es_consulta_compras = (
-            cmd in ("/comprar", "comprar", "/pedido", "pedido", "/pedidos", "pedidos", "/faltantes", "faltantes")
-            or t_compras in (
-                "que debo comprar", "que hay que comprar", "que se acabo", "que falta",
-                "que falta comprar", "lista de compras", "lista compras", "que compras faltan", "que comprar"
-            )
-            or bool(re.match(r"^(?:que\s+(?:debo|hay\s+que|falta|toca)\s+comprar|que\s+se\s+acabo|lista\s+(?:de\s+)?compras?|pedidos?)$", t_compras))
-        )
-        if es_consulta_compras:
-            client.send_message(chat_id, generar_lista_compras(Establecimiento.objects.first()))
-            return
-
-        # 5. Consultas en lenguaje natural de inventario ("que carnes tengo", "tenemos tocino", "cuanto vale el arroz", o escribir "salchicha")
-        resp_consulta = consultar_producto_o_categoria(Establecimiento.objects.first(), texto_limpio)
-        if resp_consulta:
-            client.send_message(chat_id, resp_consulta)
-            return
-
-        # 5. Comando /ultimas -> Últimos 5 movimientos
-        if cmd in ("/ultimas", "ultimas", "/historial", "historial"):
-            client.send_message(chat_id, self.generar_ultimas())
-            return
-
-        # 6. Comando /ica -> Información de impuesto ICA
-        if cmd in ("/ica", "ica", "/impuesto", "impuesto"):
-            client.send_message(chat_id, self.generar_informacion_ica())
-            return
-
-        # 7. Comando /resumen -> Acumulado del mes
-        if cmd in ("/resumen", "resumen", "/saldo", "saldo"):
-            client.send_message(chat_id, self.generar_resumen_mes())
-            return
-
-        # 8. Comando /ayuda, /start, /comandos, /guia
-        if cmd in ("/start", "/ayuda", "ayuda", "hola", "/comandos", "comandos", "/guia", "guia", "/instrucciones", "instrucciones"):
-            client.send_message(chat_id, self.mensaje_ayuda(autor))
-            return
-
-        # 9. Comando /anular <id> <motivo>
-        match_anular = re.match(r"^/anular\s+(\d+)\s*(.*)$", texto_limpio, re.IGNORECASE)
-        if match_anular:
-            venta_id = int(match_anular.group(1))
-            motivo = match_anular.group(2).strip() or "Error de digitación en caja"
-            client.send_message(chat_id, self.anular_venta(venta_id, motivo, autor))
-            return
-
-        # 10. Venta Empresa con Retención ReteICA: "Venta empresa 500000 Papeleria Central" o "Venta empresa 2 kilos lomo Asadero"
-        match_venta_empresa = re.match(r"^venta\s+empresa\s+(.*)$", texto_limpio, re.IGNORECASE)
-        if match_venta_empresa:
-            cuerpo = match_venta_empresa.group(1).strip()
-            _, valor, concepto, medio_pago = self.extraer_datos_venta(cuerpo)
-            client.send_message(chat_id, self.guardar_venta_empresa(valor or Decimal("0"), concepto, autor, medio_pago=medio_pago))
-            return
-
-        # 11. Venta Particular / Carnicería / Mostrador / Supermercado:
-        # Detecta si:
-        # a) Empieza por "venta" o "vendi" (ej: "Venta 40 mil carne molida nequi", "Venta 40000", "Venta 45000 viveres")
-        # b) O contiene un producto Y dinero: "40000 carne molida", "40 mil arroz", "20k pechuga", "15 mil costilla nequi"
-        # c) O contiene un producto Y peso: "1 libra carne molida", "2 kilos papa", "500g costilla"
-        es_venta_directa = bool(re.match(r"^(venta|vendi)\b", texto_limpio, re.IGNORECASE))
-        prod_detectado = buscar_producto_en_texto(Establecimiento.objects.first(), texto_limpio)
-        dinero_detectado, _ = parsear_dinero(texto_limpio)
-        peso_detectado = parsear_peso(texto_limpio)
-
-        if es_venta_directa or (prod_detectado and (dinero_detectado or peso_detectado)):
-            cuerpo = re.sub(r"^(venta|vendi)\s+", "", texto_limpio, flags=re.IGNORECASE).strip()
-            _, valor, concepto, medio_pago = self.extraer_datos_venta(cuerpo)
-            client.send_message(chat_id, self.guardar_venta(valor or dinero_detectado or Decimal("0"), concepto, autor, medio_pago=medio_pago))
-            return
-
-        # 12. Entrada de mercancía directa o reabastecimiento:
-        # "Llegaron 20 kilos de tocino", "Llego 15 kilos pechuga", "Entrada 50 kilos papa", "Surtir 20 kilos arroz"
-        match_entrada = re.match(r"^(?:llegaron|llego|entrada|surtir|recibir)\s+(.*)$", texto_limpio, re.IGNORECASE)
-        if match_entrada:
-            cuerpo_entrada = match_entrada.group(1).strip()
-            prod_ent, kilos_ent, info_entrada = procesar_entrada_inventario(Establecimiento.objects.first(), cuerpo_entrada)
-            if info_entrada:
-                client.send_message(chat_id, info_entrada)
-                return
-
-        # 13. Compra/Gasto: "Compra 80000 Distribuidora Boyaca"
-        match_compra = re.match(r"^compra\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
-        if match_compra:
-            valor_raw = match_compra.group(1).replace(".", "").replace(",", "")
-            proveedor = match_compra.group(2).strip() or "Gasto registrado por Telegram"
-            client.send_message(chat_id, self.guardar_compra(Decimal(valor_raw), proveedor, autor))
-            return
-
-        # 13. Retención suelta: "Retencion 18000 Alcaldia de Tunja"
-        match_ret = re.match(r"^retencion\s+([\d\.,]+)\s*(.*)$", texto_limpio, re.IGNORECASE)
-        if match_ret:
-            valor_raw = match_ret.group(1).replace(".", "").replace(",", "")
-            tercero = match_ret.group(2).strip() or "Tercero retenedor"
-            client.send_message(chat_id, self.guardar_retencion(Decimal(valor_raw), tercero, autor))
-            return
-
-        # No reconocido
-        client.send_message(
-            chat_id,
-            "❓ Comando no reconocido.\n\n"
-            "💬 *Puedes preguntarme en lenguaje natural:*\n"
-            "• _¿tenemos carne?_\n"
-            "• _¿tenemos tocino?_\n"
-            "• _¿que abarrotes hay?_\n"
-            "• _¿cuanto vale el arroz?_\n\n"
-            "O escribe `/inventario` o `/ayuda` para ver todos los comandos."
-        )
+        return
 
     def mensaje_ayuda(self, autor):
         return (
@@ -516,9 +465,10 @@ class Command(BaseCommand):
 
         return kilos, valor, concepto, medio_pago
 
-    def guardar_venta(self, valor, concepto, autor, medio_pago="efectivo"):
-        est = Establecimiento.objects.first()
-        usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
+    def guardar_venta(self, valor, concepto, autor, medio_pago="efectivo", est=None, usuario=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
+        usuario = usuario or User.objects.filter(perfil__establecimiento=est).first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
         tarifa_mil = actividad.tarifa_x_mil if actividad else Decimal("6.0")
 
@@ -572,9 +522,10 @@ class Command(BaseCommand):
             msg += f"\n{info_stock}"
         return msg
 
-    def guardar_venta_empresa(self, valor, concepto, autor, medio_pago="transferencia"):
-        est = Establecimiento.objects.first()
-        usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
+    def guardar_venta_empresa(self, valor, concepto, autor, medio_pago="transferencia", est=None, usuario=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
+        usuario = usuario or User.objects.filter(perfil__establecimiento=est).first() or User.objects.first()
         actividad = ActividadCIIU.objects.filter(establecimiento=est).first()
         tarifa_mil = actividad.tarifa_x_mil if actividad else Decimal("6.0")
 
@@ -631,9 +582,10 @@ class Command(BaseCommand):
             msg += f"\n{info_stock}"
         return msg
 
-    def guardar_compra(self, valor, proveedor, autor):
-        est = Establecimiento.objects.first()
-        usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
+    def guardar_compra(self, valor, proveedor, autor, est=None, usuario=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
+        usuario = usuario or User.objects.filter(perfil__establecimiento=est).first() or User.objects.first()
 
         # Reabastecer stock si la compra incluye producto y peso (ej: 20 kilos tocino Frigorifico)
         prod_ent, kilos_ent, info_entrada = procesar_entrada_inventario(est, proveedor)
@@ -667,9 +619,10 @@ class Command(BaseCommand):
             msg += f"\n\n{info_entrada}"
         return msg
 
-    def guardar_retencion(self, valor, tercero, autor):
-        est = Establecimiento.objects.first()
-        usuario = User.objects.filter(username="carlos.ruiz").first() or User.objects.first()
+    def guardar_retencion(self, valor, tercero, autor, est=None, usuario=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
+        usuario = usuario or User.objects.filter(perfil__establecimiento=est).first() or User.objects.first()
 
         ret = Retencion.objects.create(
             establecimiento=est,
@@ -698,9 +651,10 @@ class Command(BaseCommand):
             "_Suma a tu favor en el consolidado del periodo._"
         )
 
-    def anular_venta(self, venta_id, motivo, autor):
-        est = Establecimiento.objects.first()
-        usuario = User.objects.filter(username="maria.gomez").first() or User.objects.first()
+    def anular_venta(self, venta_id, motivo, autor, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
+        usuario = User.objects.filter(perfil__establecimiento=est, perfil__rol__in=["propietario", "empresario"]).first() or User.objects.first()
         venta = Venta.objects.filter(establecimiento=est, pk=venta_id).first()
 
         if not venta:
@@ -737,8 +691,9 @@ class Command(BaseCommand):
             msg += f"\n{info_reversion}"
         return msg
 
-    def generar_resumen_hoy(self):
-        est = Establecimiento.objects.first()
+    def generar_resumen_hoy(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         hoy = date.today()
         ventas = Venta.objects.filter(establecimiento=est, fecha=hoy, estado="vigente")
         compras = Compra.objects.filter(establecimiento=est, fecha=hoy, estado="vigente")
@@ -774,8 +729,9 @@ class Command(BaseCommand):
             f"💰 *Caja Neta Hoy:* ${(total_ventas - total_compras):,.0f} COP"
         )
 
-    def generar_resumen_mes(self):
-        est = Establecimiento.objects.first()
+    def generar_resumen_mes(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         hoy = date.today()
         inicio_mes = hoy.replace(day=1)
 
@@ -798,8 +754,9 @@ class Command(BaseCommand):
             f"🏛️ *Impuesto ICA Estimado:* ${ica:,.2f} COP"
         )
 
-    def generar_ultimas(self):
-        est = Establecimiento.objects.first()
+    def generar_ultimas(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         ventas = Venta.objects.filter(establecimiento=est).order_by("-fecha_hora", "-id")[:5]
 
         if not ventas:
@@ -814,8 +771,9 @@ class Command(BaseCommand):
             )
         return "\n\n".join(lineas)
 
-    def generar_informacion_ica(self):
-        est = Establecimiento.objects.first()
+    def generar_informacion_ica(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         hoy = date.today()
         inicio_mes = hoy.replace(day=1)
 
@@ -836,8 +794,9 @@ class Command(BaseCommand):
         lineas.append("_Este valor es la base informativa para preparar la declaración municipal._")
         return "\n".join(lineas)
 
-    def generar_inventario_carnes(self):
-        est = Establecimiento.objects.first()
+    def generar_inventario_carnes(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         productos = Producto.objects.filter(establecimiento=est, categoria="carnes", estado="activo").order_by("nombre")
         if not productos:
             return "🥩 No hay cortes de carne registrados en el inventario."
@@ -855,8 +814,9 @@ class Command(BaseCommand):
         lineas.append("\n⚖️ _Precios vigentes para pesaje en báscula de mostrador._")
         return "\n".join(lineas)
 
-    def generar_inventario_general(self):
-        est = Establecimiento.objects.first()
+    def generar_inventario_general(self, est=None):
+        if not est:
+            return "⚠️ Establecimiento no especificado o canal no vinculado."
         productos = Producto.objects.filter(establecimiento=est, estado="activo").order_by("categoria", "nombre")
         if not productos:
             return "📦 No hay productos registrados en el inventario."
@@ -876,8 +836,9 @@ class Command(BaseCommand):
 
     def generar_excel_consolidado(self, est=None):
         """Genera un archivo Excel (.xlsx) oficial con diseño profesional para el contador."""
+        if not est:
+            raise ValueError("Establecimiento requerido para generar reporte consolidado")
         wb = openpyxl.Workbook()
-        est = est or Establecimiento.objects.first()
         hoy = date.today()
         inicio_mes = hoy.replace(day=1)
 

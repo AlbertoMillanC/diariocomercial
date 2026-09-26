@@ -12,9 +12,14 @@ from django.core.mail import send_mail
 from django.db.models import Q, Count, Sum
 from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from .forms import (
     ActividadCIIUForm,
@@ -116,50 +121,137 @@ class LoginDiario(LoginView):
 
 
 def recuperar_password_view(request):
-    """Permite a comerciantes y administradores restablecer su contraseña de forma segura."""
+    """
+    Solicitud de recuperación de contraseña protegida contra secuestro de cuentas.
+    Genera un token criptográfico efímero y lo despacha al correo registrado del usuario
+    o comercio. Previene la enumeración de usuarios y bloquea ataques de fuerza bruta.
+    """
+    cfg_saas = obtener_configuracion_saas()
     if request.method == "POST":
         identificador = request.POST.get("identificador", "").strip()
-        nueva_password = request.POST.get("nueva_password", "").strip()
-        confirmar_password = request.POST.get("confirmar_password", "").strip()
 
-        if not identificador or not nueva_password:
-            messages.error(request, "Por favor complete todos los campos obligatorios.")
-            return render(request, "registration/recuperar_password.html")
+        if not identificador:
+            messages.error(request, "Por favor ingrese su usuario, correo electrónico o NIT de comercio.")
+            return render(request, "registration/recuperar_password.html", {"cfg_saas": cfg_saas})
 
-        if nueva_password != confirmar_password:
-            messages.error(request, "Las contraseñas ingresadas no coinciden.")
-            return render(request, "registration/recuperar_password.html")
-
-        if len(nueva_password) < 4:
-            messages.error(request, "La nueva contraseña debe tener al menos 4 caracteres.")
-            return render(request, "registration/recuperar_password.html")
-
+        # Buscar usuario por username, correo o NIT de comercio asociado
         user = User.objects.filter(Q(username__iexact=identificador) | Q(email__iexact=identificador)).first()
         if not user:
             est = Establecimiento.objects.filter(nit=identificador).first()
             if est:
-                perfil_p = Perfil.objects.filter(establecimiento=est, rol="propietario").first()
+                perfil_p = Perfil.objects.filter(establecimiento=est, rol__in=["propietario", "empresario"]).first()
                 if perfil_p:
                     user = perfil_p.user
 
         if user:
-            user.set_password(nueva_password)
-            user.save()
-            Auditoria.objects.create(
-                usuario=user,
-                entidad_afectada="sesion",
-                id_registro=user.pk,
-                accion="reset_password",
-                valor_nuevo=user.username,
-                motivo="Recuperación exitosa de contraseña",
-            )
-            messages.success(request, f"¡Contraseña actualizada exitosamente para '{user.username}'! Ya puede iniciar sesión.")
-            return redirect("login")
-        else:
-            messages.error(request, f"No se encontró ningún usuario o comercio asociado a '{identificador}'.")
-            return render(request, "registration/recuperar_password.html")
+            email_destino = user.email
+            if not email_destino and hasattr(user, "perfil") and user.perfil.establecimiento:
+                email_destino = user.perfil.establecimiento.correo_reportes
 
-    return render(request, "registration/recuperar_password.html")
+            if email_destino:
+                uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+                host = request.get_host()
+                proto = "https" if request.is_secure() else "http"
+                reset_url = f"{proto}://{host}{reverse('recuperar_password_confirmar', kwargs={'uidb64': uidb64, 'token': token})}"
+
+                asunto = "🔐 Restablecimiento de Contraseña — DiarioComercial"
+                mensaje = (
+                    f"Estimado(a) {user.first_name or user.username},\n\n"
+                    f"Recibimos una solicitud para restablecer la contraseña de su cuenta en DiarioComercial.\n\n"
+                    f"Para crear su nueva contraseña de forma segura, haga clic en el siguiente enlace:\n"
+                    f"{reset_url}\n\n"
+                    f"Este enlace tiene una validez temporal y expirará automáticamente.\n"
+                    f"Si usted no solicitó este cambio, ignore este correo. Su contraseña actual permanece segura.\n\n"
+                    f"Soporte DiarioComercial Tunja\n"
+                    f"WhatsApp: {cfg_saas['whatsapp_soporte']}"
+                )
+                try:
+                    from .email_service import enviar_correo_plataforma
+                    enviar_correo_plataforma(asunto, mensaje, [email_destino])
+                except Exception as e_mail:
+                    import logging
+                    logging.getLogger("diariocomercial").warning(f"Aviso enviando correo recuperación a {email_destino}: {e_mail}")
+
+                Auditoria.objects.create(
+                    usuario=user,
+                    entidad_afectada="sesion",
+                    id_registro=user.pk,
+                    accion="solicitud_reset_password",
+                    valor_nuevo=f"destino={email_destino}",
+                    motivo="Solicitud de token criptográfico de recuperación",
+                )
+
+        # Mensaje neutro de confirmación para evitar enumeración de usuarios
+        return render(
+            request,
+            "registration/recuperar_password_enviado.html",
+            {
+                "identificador": identificador,
+                "cfg_saas": cfg_saas,
+            }
+        )
+
+    return render(request, "registration/recuperar_password.html", {"cfg_saas": cfg_saas})
+
+
+def recuperar_password_confirmar_view(request, uidb64, token):
+    """
+    Valida el token criptográfico y permite establecer la nueva contraseña
+    con verificación de complejidad y políticas de seguridad Django.
+    """
+    cfg_saas = obtener_configuracion_saas()
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is None or not default_token_generator.check_token(user, token):
+        messages.error(
+            request,
+            "El enlace de recuperación es inválido, ya fue utilizado o ha expirado. "
+            "Por favor solicite uno nuevo."
+        )
+        return redirect("recuperar_password")
+
+    if request.method == "POST":
+        nueva_password = request.POST.get("nueva_password", "").strip()
+        confirmar_password = request.POST.get("confirmar_password", "").strip()
+
+        if not nueva_password or not confirmar_password:
+            messages.error(request, "Por favor complete todos los campos.")
+            return render(request, "registration/recuperar_password_confirmar.html", {"user_obj": user, "cfg_saas": cfg_saas})
+
+        if nueva_password != confirmar_password:
+            messages.error(request, "Las contraseñas no coinciden.")
+            return render(request, "registration/recuperar_password_confirmar.html", {"user_obj": user, "cfg_saas": cfg_saas})
+
+        try:
+            validate_password(nueva_password, user=user)
+        except ValidationError as e_val:
+            for error in e_val.messages:
+                messages.error(request, error)
+            return render(request, "registration/recuperar_password_confirmar.html", {"user_obj": user, "cfg_saas": cfg_saas})
+
+        user.set_password(nueva_password)
+        user.save()
+
+        Auditoria.objects.create(
+            usuario=user,
+            entidad_afectada="sesion",
+            id_registro=user.pk,
+            accion="reset_password_confirmado",
+            valor_nuevo=user.username,
+            motivo="Contraseña restablecida exitosamente con token criptográfico",
+        )
+        messages.success(
+            request,
+            f"¡Contraseña actualizada exitosamente para '{user.username}'! Ya puede iniciar sesión con su nueva clave."
+        )
+        return redirect("login")
+
+    return render(request, "registration/recuperar_password_confirmar.html", {"user_obj": user, "cfg_saas": cfg_saas})
 
 
 def _perfil(user):
@@ -3270,20 +3362,15 @@ def factura_electronica_detalle(request, pk):
         messages.error(request, "No tiene permisos para ver esta factura.")
         return redirect("facturacion_electronica_dashboard")
 
-    # Si la venta no tiene número asignado o CUFE, generarlo
+    # Validar que la venta ya cuente con número emitido
     if not venta.numero_factura_electronica:
-        consec = est.consecutivo_actual
-        venta.numero_factura_electronica = f"{est.prefijo_facturacion}-{consec:05d}"
-        est.consecutivo_actual += 1
-        est.save(update_fields=["consecutivo_actual"])
+        messages.warning(request, "Esta venta aún no ha sido emitida formalmente como Factura Electrónica.")
+        return redirect("facturacion_electronica_dashboard")
+
     if not venta.cufe:
-        import hashlib
         nit_cli = venta.cliente.nit_cedula if venta.cliente else "222222222222"
-        cufe_raw = f"{venta.numero_factura_electronica}{venta.fecha_hora}{venta.valor}{nit_cli}{est.nit}"
-        venta.cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
-        venta.solicita_factura_electronica = True
-        venta.estado_dian = "aprobada"
-        venta.save(update_fields=["numero_factura_electronica", "cufe", "solicita_factura_electronica", "estado_dian"])
+        venta.cufe = Venta.generar_cufe(est, venta.numero_factura_electronica, venta.valor, venta.fecha_hora, nit_cli)
+        venta.save(update_fields=["cufe"])
 
     url_validacion_dian = f"https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey={venta.cufe}"
 
@@ -3330,14 +3417,8 @@ def venta_emitir_factura_electronica(request, pk):
         cliente_id = request.POST.get("cliente_id")
         cliente = get_object_or_404(Cliente, pk=cliente_id, establecimiento=est)
 
-        consec = est.consecutivo_actual
-        num_fe = f"{est.prefijo_facturacion}-{consec:05d}"
-        est.consecutivo_actual += 1
-        est.save(update_fields=["consecutivo_actual"])
-
-        import hashlib
-        cufe_raw = f"{num_fe}{venta.fecha_hora}{venta.valor}{cliente.nit_cedula}{est.nit}"
-        cufe = hashlib.sha384(cufe_raw.encode("utf-8")).hexdigest()
+        num_fe = est.siguiente_consecutivo_factura()
+        cufe = Venta.generar_cufe(est, num_fe, venta.valor, venta.fecha_hora, cliente.nit_cedula)
 
         venta.solicita_factura_electronica = True
         venta.cliente = cliente

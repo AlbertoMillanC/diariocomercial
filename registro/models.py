@@ -109,11 +109,15 @@ class Establecimiento(models.Model):
     )
 
     def siguiente_consecutivo_factura(self):
-        consec = self.consecutivo_actual
-        numero = f"{self.prefijo_facturacion}-{consec:05d}"
-        self.consecutivo_actual += 1
-        self.save(update_fields=["consecutivo_actual"])
-        return numero
+        from django.db import transaction
+        with transaction.atomic():
+            est_bloqueado = Establecimiento.objects.select_for_update().get(pk=self.pk)
+            consec = est_bloqueado.consecutivo_actual
+            numero = f"{est_bloqueado.prefijo_facturacion}-{consec:05d}"
+            est_bloqueado.consecutivo_actual += 1
+            est_bloqueado.save(update_fields=["consecutivo_actual"])
+            self.consecutivo_actual = est_bloqueado.consecutivo_actual
+            return numero
 
     def tiene_medio_pago_inscrito(self):
         return bool(self.llave_bre_b and self.llave_bre_b.strip())
