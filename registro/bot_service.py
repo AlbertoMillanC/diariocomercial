@@ -34,6 +34,8 @@ from .inventario_service import (
     normalizar_texto,
     parsear_dinero,
     parsear_peso,
+    parsear_volumen,
+    parsear_unidades,
     procesar_salida_inventario,
     procesar_entrada_inventario,
     buscar_producto_en_texto,
@@ -531,20 +533,25 @@ def _registrar_venta(
         badge_pago = "🏦 Transferencia"
 
     # Procesar inventario
-    prod, kg_desc, lb_desc, val_final, info_inv = procesar_salida_inventario(
+    res_inv = procesar_salida_inventario(
         establecimiento, texto_para_inventario, valor_ingresado=val
     )
+    prod = res_inv.producto
+    val_final = res_inv.valor_final
+    info_inv = res_inv.info_formateada
 
     if not val_final or val_final <= 0:
         return (
             "❓ No entendí el valor de la venta.\n"
-            "Ejemplo: `40 mil carne molida nequi` o `2 libras pechuga`.",
+            "Ejemplo: `40 mil carne molida nequi`, `3 cervezas` o `2 libras pechuga`.",
             None,
         )
 
     # Actividad principal para ICA
     actividad = establecimiento.actividades.first()
-    concepto_venta = prod.nombre if prod else (texto_sin_dinero[:120] or "Venta general")
+    concepto_venta = res_inv.concepto_ticket if (res_inv and res_inv.concepto_ticket) else (
+        prod.nombre if prod else (texto_sin_dinero[:120] or "Venta general")
+    )
 
     # Asignación o resolución del Cliente para la venta
     mun_nom = establecimiento.municipio.nombre if establecimiento.municipio else "Tunja"
@@ -591,6 +598,9 @@ def _registrar_venta(
             usuario=usuario,
             actividad=actividad,
             cliente=cliente_ticket,
+            producto=prod,
+            cantidad=res_inv.cantidad if (res_inv and res_inv.cantidad > 0) else Decimal("1.000"),
+            unidad_medida=res_inv.unidad_medida if (res_inv and res_inv.unidad_medida) else "und",
             fecha=timezone.localdate(),
             fecha_hora=timezone.now(),
             valor=val_final,
@@ -601,7 +611,15 @@ def _registrar_venta(
 
     valor_fmt = f"${val_final:,.0f}".replace(",", ".")
     concepto_fmt = concepto_venta
-    stock_fmt = f" | Quedan {prod.stock_kilos} Kg" if prod else ""
+    if prod:
+        if prod.es_peso():
+            stock_fmt = f" | Quedan {prod.stock_kilos} Kg"
+        elif prod.es_liquido():
+            stock_fmt = f" | Quedan {prod.stock_kilos} Lt"
+        else:
+            stock_fmt = f" | Quedan {int(prod.stock_kilos)} und"
+    else:
+        stock_fmt = ""
     hora_str = timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')
 
     # 1. Si solicitó factura electrónica formal DIAN

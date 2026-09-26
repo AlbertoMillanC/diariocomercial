@@ -41,7 +41,10 @@ def parsear_dinero(texto: str) -> Tuple[Optional[Decimal], str]:
             pass
 
     # 2. Cifra de dinero con puntos o formato numérico >= 3 dígitos: ej "$40.000", "40000"
-    m_cifra = re.search(r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{3,})\b", t)
+    m_cifra = re.search(
+        r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{3,})\b(?!\s*(?:mililitros?|ml|cc|gramos?|gr|g|kilos?|kg|libras?|lb|litros?|lts?|lt|unidades?|und|paquetes?|pqts?|cajas?|cubetas?|botellas?)\b)",
+        t,
+    )
     if m_cifra:
         raw = m_cifra.group(1).replace(".", "").replace(",", "")
         val = Decimal(raw)
@@ -118,6 +121,142 @@ def parsear_peso(texto: str) -> Optional[Decimal]:
                 return (cant / Decimal("1000")).quantize(Decimal("0.001"))
         except Exception:
             pass
+
+    return None
+
+
+class ResultadoSalidaInventario(tuple):
+    """
+    Tupla de 5 elementos compatible hacia atrás:
+      (prod, cantidad_descontada, detalle_secundario, valor_final, info_formateada)
+    con atributos ricos para unidades de medida (gramos, unidades, ml) y concepto de ticket.
+    """
+    producto: Optional[Producto]
+    kilos_descontados: Decimal
+    libras_descontadas: Decimal
+    valor_final: Decimal
+    info_formateada: str
+    cantidad: Decimal
+    unidad_medida: str
+    concepto_ticket: str
+
+    def __new__(
+        cls,
+        prod: Optional[Producto],
+        cantidad_descontada: Decimal,
+        detalle_secundario: Decimal,
+        valor_final: Decimal,
+        info_formateada: str,
+        cantidad: Decimal = Decimal("0"),
+        unidad_medida: str = "und",
+        concepto_ticket: str = "",
+    ):
+        obj = super().__new__(cls, (prod, cantidad_descontada, detalle_secundario, valor_final, info_formateada))
+        obj.producto = prod
+        obj.kilos_descontados = cantidad_descontada
+        obj.libras_descontadas = detalle_secundario
+        obj.valor_final = valor_final
+        obj.info_formateada = info_formateada
+        obj.cantidad = cantidad
+        obj.unidad_medida = unidad_medida
+        obj.concepto_ticket = concepto_ticket
+        return obj
+
+
+def parsear_volumen(texto: str) -> Optional[Tuple[Decimal, str]]:
+    """
+    Extrae el volumen en MILILITROS (ml) de una frase en español.
+    Retorna: (cantidad_ml, unidad_str) o None
+    Ejemplos:
+      '500 ml aceite' -> (Decimal('500'), 'ml')
+      '500 mililitros' -> (Decimal('500'), 'ml')
+      '1 litro leche' -> (Decimal('1000'), 'ml')
+      'un litro leche' -> (Decimal('1000'), 'ml')
+      'medio litro gaseosa' -> (Decimal('500'), 'ml')
+      '1.5 lt agua' -> (Decimal('1500'), 'ml')
+      '250 cc crema' -> (Decimal('250'), 'ml')
+    """
+    t = normalizar_texto(texto)
+    # Fracciones de litro
+    if "medio litro" in t or "1/2 litro" in t or "1/2 lt" in t or "1/2 l" in t:
+        return Decimal("500"), "ml"
+    if "cuarto de litro" in t or "1/4 litro" in t or "1/4 lt" in t:
+        return Decimal("250"), "ml"
+    if "3/4 litro" in t or "3/4 lt" in t:
+        return Decimal("750"), "ml"
+
+    palabras_num = {
+        "un": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"), "tres": Decimal("3"),
+        "cuatro": Decimal("4"), "cinco": Decimal("5"), "medio": Decimal("0.5")
+    }
+    for palabra, num in palabras_num.items():
+        m = re.search(rf"\b{palabra}\s*(litros?|lts?|lt|l)\b", t)
+        if m:
+            return (num * Decimal("1000")).quantize(Decimal("1")), "ml"
+
+    # 500 ml, 250 cc, etc.
+    m_ml = re.search(r"(\d+(?:[\.,]\d+)?)\s*(mililitros?|ml|cc)\b", t)
+    if m_ml:
+        cant = Decimal(m_ml.group(1).replace(",", "."))
+        return cant.quantize(Decimal("1")), "ml"
+
+    # 1.5 lt, 2 litros, 1 l
+    m_lt = re.search(r"(\d+(?:[\.,]\d+)?)\s*(litros?|lts?|lt)\b", t)
+    if m_lt:
+        cant = Decimal(m_lt.group(1).replace(",", "."))
+        return (cant * Decimal("1000")).quantize(Decimal("1")), "ml"
+
+    return None
+
+
+def parsear_unidades(texto: str) -> Optional[Tuple[Decimal, str]]:
+    """
+    Detecta y extrae cantidades de unidades discretas (und, cajas, paquetes, etc.).
+    Retorna: (cantidad, unidad_str) o None
+    Ejemplos:
+      '3 cervezas' -> (Decimal('3'), 'und')
+      '5 panes' -> (Decimal('5'), 'und')
+      '10 pan' -> (Decimal('10'), 'und')
+      '2 cajas de leche' -> (Decimal('2'), 'cajas')
+      '1 cubeta de huevos' -> (Decimal('1'), 'cubeta')
+      'dos cervezas' -> (Decimal('2'), 'und')
+      'un pan' -> (Decimal('1'), 'und')
+    """
+    t = normalizar_texto(texto)
+    # Limpiar dinero primero para no confundir con montos
+    t_clean = re.sub(r"(?:\$|\b)(\d+(?:[\.,]\d+)?)\s*(?:mil|k|lucas)\b", " ", t)
+    t_clean = re.sub(r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{4,})\b", " ", t_clean)
+    # Limpiar peso y volumen
+    t_clean = re.sub(r"\b\d+(?:[\.,]\d+)?\s*(?:libras?|lb|kilos?|kg|gramos?|gr|g|mililitros?|ml|cc|litros?|lts?|lt)\b", " ", t_clean)
+    t_clean = re.sub(r"\b(?:media\s+libra|medio\s+kilo|medio\s+litro|1/2\s*lb|1/2\s*kilo|1/4\s*lb)\b", " ", t_clean)
+
+    # 1. Unidades con sufijo explícito: 3 und, 5 unidades, 2 pqt, 2 paquetes, 1 cubeta, 2 cajas, 3 latas, 2 botellas
+    m_exp = re.search(r"\b(\d+)\s*(unidades|unidad|und|pqt|paquetes?|cajas?|cubetas?|latas?|botellas?|bolsas?|tarros?)\b", t_clean)
+    if m_exp:
+        cant = Decimal(m_exp.group(1))
+        unidad = m_exp.group(2)
+        u = "und" if unidad in ("unidades", "unidad", "und") else unidad
+        return cant, u
+
+    # 2. Palabras numéricas seguidas de sustantivo: 'un', 'una', 'dos', 'tres', etc.
+    palabras_num = {
+        "un": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"), "tres": Decimal("3"),
+        "cuatro": Decimal("4"), "cinco": Decimal("5"), "seis": Decimal("6"), "siete": Decimal("7"),
+        "ocho": Decimal("8"), "nueve": Decimal("9"), "diez": Decimal("10"), "doce": Decimal("12"),
+    }
+    for pal, val in palabras_num.items():
+        m_pal = re.search(rf"\b{pal}\s+([a-z]+)\b", t_clean)
+        if m_pal and m_pal.group(1) not in ("mil", "kilo", "kilos", "kg", "libra", "libras", "lb", "litro", "litros", "lt", "gramo", "gramos", "g", "ml", "dian", "tipo", "codigo", "doc", "documento"):
+            return val, "und"
+
+    # 3. Número al inicio o antes de la palabra del producto: '3 cervezas', '5 panes', '20 pan', '10 huevos'
+    # No debe ser un número de cédula (longitud >= 5)
+    m_num = re.search(r"\b([1-9]\d{0,2})\s+([a-z]+)\b", t_clean)
+    if m_num:
+        palabra_sig = m_num.group(2)
+        if palabra_sig not in ("mil", "k", "lucas", "pesos", "de", "para", "con", "dian", "tipo", "codigo", "doc", "documento"):
+            cant = Decimal(m_num.group(1))
+            return cant, "und"
 
     return None
 
@@ -219,29 +358,23 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
                 if objetivo in normalizar_texto(p.nombre):
                     return p
 
-    # 3. Coincidencia por palabras individuales
+    # 3. Coincidencia por palabras individuales y singular/plural (ej: cervezas -> cerveza, panes -> pan)
     palabras_texto = [
-        w
+        re.sub(r"[^a-z0-9]", "", w)
         for w in t.split()
-        if len(w) >= 4
-        and w
-        not in (
-            "para",
-            "este",
-            "esta",
-            "kilo",
-            "libra",
-            "gramo",
-            "tenemos",
-            "cuanto",
-            "cuesta",
-            "precio",
-            "vendes",
+        if len(w) >= 3
+        and w not in (
+            "mil", "con", "para", "este", "esta", "kilo", "kilos", "libra", "libras",
+            "gramo", "gramos", "litro", "litros", "tenemos", "cuanto", "cuesta",
+            "precio", "vendes", "tipo", "dian", "codigo", "doc", "documento", "por", "que", "los", "las", "und"
         )
     ]
     for w in palabras_texto:
+        w_sing = w.rstrip("s")
         for p in productos:
-            if w in normalizar_texto(p.nombre):
+            p_norm = normalizar_texto(p.nombre)
+            p_words = [re.sub(r"[^a-z0-9]", "", pw).rstrip("s") for pw in p_norm.split()]
+            if w_sing in p_words or (len(w_sing) >= 4 and w_sing in p_norm):
                 return p
 
     # 4. Si solo dijo "carne" o "res", tomar Carne molida o Carne para asar
@@ -257,89 +390,233 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
 
 def procesar_salida_inventario(
     establecimiento, texto_venta: str, valor_ingresado: Optional[Decimal] = None
-) -> Tuple[Optional[Producto], Decimal, Decimal, Decimal, str]:
+) -> ResultadoSalidaInventario:
     """
-    Interpreta el concepto y/o valor de una venta, calcula los gramos exactos
-    según el precio por gramo/kilo, descuenta el stock del producto
-    y calcula el valor monetario si no fue provisto.
-
-    Retorna:
-      (producto, kilos_descontados, libras_descontadas, valor_final, info_formateada)
+    Interpreta el concepto y/o valor de una venta.
+    Distingue automáticamente según el tipo de producto o solicitud del usuario:
+      1. PESO: Gramos, Kilos, Libras.
+      2. LÍQUIDOS: Mililitros (ml), Litros (lt).
+      3. UNIDADES: Cantidad de piezas, paquetes, latas, und.
+    Descuenta el inventario en la escala correcta y formatea el concepto exacto para ticket/factura.
     """
     prod = buscar_producto_en_texto(establecimiento, texto_venta)
-    if not prod:
-        return None, Decimal("0"), Decimal("0"), valor_ingresado or Decimal("0"), ""
-
-    # Extraer monto de dinero si no vino en valor_ingresado
-    val_extraido, _ = parsear_dinero(texto_venta)
+    val_extraido, texto_sin_dinero = parsear_dinero(texto_venta)
     valor_final = valor_ingresado if (valor_ingresado and valor_ingresado > 1) else val_extraido
 
-    kilos = parsear_peso(texto_venta)
+    if not prod:
+        vol = parsear_volumen(texto_venta)
+        und = parsear_unidades(texto_venta)
+        peso = parsear_peso(texto_venta)
+        nombre_limpio = (texto_sin_dinero[:120].strip() or "Venta general").capitalize()
 
-    # 1. Caso Venta por Dinero (ej: $40.000 o "40 mil carne molida"):
-    # Se calcula la cantidad exacta en gramos con el precio por gramo del corte
-    if kilos is None and valor_final and prod.precio_gramo > 0:
-        gramos = int((Decimal(valor_final) / prod.precio_gramo).quantize(Decimal("1")))
-        kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
-    elif kilos is not None:
-        # 2. Caso Venta por Peso explícito (ej: 1 libra, 2 kilos, 500g):
-        gramos = int((kilos * Decimal("1000")).quantize(Decimal("1")))
-        if not valor_final and prod.precio_gramo > 0:
-            valor_final = (Decimal(gramos) * prod.precio_gramo).quantize(Decimal("1"))
+        cant = Decimal("1.000")
+        u_med = "und"
+        concepto_ticket = nombre_limpio
+
+        if vol:
+            cant = vol[0]
+            u_med = "ml"
+            concepto_ticket = f"{nombre_limpio} ({int(cant):,} ml)".replace(",", ".")
+        elif und:
+            cant = und[0]
+            u_med = und[1]
+            concepto_ticket = f"{nombre_limpio} ({int(cant)} {u_med})"
+        elif peso:
+            g = int(peso * Decimal("1000"))
+            cant = Decimal(g)
+            u_med = "g"
+            concepto_ticket = f"{nombre_limpio} ({g:,} g)".replace(",", ".")
+
+        return ResultadoSalidaInventario(
+            None, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+            cantidad=cant, unidad_medida=u_med, concepto_ticket=concepto_ticket
+        )
+
+    # Determinar si el producto se gestiona por Peso, Líquido o Unidad
+    es_peso = prod.es_peso()
+    es_liquido = prod.es_liquido()
+    es_unidad = prod.es_unidad()
+
+    kilos_peso = parsear_peso(texto_venta)
+    volumen_ml = parsear_volumen(texto_venta)
+    unidades_und = parsear_unidades(texto_venta)
+
+    # -------------------------------------------------------------
+    # CASO 1: PESO (Carnes, Fruver, etc. medidos por Gramos/Kg/lb)
+    # -------------------------------------------------------------
+    if es_peso or (kilos_peso is not None and not es_liquido and not es_unidad):
+        if kilos_peso is None and valor_final and prod.precio_gramo > 0:
+            gramos = int((Decimal(valor_final) / prod.precio_gramo).quantize(Decimal("1")))
+            kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
+        elif kilos_peso is not None:
+            kilos = kilos_peso
+            gramos = int((kilos * Decimal("1000")).quantize(Decimal("1")))
+            if not valor_final and prod.precio_gramo > 0:
+                valor_final = (Decimal(gramos) * prod.precio_gramo).quantize(Decimal("1"))
+        else:
+            gramos = 0
+            kilos = Decimal("0")
+
+        if not kilos or kilos <= 0:
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="g", concepto_ticket=prod.nombre
+            )
+
+        with transaction.atomic():
+            prod = Producto.objects.select_for_update().get(pk=prod.pk)
+            prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
+            prod.save()
+
+        libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
+        gramos_str = f"{gramos:,.0f}".replace(",", ".")
+        kilos_str = f"{kilos:.3f}".rstrip("0").rstrip(".")
+
+        if gramos >= 1000 and gramos % 1000 == 0:
+            concepto_ticket = f"{prod.nombre} ({gramos // 1000} Kg)"
+        else:
+            concepto_ticket = f"{prod.nombre} ({gramos_str} g)"
+
+        info_formateada = (
+            f"\n📦 *Inventario Actualizado (Cálculo Exacto):*\n"
+            f"   • Producto: *{prod.nombre}*\n"
+            f"   • Salida vendida: *{gramos_str} gramos* ({kilos_str} Kg / {libras} lb)\n"
+            f"   • Stock restante: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)"
+        )
+        if prod.stock_kilos <= Decimal("0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="agotado", cantidad_sugerida=Decimal("10.0"), unidad="Kg", observacion="Agotado tras venta reciente"
+            )
+            info_formateada += f"\n\n🚨 *ALERTA COMPRAR:* ¡Stock de *{prod.nombre}* AGOTADO (0 Kg restantes)!"
+        elif prod.stock_kilos <= Decimal("3.0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="stock_bajo", cantidad_sugerida=Decimal("5.0"), unidad="Kg", observacion=f"Stock bajo: {prod.stock_kilos} Kg"
+            )
+            info_formateada += f"\n\n⚠️ *ALERTA COMPRAR:* Stock de *{prod.nombre}* bajo ({prod.stock_kilos} Kg restantes)."
+
+        return ResultadoSalidaInventario(
+            prod, kilos, libras, valor_final or Decimal("0"), info_formateada,
+            cantidad=Decimal(gramos), unidad_medida="g", concepto_ticket=concepto_ticket
+        )
+
+    # -------------------------------------------------------------
+    # CASO 2: LÍQUIDOS (Aceite, Bebidas, Leche en Litros / ml)
+    # -------------------------------------------------------------
+    elif es_liquido or volumen_ml is not None:
+        precio_ml = prod.precio_kilo / Decimal("1000") if prod.precio_kilo > 0 else Decimal("0")
+        if volumen_ml is None and valor_final and precio_ml > 0:
+            ml = int((Decimal(valor_final) / precio_ml).quantize(Decimal("1")))
+            litros = (Decimal(ml) / Decimal("1000")).quantize(Decimal("0.001"))
+        elif volumen_ml is not None:
+            ml = int(volumen_ml[0])
+            litros = (Decimal(ml) / Decimal("1000")).quantize(Decimal("0.001"))
+            if not valor_final and precio_ml > 0:
+                valor_final = (Decimal(ml) * precio_ml).quantize(Decimal("1"))
+        else:
+            ml = 0
+            litros = Decimal("0")
+
+        if not litros or litros <= 0:
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="ml", concepto_ticket=prod.nombre
+            )
+
+        with transaction.atomic():
+            prod = Producto.objects.select_for_update().get(pk=prod.pk)
+            prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - litros)
+            prod.save()
+
+        ml_str = f"{ml:,.0f}".replace(",", ".")
+        litros_str = f"{litros:.3f}".rstrip("0").rstrip(".")
+
+        if ml >= 1000 and ml % 1000 == 0:
+            concepto_ticket = f"{prod.nombre} ({ml // 1000} Lt)"
+        else:
+            concepto_ticket = f"{prod.nombre} ({ml_str} ml)"
+
+        info_formateada = (
+            f"\n📦 *Inventario Actualizado (Líquidos):*\n"
+            f"   • Producto: *{prod.nombre}*\n"
+            f"   • Salida vendida: *{ml_str} ml* ({litros_str} Lt)\n"
+            f"   • Stock restante: *{prod.stock_kilos} Lt* ({prod.stock_kilos * 1000:,.0f} ml)"
+        )
+        if prod.stock_kilos <= Decimal("0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="agotado", cantidad_sugerida=Decimal("5.0"), unidad="Lt", observacion="Agotado tras venta reciente"
+            )
+            info_formateada += f"\n\n🚨 *ALERTA COMPRAR:* ¡Stock de *{prod.nombre}* AGOTADO (0 Lt restantes)!"
+        elif prod.stock_kilos <= Decimal("2.0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="stock_bajo", cantidad_sugerida=Decimal("5.0"), unidad="Lt", observacion=f"Stock bajo: {prod.stock_kilos} Lt"
+            )
+            info_formateada += f"\n\n⚠️ *ALERTA COMPRAR:* Stock de *{prod.nombre}* bajo ({prod.stock_kilos} Lt restantes)."
+
+        return ResultadoSalidaInventario(
+            prod, litros, Decimal("0"), valor_final or Decimal("0"), info_formateada,
+            cantidad=Decimal(ml), unidad_medida="ml", concepto_ticket=concepto_ticket
+        )
+
+    # -------------------------------------------------------------
+    # CASO 3: UNIDADES (Pan, Cerveza, Huevos, Abarrotes, Latas, etc.)
+    # -------------------------------------------------------------
     else:
-        gramos = 0
+        if unidades_und is None and valor_final and prod.precio_kilo > 0:
+            cant_und = (Decimal(valor_final) / prod.precio_kilo).quantize(Decimal("1"))
+            u_nom = "und"
+        elif unidades_und is not None:
+            cant_und = unidades_und[0]
+            u_nom = unidades_und[1]
+            if not valor_final and prod.precio_kilo > 0:
+                valor_final = (cant_und * prod.precio_kilo).quantize(Decimal("1"))
+        else:
+            cant_und = Decimal("1")
+            u_nom = "und"
+            if not valor_final:
+                valor_final = prod.precio_kilo
 
-    if not kilos or kilos <= 0:
-        return prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), ""
+        if cant_und <= 0:
+            return ResultadoSalidaInventario(
+                prod, Decimal("0"), Decimal("0"), valor_final or Decimal("0"), "",
+                cantidad=Decimal("0"), unidad_medida="und", concepto_ticket=prod.nombre
+            )
 
-    # Descontar del inventario con precisión de gramos y bloqueo atómico
-    with transaction.atomic():
-        prod = Producto.objects.select_for_update().get(pk=prod.pk)
-        prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - kilos)
-        prod.save()
+        with transaction.atomic():
+            prod = Producto.objects.select_for_update().get(pk=prod.pk)
+            prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - cant_und)
+            prod.save()
 
-    libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
-    gramos_str = f"{gramos:,.0f}".replace(",", ".")
-    kilos_str = f"{kilos:.3f}".rstrip("0").rstrip(".")
+        cant_int = int(cant_und) if cant_und % 1 == 0 else f"{cant_und:.1f}"
+        concepto_ticket = f"{prod.nombre} ({cant_int} {u_nom})"
 
-    info_formateada = (
-        f"\n📦 *Inventario Actualizado (Cálculo Exacto):*\n"
-        f"   • Producto: *{prod.nombre}*\n"
-        f"   • Salida vendida: *{gramos_str} gramos* ({kilos_str} Kg / {libras} lb)\n"
-        f"   • Stock restante: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)"
-    )
-
-    # Alerta inmediata de compras si el stock queda agotado o bajo
-    if prod.stock_kilos <= Decimal("0"):
-        registrar_o_actualizar_pedido(
-            establecimiento=establecimiento,
-            nombre_producto=prod.nombre,
-            producto=prod,
-            origen="agotado",
-            cantidad_sugerida=Decimal("10.0") if prod.categoria in ("carnes", "abarrotes") else Decimal("5.0"),
-            unidad="Kg",
-            observacion="Agotado tras venta reciente",
+        stock_int = int(prod.stock_kilos) if prod.stock_kilos % 1 == 0 else f"{prod.stock_kilos:.1f}"
+        info_formateada = (
+            f"\n📦 *Inventario Actualizado (Unidades):*\n"
+            f"   • Producto: *{prod.nombre}*\n"
+            f"   • Salida vendida: *{cant_int} {u_nom}*\n"
+            f"   • Stock restante: *{stock_int} unidades*"
         )
-        info_formateada += (
-            f"\n\n🚨 *ALERTA COMPRAR:* ¡Stock de *{prod.nombre}* AGOTADO (0 Kg restantes)!\n"
-            f"   Se incluyó automáticamente en la lista de compras pendientes (`/comprar`)."
-        )
-    elif prod.stock_kilos <= Decimal("3.0"):
-        registrar_o_actualizar_pedido(
-            establecimiento=establecimiento,
-            nombre_producto=prod.nombre,
-            producto=prod,
-            origen="stock_bajo",
-            cantidad_sugerida=Decimal("5.0"),
-            unidad="Kg",
-            observacion=f"Stock bajo tras venta: {prod.stock_kilos} Kg",
-        )
-        info_formateada += (
-            f"\n\n⚠️ *ALERTA COMPRAR:* Stock de *{prod.nombre}* bajo ({prod.stock_kilos} Kg restantes).\n"
-            f"   Sugerido para pedido de reposición en `/comprar`."
-        )
+        if prod.stock_kilos <= Decimal("0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="agotado", cantidad_sugerida=Decimal("10"), unidad="und", observacion="Agotado tras venta reciente"
+            )
+            info_formateada += f"\n\n🚨 *ALERTA COMPRAR:* ¡Stock de *{prod.nombre}* AGOTADO (0 unidades restantes)!"
+        elif prod.stock_kilos <= Decimal("5.0"):
+            registrar_o_actualizar_pedido(
+                establecimiento=establecimiento, nombre_producto=prod.nombre, producto=prod,
+                origen="stock_bajo", cantidad_sugerida=Decimal("10"), unidad="und", observacion=f"Stock bajo: {stock_int} und"
+            )
+            info_formateada += f"\n\n⚠️ *ALERTA COMPRAR:* Stock de *{prod.nombre}* bajo ({stock_int} unidades restantes)."
 
-    return prod, kilos, libras, valor_final or Decimal("0"), info_formateada
+        return ResultadoSalidaInventario(
+            prod, cant_und, Decimal("0"), valor_final or Decimal("0"), info_formateada,
+            cantidad=cant_und, unidad_medida=u_nom, concepto_ticket=concepto_ticket
+        )
 
 
 def revertir_salida_inventario(establecimiento, venta) -> str:
@@ -361,24 +638,54 @@ def revertir_salida_inventario(establecimiento, venta) -> str:
     if not prod:
         prod = buscar_producto_en_texto(establecimiento, venta.concepto)
 
+    if not prod and hasattr(venta, "producto") and venta.producto:
+        prod = venta.producto
+
     if prod:
+        cant_reponer = getattr(venta, "cantidad", Decimal("0"))
         if audit and "kilos=" in audit.valor_nuevo:
             m_k = re.search(r"kilos=([\d\.]+)", audit.valor_nuevo)
             if m_k:
                 kilos = Decimal(m_k.group(1))
 
-        if not kilos:
-            kilos = parsear_peso(venta.concepto)
-            if not kilos and prod.precio_gramo > 0 and venta.valor > 0:
-                gramos = int((Decimal(venta.valor) / prod.precio_gramo).quantize(Decimal("1")))
-                kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
-
-        if kilos and kilos > 0:
-            prod.stock_kilos += kilos
+        if prod.es_unidad():
+            if not cant_reponer or cant_reponer <= 0:
+                und_m = parsear_unidades(venta.concepto)
+                cant_reponer = und_m[0] if und_m else (
+                    (Decimal(venta.valor) / prod.precio_kilo).quantize(Decimal("1")) if prod.precio_kilo > 0 else Decimal("1")
+                )
+            prod.stock_kilos += cant_reponer
             prod.save()
-            gramos = int(kilos * 1000)
-            libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
-            return f"\n🔄 *Inventario Revertido:* Se repusieron +{gramos:,} g (+{kilos} Kg / +{libras} lb) a *{prod.nombre}* (Stock: {prod.stock_kilos} Kg)."
+            return f"\n🔄 *Inventario Revertido:* Se repusieron +{int(cant_reponer)} unidades a *{prod.nombre}* (Stock: {int(prod.stock_kilos)} unidades)."
+
+        elif prod.es_liquido():
+            if not cant_reponer or cant_reponer <= 0:
+                vol_m = parsear_volumen(venta.concepto)
+                ml_val = vol_m[0] if vol_m else (
+                    int(Decimal(venta.valor) / (prod.precio_kilo / Decimal("1000"))) if prod.precio_kilo > 0 else 0
+                )
+            else:
+                ml_val = cant_reponer
+            litros = (Decimal(ml_val) / Decimal("1000")).quantize(Decimal("0.001"))
+            prod.stock_kilos += litros
+            prod.save()
+            return f"\n🔄 *Inventario Revertido:* Se repusieron +{int(ml_val):,} ml (+{litros} Lt) a *{prod.nombre}* (Stock: {prod.stock_kilos} Lt)."
+
+        else:
+            if not kilos:
+                kilos = parsear_peso(venta.concepto)
+                if not kilos and prod.precio_gramo > 0 and venta.valor > 0:
+                    gramos = int((Decimal(venta.valor) / prod.precio_gramo).quantize(Decimal("1")))
+                    kilos = (Decimal(gramos) / Decimal("1000")).quantize(Decimal("0.001"))
+                elif not kilos and cant_reponer > 0:
+                    kilos = (cant_reponer / Decimal("1000")).quantize(Decimal("0.001"))
+
+            if kilos and kilos > 0:
+                prod.stock_kilos += kilos
+                prod.save()
+                gramos = int(kilos * 1000)
+                libras = (Decimal(gramos) / Decimal("500")).quantize(Decimal("0.01"))
+                return f"\n🔄 *Inventario Revertido:* Se repusieron +{gramos:,} g (+{kilos} Kg / +{libras} lb) a *{prod.nombre}* (Stock: {prod.stock_kilos} Kg)."
 
     return ""
 

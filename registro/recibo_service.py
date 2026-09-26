@@ -342,10 +342,30 @@ def generar_pdf_factura_electronica_dian(venta: Venta) -> bytes:
     p.setFillColorRGB(0.1, 0.1, 0.1)
     p.setFont("Helvetica", 8.5)
     p.drawString(46, y_row, f"ITM-{venta.pk}")
-    p.drawString(100, y_row, (venta.concepto or "Venta de mostrador")[:38])
-    p.drawString(330, y_row, "1.00 Und")
+    p.drawString(100, y_row, (venta.concepto or "Venta de mostrador")[:35])
+
+    u_med = (getattr(venta, "unidad_medida", "") or "und").lower()
+    cant_val = getattr(venta, "cantidad", Decimal("1")) or Decimal("1")
+    if u_med in ("g", "gramos", "gr"):
+        cant_fmt = f"{cant_val:,.0f} g".replace(",", ".")
+        v_unit_num = (venta.valor / (cant_val / Decimal("1000"))) if cant_val > 0 else venta.valor
+        v_unit_fmt = f"${v_unit_num:,.0f}/Kg".replace(",", ".")
+    elif u_med in ("ml", "mililitros", "cc"):
+        cant_fmt = f"{cant_val:,.0f} ml".replace(",", ".")
+        v_unit_num = (venta.valor / (cant_val / Decimal("1000"))) if cant_val > 0 else venta.valor
+        v_unit_fmt = f"${v_unit_num:,.0f}/Lt".replace(",", ".")
+    elif u_med in ("und", "unidad", "unidades"):
+        cant_fmt = f"{int(cant_val)} Und"
+        v_unit_num = (venta.valor / cant_val) if cant_val > 0 else venta.valor
+        v_unit_fmt = f"${v_unit_num:,.0f}".replace(",", ".")
+    else:
+        cant_fmt = f"{cant_val:.2f} {u_med}"
+        v_unit_num = (venta.valor / cant_val) if cant_val > 0 else venta.valor
+        v_unit_fmt = f"${v_unit_num:,.0f}".replace(",", ".")
+
     valor_fmt = f"${venta.valor:,.0f}".replace(",", ".")
-    p.drawString(390, y_row, valor_fmt)
+    p.drawString(320, y_row, cant_fmt)
+    p.drawString(390, y_row, v_unit_fmt)
     p.drawString(480, y_row, valor_fmt)
 
     p.setStrokeColorRGB(0.9, 0.9, 0.9)

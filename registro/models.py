@@ -310,6 +310,17 @@ class Venta(models.Model):
     cliente = models.ForeignKey(
         "Cliente", on_delete=models.SET_NULL, null=True, blank=True, related_name="ventas"
     )
+    producto = models.ForeignKey(
+        "Producto", on_delete=models.SET_NULL, null=True, blank=True, related_name="ventas"
+    )
+    cantidad = models.DecimalField(
+        max_digits=12, decimal_places=3, default=Decimal("1.000"),
+        help_text="Cantidad vendida en la unidad correspondiente (gramos, unidades o ml)"
+    )
+    unidad_medida = models.CharField(
+        max_length=20, default="und",
+        help_text="g, kg, lb, und, ml, lt, etc."
+    )
     solicita_factura_electronica = models.BooleanField(
         default=False, help_text="Cliente solicitó Factura Electrónica con reporte individual DIAN"
     )
@@ -488,6 +499,28 @@ class Producto(models.Model):
     @property
     def stock_gramos(self):
         return int((Decimal(str(self.stock_kilos)) * Decimal("1000")).quantize(Decimal("1")))
+
+    @property
+    def precio_ml(self):
+        return (Decimal(str(self.precio_kilo)) / Decimal("1000")).quantize(Decimal("0.01"))
+
+    @property
+    def stock_ml(self):
+        return int((Decimal(str(self.stock_kilos)) * Decimal("1000")).quantize(Decimal("1")))
+
+    def es_peso(self) -> bool:
+        u = self.unidad_medida.lower().strip()
+        if u in ("kg", "kilo", "kilos", "kilogramo", "g", "gr", "gramo", "gramos", "lb", "libra", "libras"):
+            return True
+        return self.categoria in ("carnes", "fruver") and u not in ("und", "unidad", "unidades", "pqt", "paquete", "caja", "ml", "lt", "litro")
+
+    def es_liquido(self) -> bool:
+        u = self.unidad_medida.lower().strip()
+        return u in ("ml", "mililitro", "mililitros", "cc", "l", "lt", "litro", "litros")
+
+    def es_unidad(self) -> bool:
+        return not self.es_peso() and not self.es_liquido()
+
 
 
 class ItemPedido(models.Model):

@@ -427,3 +427,130 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertIn("Consumidor Final (222222222222)", resp)
         self.assertNotIn("Tipo 13 DIAN", resp)
 
+    def test_bot_venta_peso_gramos_en_ticket_y_factura(self):
+        """Verifica que productos por peso calculen gramos exactos y se reflejen en ticket y factura."""
+        from registro.models import Producto, VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        from registro.recibo_service import generar_pdf_factura_electronica_dian, generar_pdf_recibo_venta
+
+        Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Carne para asar",
+            categoria="carnes",
+            unidad_medida="kg",
+            precio_kilo=Decimal("25000"),
+            stock_kilos=Decimal("20.0"),
+        )
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="gramos_user_1", usuario=self.dueno, establecimiento=self.est
+        )
+        # $40.000 / $25 por gramo = 1.600 gramos
+        resp, v, _ = despachar_mensaje("telegram", "gramos_user_1", "40 mil carne", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.cantidad, Decimal("1600.000"))
+        self.assertEqual(v.unidad_medida, "g")
+        self.assertIn("1.600 g", v.concepto)
+        self.assertIn("Kg", resp)
+
+        # Verificar generación de PDF de factura electrónica y recibo
+        pdf_fe = generar_pdf_factura_electronica_dian(v)
+        self.assertGreater(len(pdf_fe), 1000)
+        pdf_recibo = generar_pdf_recibo_venta(v)
+        self.assertGreater(len(pdf_recibo), 500)
+
+    def test_bot_venta_unidades_en_ticket_y_factura(self):
+        """Verifica que productos por unidades se vendan y descuenten en unidades (sin hablar de gramos/kilos)."""
+        from registro.models import Producto, VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        from registro.recibo_service import generar_pdf_factura_electronica_dian
+
+        p_pan = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Pan campesino",
+            categoria="abarrotes",
+            unidad_medida="und",
+            precio_kilo=Decimal("500"),
+            stock_kilos=Decimal("100.0"),
+        )
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="und_user_1", usuario=self.dueno, establecimiento=self.est
+        )
+        # 10 mil de pan campesino a $500 c/u = 20 unidades
+        resp, v, _ = despachar_mensaje("telegram", "und_user_1", "10 mil pan", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.cantidad, Decimal("20.000"))
+        self.assertEqual(v.unidad_medida, "und")
+        self.assertIn("20 und", v.concepto)
+        self.assertIn("80 und", resp)
+
+        p_pan.refresh_from_db()
+        self.assertEqual(p_pan.stock_kilos, Decimal("80.0"))
+
+        pdf_fe = generar_pdf_factura_electronica_dian(v)
+        self.assertGreater(len(pdf_fe), 1000)
+
+    def test_bot_venta_liquidos_ml_en_ticket_y_factura(self):
+        """Verifica que productos líquidos se vendan y descuenten en ml o litros."""
+        from registro.models import Producto, VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        from registro.recibo_service import generar_pdf_factura_electronica_dian
+
+        p_aceite = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Aceite de girasol",
+            categoria="abarrotes",
+            unidad_medida="lt",
+            precio_kilo=Decimal("12000"),
+            stock_kilos=Decimal("10.0"),
+        )
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="liq_user_1", usuario=self.dueno, establecimiento=self.est
+        )
+        # 500 ml a $12.000/lt = $6.000 COP
+        resp, v, _ = despachar_mensaje("telegram", "liq_user_1", "500 ml aceite", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("6000"))
+        self.assertEqual(v.cantidad, Decimal("500.000"))
+        self.assertEqual(v.unidad_medida, "ml")
+        self.assertIn("500 ml", v.concepto)
+        self.assertIn("9.500 Lt", resp)
+
+        p_aceite.refresh_from_db()
+        self.assertEqual(p_aceite.stock_kilos, Decimal("9.500"))
+
+        pdf_fe = generar_pdf_factura_electronica_dian(v)
+        self.assertGreater(len(pdf_fe), 1000)
+
+    def test_bot_venta_unidades_conteo_directo(self):
+        """Verifica venta directa por conteo (ej: '3 cervezas') con cálculo de valor y deducción en unidades."""
+        from registro.models import Producto, VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        from registro.recibo_service import generar_pdf_factura_electronica_dian
+
+        p_cerveza = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Cerveza Aguila",
+            categoria="bebidas",
+            unidad_medida="und",
+            precio_kilo=Decimal("3500"),
+            stock_kilos=Decimal("24.0"),
+        )
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="und_direct_1", usuario=self.dueno, establecimiento=self.est
+        )
+        resp, v, _ = despachar_mensaje("telegram", "und_direct_1", "3 cervezas", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("10500"))
+        self.assertEqual(v.cantidad, Decimal("3.000"))
+        self.assertEqual(v.unidad_medida, "und")
+        self.assertIn("3 und", v.concepto)
+        self.assertIn("21 und", resp)
+
+        p_cerveza.refresh_from_db()
+        self.assertEqual(p_cerveza.stock_kilos, Decimal("21.0"))
+
+        pdf_fe = generar_pdf_factura_electronica_dian(v)
+        self.assertGreater(len(pdf_fe), 1000)
+
+
+
