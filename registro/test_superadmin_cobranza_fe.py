@@ -206,3 +206,46 @@ class SuperadminCobranzaFacturacionTests(TestCase):
         self.assertEqual(resp_pdf.status_code, 200)
         self.assertEqual(resp_pdf["Content-Type"], "application/pdf")
         self.assertTrue(len(resp_pdf.content) > 1000)
+
+    def test_bot_emitir_factura_electronica_desde_celular(self):
+        """Verifica la emisión de Factura Electrónica formal DIAN mediante comando de chat."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="99887766", usuario=self.dueno, establecimiento=self.est
+        )
+        # 1. Registrar venta normal
+        resp_v, v, _ = despachar_mensaje("telegram", "99887766", "40 mil carne nequi", return_adjuntos=True)
+        self.assertIsNotNone(v)
+        self.assertEqual(v.valor, Decimal("40000"))
+        self.assertIn("¿El cliente pide Factura Electrónica formal DIAN?", resp_v)
+        self.assertIn(f"/factura {v.pk}", resp_v)
+
+        # 2. Emitir Factura Electrónica por comando de chat
+        cmd_fe = f"/factura {v.pk} 1049582123 Carlos Gómez carlos@gmail.com"
+        resp_fe = despachar_mensaje("telegram", "99887766", cmd_fe)
+        self.assertIn("¡Factura Electrónica Emitida Exitosamente!", resp_fe)
+        self.assertIn("FE-00001", resp_fe)
+        self.assertIn("Carlos Gómez", resp_fe)
+        self.assertIn("CUFE:", resp_fe)
+
+        v.refresh_from_db()
+        self.assertTrue(v.solicita_factura_electronica)
+        self.assertEqual(v.numero_factura_electronica, "FE-00001")
+        self.assertEqual(v.estado_dian, "aprobada")
+        self.assertEqual(v.cliente.nit_cedula, "1049582123")
+        self.assertEqual(v.cliente.correo_electronico, "carlos@gmail.com")
+
+    def test_bot_emitir_factura_guia_sin_parametros(self):
+        """Verifica que el bot oriente al comerciante si escribe /factura sin datos del cliente."""
+        from registro.models import VinculoCanal
+        from registro.bot_service import despachar_mensaje
+        
+        VinculoCanal.objects.create(
+            canal="telegram", identificador_externo="11223344", usuario=self.dueno, establecimiento=self.est
+        )
+        resp_guia = despachar_mensaje("telegram", "11223344", f"/factura {self.venta.pk}")
+        self.assertIn("Datos Requeridos para Facturar", resp_guia)
+        self.assertIn("Cédula o NIT", resp_guia)
+        self.assertIn("Correo Electrónico", resp_guia)

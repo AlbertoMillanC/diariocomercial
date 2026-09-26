@@ -27,6 +27,7 @@ from .models import (
     TokenVinculacion,
     MensajeProcesado,
     Cliente,
+    Auditoria,
     obtener_configuracion_saas,
 )
 from .inventario_service import (
@@ -241,7 +242,13 @@ def despachar_mensaje(
         cobro_info = {"monto": val, "tx": tx, "payload": payload, "establecimiento": establecimiento}
         return (resp, None, cobro_info) if return_adjuntos else resp
 
-    # 4.3 Registro de Venta (Flujo Natural del Mostrador)
+    # 4.3 Emisión de Factura Electrónica formal DIAN desde el chat
+    if t_norm.startswith(("/factura", "/facturar", "factura", "facturar", "emitir factura")):
+        resp = _emitir_factura_electronica_bot(establecimiento, usuario, texto)
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    # 4.4 Registro de Venta (Flujo Natural del Mostrador)
     resp, venta_creada = _registrar_venta(establecimiento, usuario, texto)
     _cachear_respuesta(canal, identificador_mensaje, resp)
     return (resp, venta_creada, None) if return_adjuntos else resp
@@ -309,15 +316,175 @@ def _registrar_venta(establecimiento: Establecimiento, usuario: User, texto: str
     valor_fmt = f"${val_final:,.0f}".replace(",", ".")
     concepto_fmt = prod.nombre if prod else "Venta general"
     stock_fmt = f" | Quedan {prod.stock_kilos} Kg" if prod else ""
+    base_url = getattr(settings, "BASE_URL", os.environ.get("BASE_URL", "http://127.0.0.1:8001")).rstrip("/")
+    link_emitir_fe = f"{base_url}/ventas/{venta.pk}/emitir-factura-electronica/"
+
+    # Si en el mismo mensaje solicitó factura formal con datos del cliente
+    if "factura" in t_lower and ("@" in texto or re.search(r"\b\d{6,12}\b", texto)):
+        resp_fe = _emitir_factura_electronica_bot(establecimiento, usuario, f"/factura {venta.pk} {texto}")
+        resp = f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {badge_pago}{stock_fmt}\n\n" + resp_fe
+        return resp, venta
 
     resp = (
         f"✅ *Venta Registrada:* {valor_fmt} ({concepto_fmt}) {badge_pago}{stock_fmt}\n"
-        f"🧾 Ticket #{venta.pk} | {timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')}"
+        f"🧾 Ticket #{venta.pk} | {timezone.localtime(venta.fecha_hora).strftime('%I:%M %p')}\n\n"
+        f"💡 *¿El cliente pide Factura Electrónica formal DIAN?*\n"
+        f"• Escribe aquí: `/factura {venta.pk} <NIT/Cédula> <Nombre> <Correo>`\n"
+        f"• O emítela con 1 clic en el celular: {link_emitir_fe}"
     )
     if info_inv:
         resp += f"\n{info_inv}"
 
     return resp, venta
+
+
+def _emitir_factura_electronica_bot(establecimiento: Establecimiento, usuario: User, texto: str) -> str:
+    """Emite Factura Electrónica formal DIAN desde el chat para un ticket de venta."""
+    base_url = getattr(settings, "BASE_URL", os.environ.get("BASE_URL", "http://127.0.0.1:8001")).rstrip("/")
+    
+    # 1. Extraer ID del ticket (ej: /factura 124, /facturar #124)
+    match_ticket = re.search(r"(?:/factura|/facturar|factura|facturar|emitir factura)\s*(?:#|no\.?|num\.?)?\s*(\d+)", texto, re.IGNORECASE)
+    
+    if not match_ticket:
+        ultima_venta = Venta.objects.filter(establecimiento=establecimiento, fecha=timezone.localdate()).order_by("-id").first()
+        sug_ticket = f"{ultima_venta.pk}" if ultima_venta else "124"
+        return (
+            "🧾 *Emisión de Factura Electrónica DIAN desde el Celular*\n\n"
+            "Para generar una Factura Electrónica oficial a un cliente, envía:\n"
+            f"👉 `/factura <ticket> <Cédula o NIT> <Nombre o Razón Social> <Correo>`\n\n"
+            "*Ejemplo Persona Natural:*\n"
+            f"`/factura {sug_ticket} 1049582123 Carlos Gómez carlos@gmail.com`\n\n"
+            "*Ejemplo Empresa (NIT):*\n"
+            f"`/factura {sug_ticket} 901234567 Distribuidora Boyacá SAS compras@boyaca.co`\n\n"
+            f"🌐 O selecciona la venta directamente en tu pantalla móvil:\n"
+            f"{base_url}/facturacion-electronica/"
+        )
+
+    ticket_id = int(match_ticket.group(1))
+    venta = Venta.objects.filter(pk=ticket_id, establecimiento=establecimiento).first()
+    if not venta:
+        return f"❌ No se encontró ninguna venta con el ticket #{ticket_id} en {establecimiento.nombre}."
+
+    if venta.solicita_factura_electronica and venta.numero_factura_electronica:
+        link_ver = f"{base_url}/facturacion-electronica/{venta.pk}/"
+        return (
+            f"ℹ️ El ticket #{ticket_id} ya fue emitido formalmente ante la DIAN.\n\n"
+            f"• *Factura Electrónica:* `{venta.numero_factura_electronica}`\n"
+            f"• *Adquirente:* {venta.cliente.nombre if venta.cliente else 'Adquirente'}\n"
+            f"• *CUFE:* `{venta.cufe[:16]}...`\n"
+            f"• *Estado DIAN:* ✅ Aprobada\n\n"
+            f"📄 Ver documento oficial: {link_ver}"
+        )
+
+    # 2. Extraer datos del cliente (Cédula/NIT, Nombre, Correo)
+    resto = texto[match_ticket.end():].strip()
+    
+    # Buscar correo electrónico
+    email_match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", resto)
+    email_cliente = email_match.group(0).strip().lower() if email_match else ""
+    
+    # Quitar el correo para buscar documento y nombre
+    resto_sin_email = (resto[:email_match.start()] + resto[email_match.end():]).strip() if email_match else resto
+    
+    # Buscar Cédula o NIT (6 a 12 dígitos, opcionalmente con guion)
+    doc_match = re.search(r"\b(\d{6,12}(?:-\d)?)\b", resto_sin_email)
+    doc_cliente = doc_match.group(1).strip() if doc_match else ""
+    
+    # El nombre es el resto del texto
+    nombre_cliente = ""
+    if doc_match:
+        resto_nombre = resto_sin_email[:doc_match.start()] + " " + resto_sin_email[doc_match.end():]
+        nombre_cliente = re.sub(r"\b(a|para|cliente|nombre|nit|cc|cedula|correo|email)\b", " ", resto_nombre, flags=re.IGNORECASE)
+        nombre_cliente = re.sub(r"\s+", " ", nombre_cliente).strip(" :-")
+
+    # Si faltan datos obligatorios según la Resolución 000165 de la DIAN:
+    if not doc_cliente or not email_cliente or not nombre_cliente:
+        link_emitir_web = f"{base_url}/ventas/{venta.pk}/emitir-factura-electronica/"
+        faltantes = []
+        if not doc_cliente: faltantes.append("Cédula o NIT")
+        if not nombre_cliente: faltantes.append("Nombre o Razón Social")
+        if not email_cliente: faltantes.append("Correo Electrónico (para entrega DIAN)")
+        
+        return (
+            f"🧾 *Datos Requeridos para Facturar el Ticket #{ticket_id} (${venta.valor:,.0f} COP)*\n\n"
+            f"⚠️ La normativa DIAN exige obligatoriamente los siguientes datos del comprador:\n"
+            f"Faltó indicar: *{', '.join(faltantes)}*.\n\n"
+            f"👉 Por favor responde:\n"
+            f"`/factura {ticket_id} <Cédula o NIT> <Nombre Completo> <Correo Electrónico>`\n\n"
+            f"*Ejemplo:* `/factura {ticket_id} 1049582123 Carlos Gómez carlos@gmail.com`\n\n"
+            f"🔗 O si prefieres, emítela con 1 clic en la pantalla de tu celular:\n"
+            f"{link_emitir_web}"
+        )
+
+    # 3. Registrar o actualizar Tercero / Cliente
+    doc_limpio = doc_cliente.split("-")[0]
+    es_nit = "-" in doc_cliente or (len(doc_limpio) == 9 and doc_limpio.startswith(("8", "9")))
+    tipo_doc = "31" if es_nit else "13"
+    tipo_pers = "juridica" if es_nit else "natural"
+    
+    cliente = Cliente.objects.filter(establecimiento=establecimiento, nit_cedula=doc_cliente).first()
+    if not cliente:
+        cliente = Cliente.objects.create(
+            establecimiento=establecimiento,
+            nombre=nombre_cliente,
+            tipo_documento=tipo_doc,
+            nit_cedula=doc_cliente,
+            tipo_persona=tipo_pers,
+            correo_electronico=email_cliente,
+            municipio_nombre=establecimiento.municipio.nombre,
+            departamento_nombre=establecimiento.municipio.departamento,
+        )
+    else:
+        actualizar = []
+        if email_cliente and cliente.correo_electronico != email_cliente:
+            cliente.correo_electronico = email_cliente
+            actualizar.append("correo_electronico")
+        if nombre_cliente and cliente.nombre != nombre_cliente:
+            cliente.nombre = nombre_cliente
+            actualizar.append("nombre")
+        if actualizar:
+            cliente.save(update_fields=actualizar)
+
+    # 4. Asignación atómica de consecutivo y CUFE DIAN
+    with transaction.atomic():
+        num_fe = establecimiento.siguiente_consecutivo_factura()
+        cufe = Venta.generar_cufe(establecimiento, num_fe, venta.valor, venta.fecha_hora, cliente.nit_cedula)
+        
+        venta.solicita_factura_electronica = True
+        venta.cliente = cliente
+        venta.numero_factura_electronica = num_fe
+        venta.cufe = cufe
+        venta.estado_dian = "aprobada"
+        venta.save(update_fields=["solicita_factura_electronica", "cliente", "numero_factura_electronica", "cufe", "estado_dian"])
+
+        Auditoria.objects.create(
+            establecimiento=establecimiento,
+            usuario=usuario,
+            entidad_afectada="Venta",
+            id_registro=venta.pk,
+            accion="emitir_factura_electronica",
+            valor_anterior="Consumidor Final",
+            valor_nuevo=f"Factura #{num_fe}, Cliente={cliente.nombre}",
+            motivo="Emisión de Factura Electrónica por comando de Asistente Móvil",
+        )
+
+    valor_fmt = f"${venta.valor:,.0f}".replace(",", ".")
+    link_pdf = f"{base_url}/facturacion-electronica/{venta.pk}/pdf/"
+    link_ver = f"{base_url}/facturacion-electronica/{venta.pk}/"
+
+    return (
+        f"🧾 *¡Factura Electrónica Emitida Exitosamente!*\n\n"
+        f"• *Factura DIAN N°:* `{num_fe}`\n"
+        f"• *Ticket Base:* #{venta.pk}\n"
+        f"• *Adquirente:* {cliente.nombre}\n"
+        f"• *Documento:* `{cliente.nit_cedula}` ({cliente.get_tipo_documento_display()})\n"
+        f"• *Correo Entrega:* {cliente.correo_electronico}\n"
+        f"• *Monto Total:* {valor_fmt} COP\n"
+        f"• *CUFE:* `{cufe[:18]}...`\n"
+        f"• *Estado DIAN:* ✅ Aprobada y Transmitida\n\n"
+        f"📥 *Descargar Factura PDF:* {link_pdf}\n"
+        f"🌐 *Ver Detalle Oficial:* {link_ver}"
+    )
 
 
 def _registrar_compra(establecimiento: Establecimiento, usuario: User, texto: str) -> str:
@@ -404,6 +571,9 @@ def _generar_ayuda(es_propietario: bool) -> str:
     ayuda = (
         "🤖 *Comandos y Uso de DiarioComercial:*\n\n"
         "• *Registrar Venta:* `40 mil carne molida nequi` o `2 libras pechuga`\n"
+        "• *Cobro Inmediato Bre-B (WeChat Pay):* `/cobrar 45 mil`\n"
+        "• *Factura Electrónica DIAN:* `/factura <ticket> <NIT/Cédula> <Nombre> <Correo>`\n"
+        "  _Ej:_ `/factura 124 1049582123 Carlos Gomez carlos@gmail.com`\n"
         "• *Registrar Compra:* `compra 80 mil proveedor verduras`\n"
         "• *Consultar Stock:* `cuanto queda de costilla` o `/stock`\n"
     )
@@ -411,5 +581,7 @@ def _generar_ayuda(es_propietario: bool) -> str:
         ayuda += (
             "\n👑 *Comandos de Propietario:*\n"
             "• `/hoy` o `cierre`: Arqueo y balance discriminado de caja\n"
+            "• `/excel` o `/consolidado`: Descargar libro oficial para el contador\n"
+            "• `/anular <ticket> <motivo>`: Anulación segura con auditoría\n"
         )
     return ayuda
