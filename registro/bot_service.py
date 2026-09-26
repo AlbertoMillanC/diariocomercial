@@ -366,7 +366,7 @@ def despachar_mensaje(
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
 
-    # 4.2 Cobro Rápido con Código QR Bre-B (Estilo WeChat Pay)
+    # 4.2 Cobro Rápido con Código QR Bre-B (Pago Interoperable en Mostrador)
     if t_norm.startswith(("/cobrar", "cobrar", "/qr", "qr", "generar qr", "cobro qr")):
         val, _ = parsear_dinero(texto)
         if not val or val <= 0:
@@ -385,7 +385,7 @@ def despachar_mensaje(
         )
         valor_fmt = f"${val:,.0f} COP".replace(",", ".")
         resp = (
-            f"⚡ *Cobro Bre-B Generado (WeChat Pay):* {valor_fmt}\n"
+            f"⚡ *Cobro Bre-B Generado:* {valor_fmt}\n"
             f"Ref: `{tx.referencia_unica}` • Token: `{tx.token_visual_corto}`\n\n"
             f"📲 Muestre el siguiente código QR al cliente en su mostrador para pagar en 2 segundos desde *Nequi, Daviplata, Bancolombia* o cualquier banco."
         )
@@ -968,7 +968,7 @@ def _generar_ayuda(es_propietario: bool) -> str:
     ayuda = (
         "🤖 *Comandos y Uso de DiarioComercial:*\n\n"
         "• *Registrar Venta:* `40 mil carne molida nequi` o `2 libras pechuga`\n"
-        "• *Cobro Inmediato Bre-B (WeChat Pay):* `/cobrar 45 mil`\n"
+        "• *Cobro Inmediato Bre-B:* `/cobrar 45 mil`\n"
         "• *Factura Electrónica DIAN:* `/factura <ticket> <NIT/Cédula> <Nombre> <Correo>`\n"
         "  _Ej:_ `/factura 124 1049582123 Carlos Gomez carlos@gmail.com`\n"
         "• *Registrar Compra:* `compra 80 mil proveedor verduras`\n"

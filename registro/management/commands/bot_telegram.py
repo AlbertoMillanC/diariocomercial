@@ -361,7 +361,7 @@ class Command(BaseCommand):
             try:
                 from registro.recibo_service import preparar_paquete_omnicanal_venta
                 paquete = preparar_paquete_omnicanal_venta(venta_obj)
-                # 1. Enviar Código QR Bre-B (Estilo WeChat Pay para pagar en mostrador)
+                # 1. Enviar Código QR Bre-B para pagar en mostrador
                 client.send_photo(chat_id, paquete["qr_bytes"], caption=paquete["qr_caption"])
                 # 2. Enviar Factura / Recibo de Pago en PDF
                 client.send_document(chat_id, paquete["pdf_bytes"], paquete["pdf_filename"], caption=paquete["pdf_caption"])
@@ -382,7 +382,7 @@ class Command(BaseCommand):
                 )
                 monto_fmt = f"${cobro_info['monto']:,.0f} COP".replace(",", ".")
                 caption = (
-                    f"⚡ *Código QR Bre-B para Cobro en Mostrador (WeChat Pay)*\n"
+                    f"⚡ *Código QR Bre-B para Cobro en Mostrador*\n"
                     f"💰 *Monto exacto:* {monto_fmt}\n"
                     f"Ref: {tx.token_visual_corto} • {tx.referencia_unica[:18]}\n"
                     f"📲 El cliente puede escanear con Nequi, Daviplata o cualquier banco."

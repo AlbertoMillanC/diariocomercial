@@ -65,6 +65,8 @@ class Phase5ServicesTests(TestCase):
         self.assertIn(b"TOTAL PAGADO:", raw_bytes)
         self.assertIn(b"35.000", raw_bytes)
         self.assertIn(b"BRE-B", raw_bytes)
+        self.assertIn(b"DIARIO COMERCIAL", raw_bytes)
+        self.assertIn(b"3146922087", raw_bytes)
 
     def test_modulo_shadow_parser_e_ingesta(self):
         """El Módulo Shadow intercepta un ticket de SIIGO/POS Windows y lo procesa."""

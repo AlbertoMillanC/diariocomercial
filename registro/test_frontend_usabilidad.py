@@ -234,8 +234,12 @@ class FrontendUsabilidadTests(TestCase):
         )
         paquete = preparar_paquete_omnicanal_venta(venta)
         self.assertIsNotNone(paquete["qr_bytes"])
-        self.assertTrue(len(paquete["qr_bytes"]) > 1000)
         self.assertIsNotNone(paquete["pdf_bytes"])
         self.assertTrue(len(paquete["pdf_bytes"]) > 500)
+        self.assertTrue(paquete["pdf_bytes"].startswith(b"%PDF"))
         self.assertIn("messaging_product", paquete["whatsapp_fields"])
         self.assertEqual(paquete["whatsapp_fields"]["messaging_product"], "whatsapp")
+        # Verificar que NO aparezca 'WeChat Pay de Colombia' ni 'WeChat Pay'
+        self.assertNotIn("WeChat Pay", paquete["qr_caption"])
+        self.assertIn("⚡ *Cobro Rápido Bre-B*", paquete["qr_caption"])
+

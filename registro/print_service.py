@@ -81,7 +81,7 @@ def generar_bytes_escpos_recibo(
     if est.municipio:
         buffer.extend(f"{limpiar_ascii(est.municipio.nombre)} - Colombia\n".encode("ascii", "ignore"))
 
-    buffer.extend(separador.encode("ascii"))
+    buffer.extend(separador_fino.encode("ascii"))
 
     # 2. METADATOS DE TICKET
     buffer.extend(CMD_ALIGN_LEFT)
@@ -105,17 +105,25 @@ def generar_bytes_escpos_recibo(
     medio_str = dict(Venta.MEDIOS_PAGO).get(venta.medio_pago, venta.medio_pago).upper()
     buffer.extend(f"Medio de Pago: {medio_str}\n".encode("ascii"))
 
-    # 5. PIE DE PÁGINA & RECIBO DIGITAL
-    buffer.extend(separador.encode("ascii"))
+    # 5. PIE DE PÁGINA & CONTACTO SISTEMA (COMPACTO PARA AHORRO DE PAPEL Y TINTA)
+    buffer.extend(separador_fino.encode("ascii"))
     buffer.extend(CMD_ALIGN_CENTER)
     buffer.extend(b"Gracias por su compra!\n")
-    buffer.extend(b"Conserve este comprobante\n")
     if url_recibo_digital:
-        buffer.extend(b"\nConsulte su garantia en:\n")
-        buffer.extend(url_recibo_digital.encode("ascii") + b"\n")
+        buffer.extend(f"Garantia: {url_recibo_digital}\n".encode("ascii", "ignore"))
+    buffer.extend(separador_fino.encode("ascii"))
+    buffer.extend(CMD_BOLD_ON)
+    if ancho_cols >= 40:
+        buffer.extend(b"DIARIO COMERCIAL\n")
+        buffer.extend(b"CONTACTO VENTAS ESTE SISTEMA: 3146922087\n")
+    else:
+        buffer.extend(b"DIARIO COMERCIAL\n")
+        buffer.extend(b"CONTACTO VENTAS ESTE SISTEMA:\n")
+        buffer.extend(b"3146922087\n")
+    buffer.extend(CMD_BOLD_OFF)
 
-    # Avance de papel para no cortar sobre el texto
-    buffer.extend(b"\n\n\n")
+    # Avance mínimo indispensable para el corte
+    buffer.extend(b"\n\n")
     buffer.extend(CMD_CUT_PAPER)
 
     return bytes(buffer)

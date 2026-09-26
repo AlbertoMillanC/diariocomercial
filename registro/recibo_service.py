@@ -1,7 +1,7 @@
 """
 registro/recibo_service.py
 Generador omnicanal de Recibos/Facturas en PDF y Tarjetas de Pago con Código QR Bre-B
-(Arquitectura WeChat Pay adaptada al comercio popular colombiano para Telegram y WhatsApp).
+(Arquitectura de pagos interoperables inmediatos para Telegram y WhatsApp).
 """
 import io
 import base64
@@ -26,7 +26,7 @@ def generar_imagen_qr_bre_b(
     payload_emvco: str = "",
 ) -> bytes:
     """
-    Genera una tarjeta visual de pago de alto impacto (estilo WeChat Pay) con:
+    Genera una tarjeta visual de pago de alto impacto (estándar Bre-B / EMVCo) con:
     - Banner institucional Bre-B (Banco de la República).
     - Código QR interoperable EMVCo con monto exacto embebido.
     - Monto a pagar en pesos enteros sin decimales.
@@ -162,78 +162,109 @@ def generar_imagen_qr_suscripcion_saas(
 def generar_pdf_recibo_venta(venta: Venta) -> bytes:
     """
     Genera un comprobante oficial de venta / factura de mostrador en formato PDF
-    estandarizado para rollo térmico o consulta en dispositivos móviles (Telegram / WhatsApp).
+    estandarizado y ultracompacto para rollo térmico o consulta en dispositivos móviles (Telegram / WhatsApp).
+    Diseñado sin renglones en blanco innecesarios para optimizar lectura y ahorrar papel/tinta.
     """
     buf = io.BytesIO()
-    # Ancho 226 pt (~80mm) x Alto 440 pt
-    p = canvas.Canvas(buf, pagesize=(226, 460))
     est = venta.establecimiento
 
-    y = 440
-    def linea(texto: str, size: int = 8, bold: bool = False, centro: bool = False, sep: int = 12):
-        nonlocal y
-        y -= sep
-        font_name = "Helvetica-Bold" if bold else "Helvetica"
-        p.setFont(font_name, size)
-        if centro:
-            p.drawCentredString(113, y, str(texto)[:45])
-        else:
-            p.drawString(14, y, str(texto)[:45])
-
-    def divisor():
-        nonlocal y
-        y -= 8
-        p.setFont("Helvetica", 7)
-        p.drawString(14, y, "------------------------------------------------------------")
-
-    # Encabezado Comercial
-    linea("DIARIOCOMERCIAL", size=11, bold=True, centro=True, sep=14)
-    linea(est.nombre.upper(), size=10, bold=True, centro=True)
+    # Formateo de datos
+    nombre_est = (est.nombre or "COMERCIO").upper()[:36]
     nit_str = f"NIT: {est.nit or '891800846-1'}"
     if est.municipio:
         nit_str += f" - {est.municipio.nombre.upper()}"
-    linea(nit_str, size=8, centro=True)
-    if est.direccion:
-        linea(est.direccion[:40], size=7, centro=True)
+    dir_str = est.direccion[:38] if est.direccion else ""
 
-    divisor()
-    linea("COMPROBANTE DE PAGO / FACTURA", size=9, bold=True, centro=True)
-    linea(f"TICKET NÚMERO: #{venta.pk:05d}", size=9, bold=True, centro=True)
-    
+    ticket_num = f"TICKET NÚMERO: #{venta.pk:05d}"
     hora_str = timezone.localtime(venta.fecha_hora).strftime("%d/%m/%Y  %I:%M %p")
-    linea(f"Fecha: {hora_str}", size=8)
     cajero = venta.usuario.get_full_name() or venta.usuario.username if venta.usuario else "Cajero"
-    linea(f"Atendido por: {cajero}", size=8)
+    cajero_str = f"Atendido por: {cajero[:28]}"
+
     if not venta.cliente or venta.cliente.es_consumidor_final:
-        cli_str = "Consumidor Final (222222222222)"
+        cli_str = "Cliente: Consumidor Final (222222222222)"
     elif venta.cliente.nombre and not venta.cliente.nombre.startswith(("Cliente CC", "CC ", "NIT ")) and venta.cliente.nombre != venta.cliente.nit_cedula:
-        cli_str = f"{venta.cliente.nombre} (CC {venta.cliente.nit_cedula})"
+        cli_str = f"Cliente: {venta.cliente.nombre[:22]} (CC {venta.cliente.nit_cedula})"
     else:
         prefix = "NIT" if ("-" in venta.cliente.nit_cedula or (len(venta.cliente.nit_cedula) == 9 and venta.cliente.nit_cedula.startswith(("8", "9")))) else "CC"
-        cli_str = f"{prefix} {venta.cliente.nit_cedula}"
-    linea(f"Cliente: {cli_str[:35]}", size=8)
+        cli_str = f"Cliente: {prefix} {venta.cliente.nit_cedula}"
 
-    divisor()
-    linea("DETALLE DE LA OPERACIÓN", size=8, bold=True)
-    linea(f"Concepto: {venta.concepto[:35]}", size=8)
-    linea(f"Medio de Pago: {venta.get_medio_pago_display() or venta.medio_pago.upper()}", size=8, bold=True)
+    concepto_str = f"Concepto: {(venta.concepto or 'Venta de mostrador')[:36]}"
+    medio_display = venta.get_medio_pago_display() or venta.medio_pago.upper()
+    medio_str = f"Medio de Pago: {medio_display}"
 
-    divisor()
     valor_fmt = f"${venta.valor:,.0f} COP".replace(",", ".")
     ica_fmt = f"${venta.ica_estimado:,.0f} COP".replace(",", ".")
+    subtot_str = f"Subtotal: {valor_fmt}"
+    ica_str = f"ICA Tunja (Acuerdo 0032): {ica_fmt}"
+    total_str = f"TOTAL PAGADO: {valor_fmt}"
+    estado_str = "ESTADO: PAGADO Y CUADRADO"
+    gracias_str = "¡Muchas gracias por su compra!"
+    visitenos_str = f"Visítenos de nuevo en {est.nombre[:28]}"
 
-    linea(f"Subtotal:           {valor_fmt}", size=8)
-    linea(f"ICA Tunja (Acuerdo 0032): {ica_fmt}", size=7)
-    
-    divisor()
-    linea(f"TOTAL PAGADO: {valor_fmt}", size=11, bold=True)
-    divisor()
+    # Elementos a dibujar: ("tipo", texto/args..., font_size, bold, centro, separacion_y)
+    items = []
+    items.append(("text", nombre_est, 10, True, True, 12))
+    items.append(("text", nit_str, 7.5, False, True, 9.5))
+    if dir_str:
+        items.append(("text", dir_str, 7, False, True, 9))
+    items.append(("line", 0.5, 3, 4))
 
-    linea("ESTADO: PAGADO Y CUADRADO", size=8, bold=True, centro=True)
-    linea("¡Muchas gracias por su compra!", size=8, centro=True)
-    linea(f"Visítenos de nuevo en {est.nombre}", size=7, centro=True)
-    divisor()
-    linea("Plataforma DiarioComercial v2.0", size=6, centro=True)
+    items.append(("text", "COMPROBANTE DE PAGO / FACTURA", 8, True, True, 10))
+    items.append(("text", ticket_num, 8.5, True, True, 10))
+    items.append(("text", f"Fecha: {hora_str}", 7.5, False, False, 9.5))
+    items.append(("text", cajero_str, 7.5, False, False, 9.5))
+    items.append(("text", cli_str[:38], 7.5, False, False, 9.5))
+    items.append(("line", 0.5, 3, 4))
+
+    items.append(("text", "DETALLE DE LA OPERACIÓN", 7.5, True, False, 9.5))
+    items.append(("text", concepto_str, 8, False, False, 10))
+    items.append(("text", medio_str, 7.5, True, False, 9.5))
+    items.append(("line", 0.5, 3, 4))
+
+    items.append(("text", subtot_str, 7.5, False, False, 9.5))
+    if venta.ica_estimado and venta.ica_estimado > 0:
+        items.append(("text", ica_str, 7, False, False, 9))
+    items.append(("line", 0.5, 3, 4))
+
+    items.append(("text", total_str, 10, True, False, 12))
+    items.append(("line", 0.5, 3, 4))
+
+    items.append(("text", estado_str, 7.5, True, True, 9.5))
+    items.append(("text", gracias_str, 7.5, False, True, 9.5))
+    items.append(("text", visitenos_str, 7, False, True, 9))
+    items.append(("line", 0.5, 3, 4))
+
+    # Pie de página: DIARIO COMERCIAL CONTACTO VENTAS ESTE SISTEMA : 3146922087
+    items.append(("text", "DIARIO COMERCIAL", 7, True, True, 9))
+    items.append(("text", "CONTACTO VENTAS ESTE SISTEMA: 3146922087", 6.5, True, True, 8.5))
+
+    # Calcular altura exacta sin dejar renglones ni espacios en blanco innecesarios
+    altura_contenido = sum(
+        it[-1] if it[0] == "text" else (it[2] + it[3]) for it in items
+    )
+    padding_v = 8
+    alto_total = altura_contenido + (padding_v * 2)
+
+    p = canvas.Canvas(buf, pagesize=(226, alto_total))
+    y = alto_total - padding_v
+
+    for it in items:
+        if it[0] == "line":
+            _, stroke_w, gap_before, gap_after = it
+            y -= gap_before
+            p.setStrokeColorRGB(0.75, 0.75, 0.75)
+            p.setLineWidth(stroke_w)
+            p.line(14, y, 212, y)
+            y -= gap_after
+        else:
+            _, txt, sz, bold, centro, sep = it
+            y -= sep
+            p.setFillColorRGB(0.1, 0.1, 0.1)
+            p.setFont("Helvetica-Bold" if bold else "Helvetica", sz)
+            if centro:
+                p.drawCentredString(113, y, str(txt)[:45])
+            else:
+                p.drawString(14, y, str(txt)[:45])
 
     p.save()
     return buf.getvalue()
@@ -433,7 +464,7 @@ def generar_pdf_factura_electronica_dian(venta: Venta) -> bytes:
     p.setFont("Helvetica", 6.5)
     p.setFillColorRGB(0.5, 0.5, 0.5)
     p.drawCentredString(width / 2, 38, "Esta factura electrónica de venta cumple los requisitos de la Ley 2010 de 2019, Decreto 358 de 2020 y Resolución DIAN 000165 de 2023.")
-    p.drawCentredString(width / 2, 28, f"Generado e impreso por el sistema DiarioComercial • {est.nombre} • Tunja, Colombia")
+    p.drawCentredString(width / 2, 28, f"DIARIO COMERCIAL CONTACTO VENTAS ESTE SISTEMA: 3146922087 • {est.nombre} • Tunja, Colombia")
 
     p.save()
     return buf.getvalue()
@@ -460,7 +491,7 @@ def preparar_paquete_omnicanal_venta(
 
     valor_fmt = f"${venta.valor:,.0f} COP".replace(",", ".")
     caption_qr = (
-        f"⚡ *Cobro Rápido Bre-B (WeChat Pay de Colombia)*\n"
+        f"⚡ *Cobro Rápido Bre-B*\n"
         f"💰 *Monto a Pagar:* {valor_fmt}\n"
         f"🏪 *Comercio:* {est.nombre}\n"
         f"📲 El cliente puede escanear este QR desde *Nequi, Daviplata, Bancolombia* o cualquier app bancaria."

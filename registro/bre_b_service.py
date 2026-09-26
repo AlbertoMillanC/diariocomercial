@@ -75,7 +75,7 @@ def generar_qr_dinamico_bre_b(
 
     # Sub-tags Tag 62 (Additional Data)
     subtag_ref = format_tlv("05", referencia[:25])
-    subtag_terminal = format_tlv("07", "DC-WECHAT-POS")
+    subtag_terminal = format_tlv("07", "DC-BREB-POS")
     tag_62 = format_tlv("62", f"{subtag_ref}{subtag_terminal}")
 
     monto_str = f"{monto:.2f}"
