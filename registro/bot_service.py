@@ -6,6 +6,9 @@ idempotencia anti-duplicados y modo Carrito/Ticket Abierto.
 """
 import os
 import re
+import json
+import time
+import tempfile
 import secrets
 from decimal import Decimal
 from typing import Optional, Tuple, Dict, Any
@@ -53,6 +56,57 @@ _VENTAS_PENDIENTES_FACTURA: Dict[Tuple[str, str], Dict[str, Any]] = {}
 # Buffer para tickets de mostrador que están esperando número de documento de cliente
 # Estructura: {(canal, id_externo): {"venta_id": int, "tipo_doc": Optional[str], "fecha": datetime}}
 _VENTAS_PENDIENTES_DOCUMENTO: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+
+def _get_doc_pend_filepath(key_sesion: Tuple[str, str]) -> str:
+    canal, id_ext = key_sesion
+    safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', f"{canal}_{id_ext}")
+    return os.path.join(tempfile.gettempdir(), f"diariocomercial_doc_{safe_name}.json")
+
+
+def _guardar_pendiente_documento(key_sesion: Tuple[str, str], datos: Dict[str, Any]) -> None:
+    _VENTAS_PENDIENTES_DOCUMENTO[key_sesion] = datos
+    try:
+        fpath = _get_doc_pend_filepath(key_sesion)
+        serializable = dict(datos)
+        if isinstance(serializable.get("valor_ingresado"), Decimal):
+            serializable["valor_ingresado"] = str(serializable["valor_ingresado"])
+        if hasattr(serializable.get("fecha"), "isoformat"):
+            serializable["fecha"] = serializable["fecha"].isoformat()
+        serializable["_saved_at"] = time.time()
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(serializable, f)
+    except Exception:
+        pass
+
+
+def _obtener_pendiente_documento(key_sesion: Tuple[str, str]) -> Optional[Dict[str, Any]]:
+    datos = _VENTAS_PENDIENTES_DOCUMENTO.pop(key_sesion, None)
+    if not datos:
+        try:
+            fpath = _get_doc_pend_filepath(key_sesion)
+            if os.path.exists(fpath):
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                saved_at = cached.get("_saved_at", 0)
+                if time.time() - saved_at < 600:  # 10 minutos de vigencia
+                    if cached.get("valor_ingresado") is not None:
+                        cached["valor_ingresado"] = Decimal(str(cached["valor_ingresado"]))
+                    datos = cached
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+        except Exception:
+            pass
+    else:
+        try:
+            fpath = _get_doc_pend_filepath(key_sesion)
+            if os.path.exists(fpath):
+                os.remove(fpath)
+        except OSError:
+            pass
+    return datos
 
 DIAN_TIPOS_DOC: Dict[str, str] = {
     "11": "Registro Civil",
@@ -116,6 +170,13 @@ def despachar_mensaje(
         .filter(canal=canal, identificador_externo=identificador_externo, activo=True)
         .first()
     )
+    if not vinculo and canal == "whatsapp":
+        alt_id = identificador_externo[2:] if (identificador_externo.startswith("57") and len(identificador_externo) == 12) else f"57{identificador_externo}"
+        vinculo = (
+            VinculoCanal.objects.select_related("usuario", "establecimiento")
+            .filter(canal=canal, identificador_externo=alt_id, activo=True)
+            .first()
+        )
 
     # 3. Flujo de Vinculación por Token (/start auth_XYZ o código de 6 dígitos)
     match_token = re.search(r"auth_[A-Za-z0-9_-]+", texto)
@@ -241,9 +302,12 @@ def despachar_mensaje(
                 _VENTAS_PENDIENTES_FACTURA.pop(key_sesion, None)
 
     # 4.0.1 Interceptación de Flujo de Documento de Cliente Pendiente para Ticket
-    if key_sesion in _VENTAS_PENDIENTES_DOCUMENTO:
-        datos_doc = _VENTAS_PENDIENTES_DOCUMENTO.pop(key_sesion, None)
+    datos_doc = _obtener_pendiente_documento(key_sesion)
+    if not datos_doc and canal == "whatsapp":
+        alt_id = identificador_externo[2:] if (identificador_externo.startswith("57") and len(identificador_externo) == 12) else f"57{identificador_externo}"
+        datos_doc = _obtener_pendiente_documento((canal, alt_id))
 
+    if datos_doc:
         val_prueba, _ = parsear_dinero(texto)
         es_venta_nueva = (
             val_prueba is not None
@@ -313,7 +377,7 @@ def despachar_mensaje(
                     resto_nombre = texto[:match_num.start()] + " " + texto[match_num.end():]
                 else:
                     # No reconoció un número de documento, repreguntar y guardar estado
-                    _VENTAS_PENDIENTES_DOCUMENTO[key_sesion] = datos_doc
+                    _guardar_pendiente_documento(key_sesion, datos_doc)
                     resp = (
                         "⚠️ No reconocí un número de documento válido.\n\n"
                         "Por favor escribe la cédula o NIT (ej: `7178367` o `13 7178367`), o escribe `omitir`:"
@@ -619,14 +683,17 @@ def _registrar_venta(
             )
 
         if canal_sesion:
-            _VENTAS_PENDIENTES_DOCUMENTO[canal_sesion] = {
-                "texto_inventario": texto_para_inventario,
-                "valor_ingresado": val,
-                "medio_pago": medio_pago,
-                "badge_pago": badge_pago,
-                "tipo_doc_dian_pendiente": tipo_doc_dian_pendiente,
-                "fecha": timezone.now(),
-            }
+            _guardar_pendiente_documento(
+                canal_sesion,
+                {
+                    "texto_inventario": texto_para_inventario,
+                    "valor_ingresado": val,
+                    "medio_pago": medio_pago,
+                    "badge_pago": badge_pago,
+                    "tipo_doc_dian_pendiente": tipo_doc_dian_pendiente,
+                    "fecha": timezone.now(),
+                },
+            )
 
         val_fmt = f"${val:,.0f}".replace(",", ".") if val else ""
         monto_tag = f" (Monto: {val_fmt})" if val_fmt else ""
