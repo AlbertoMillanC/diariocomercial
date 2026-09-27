@@ -112,7 +112,8 @@
     <table>
       <thead>
         <tr>
-          <th>Código / SKU</th>
+          <th>⚡ Código Corto (PLU)</th>
+          <th>Código de Barras / SKU</th>
           <th>Tipo / Categoría</th>
           <th>Producto / Servicio</th>
           <th>Stock Actual</th>
@@ -127,11 +128,20 @@
         {% for p in productos %}
         <tr id="fila-prod-{{ p.pk }}" style="{% if p.stock_kilos <= 0 and not p.es_servicio %}background:rgba(239, 68, 68, 0.05);{% endif %}">
           <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <code style="background:#0f172a; color:#facc15; padding:4px 8px; border-radius:6px; font-size:13px; font-weight:900; letter-spacing:0.5px; border:1px solid #ca8a04;">⚡ {{ p.codigo_corto }}</code>
+              {% if puede_editar %}
+                <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_corto|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:0;" title="Modificar código corto / PLU">✏️</button>
+              {% endif %}
+            </div>
+            <small style="display:block; color:#64748b; font-size:10px; margin-top:2px;">Marcación rápida</small>
+          </td>
+          <td>
             {% if p.codigo_barras %}
               <div style="display:flex; align-items:center; gap:6px;">
                 <code style="background:#0f172a; color:#38bdf8; padding:3px 7px; border-radius:4px; font-size:12px; font-weight:bold; letter-spacing:0.5px;">{{ p.codigo_barras }}</code>
                 {% if puede_editar %}
-                  <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:0;" title="Modificar código de barras / datos">✏️</button>
+                  <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_corto|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:0;" title="Modificar código de barras / datos">✏️</button>
                 {% endif %}
               </div>
             {% else %}
@@ -141,7 +151,7 @@
                   <small style="display:block; color:#94a3b8; font-size:10px; margin-top:2px;">(SKU automático)</small>
                 </div>
                 {% if puede_editar %}
-                  <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" class="btn btn-ghost" style="padding:2px 6px; font-size:11px; border:1px solid #cbd5e1; border-radius:4px; white-space:nowrap;" title="Asignar código de barras de fábrica o EAN-13">
+                  <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_corto|escapejs }}', '', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" class="btn btn-ghost" style="padding:2px 6px; font-size:11px; border:1px solid #cbd5e1; border-radius:4px; white-space:nowrap;" title="Asignar código de barras de fábrica o EAN-13">
                     + Código
                   </button>
                 {% endif %}
@@ -244,10 +254,14 @@
     {% csrf_token %}
     <input type="hidden" name="crear_producto" value="1">
     
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1.2fr; gap:12px; margin-bottom:10px;">
       <div>
         <label style="font-weight:bold; font-size:12px;">{{ form.nombre.label }} *</label>
         {{ form.nombre }}
+      </div>
+      <div>
+        <label style="font-weight:bold; font-size:12px; color:#b45309;">⚡ {{ form.codigo_corto.label }}</label>
+        {{ form.codigo_corto }}
       </div>
       <div>
         <label style="font-weight:bold; font-size:12px;">{{ form.codigo_barras.label }}</label>
@@ -484,6 +498,16 @@
         <input type="text" id="edit-nombre" name="nombre" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; box-sizing:border-box;">
       </div>
 
+      <div style="margin-bottom:12px; background:#fefce8; padding:10px; border-radius:8px; border:1px solid #fef08a;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#854d0e;">
+          ⚡ Código Corto / PLU (Marcación Rápida en Caja y Pedidos):
+        </label>
+        <input type="text" id="edit-codigo-corto" name="codigo_corto" placeholder="Ej: 2323, 101, 12" style="width:100%; padding:8px; border-radius:6px; border:1px solid #eab308; font-size:14px; box-sizing:border-box; font-family:monospace; font-weight:bold; color:#0f172a;">
+        <small style="display:block; color:#713f12; font-size:11px; margin-top:4px;">
+          ⚡ Permite al cajero teclear solo este número si no hay código de barras, y permite a los clientes pedir por WhatsApp/Telegram (ej: <code>40 mil 2323</code> o <code>5 2323</code>).
+        </small>
+      </div>
+
       <div style="margin-bottom:12px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
         <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#1e293b;">
           📶 Código de Barras / SKU / EAN-13:
@@ -521,15 +545,16 @@
 </div>
 
 <script>
-function abrirEditarProducto(id, nombre, codigo, stock, precio, costo) {
+function abrirEditarProducto(id, nombre, codigo_corto, codigo_barras, stock, precio, costo) {
   document.getElementById('form-editar-producto').action = '/inventario/' + id + '/ajustar/';
   document.getElementById('edit-nombre').value = nombre;
-  document.getElementById('edit-codigo').value = codigo;
+  document.getElementById('edit-codigo-corto').value = codigo_corto || '';
+  document.getElementById('edit-codigo').value = codigo_barras || '';
   document.getElementById('edit-stock').value = stock;
   document.getElementById('edit-precio').value = precio;
   document.getElementById('edit-costo').value = costo;
   document.getElementById('modal-editar-producto').style.display = 'flex';
-  setTimeout(() => document.getElementById('edit-codigo').focus(), 100);
+  setTimeout(() => document.getElementById('edit-codigo-corto').focus(), 100);
 }
 
 function abrirSurtir(id, nombre, stock, unidad) {

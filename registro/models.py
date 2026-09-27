@@ -655,6 +655,12 @@ class Producto(models.Model):
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="productos")
     categoria = models.CharField(max_length=20, choices=CATEGORIAS, default="carnes")
     nombre = models.CharField(max_length=120)
+    codigo_corto = models.CharField(
+        max_length=20,
+        blank=True,
+        db_index=True,
+        help_text="Código corto o PLU de marcación rápida para caja y pedidos de clientes (ej: 101, 2323)",
+    )
     codigo_barras = models.CharField(
         max_length=64, blank=True, db_index=True, help_text="Código de barras EAN-13, SKU o referencia"
     )
@@ -677,9 +683,17 @@ class Producto(models.Model):
     def __str__(self):
         return f"{self.nombre} - ${self.precio_kilo}/kg"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.codigo_corto:
+            self.codigo_corto = str(self.pk)
+            Producto.objects.filter(pk=self.pk).update(codigo_corto=str(self.pk))
+
     @property
     def codigo_sku(self) -> str:
-        """Retorna el código de barras asignado o el SKU interno automático (ej: DC00005)."""
+        """Retorna el código corto / PLU si existe, o código de barras, o SKU interno."""
+        if self.codigo_corto and self.codigo_corto.strip():
+            return self.codigo_corto.strip()
         if self.codigo_barras and self.codigo_barras.strip():
             return self.codigo_barras.strip()
         return f"DC{self.pk:05d}"

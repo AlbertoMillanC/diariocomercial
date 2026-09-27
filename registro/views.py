@@ -1197,12 +1197,15 @@ def inventario_ajustar(request, pk):
         nuevo_stock = request.POST.get("stock_kilos")
         nuevo_precio = request.POST.get("precio_kilo")
         nuevo_costo = request.POST.get("costo_unitario")
+        nuevo_codigo_corto = request.POST.get("codigo_corto")
         nuevo_codigo = request.POST.get("codigo_barras")
         nuevo_nombre = request.POST.get("nombre")
         try:
-            val_ant = f"Nombre: {prod.nombre}, Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}"
+            val_ant = f"Nombre: {prod.nombre}, Código Corto: {prod.codigo_corto}, Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}"
             if nuevo_nombre is not None and nuevo_nombre.strip():
                 prod.nombre = nuevo_nombre.strip()
+            if nuevo_codigo_corto is not None and nuevo_codigo_corto.strip():
+                prod.codigo_corto = nuevo_codigo_corto.strip()
             if nuevo_stock is not None and nuevo_stock != "":
                 prod.stock_kilos = Decimal(nuevo_stock)
             if nuevo_precio is not None and nuevo_precio != "":
@@ -1477,6 +1480,14 @@ def api_buscar_producto_codigo(request):
             precio_calculado = float(round(prod.precio_kilo * peso_kg))
             detalle_bascula = f"⚖️ Báscula de mostrador: {peso_bascula:.3f} {prod.unidad_medida} a ${prod.precio_kilo:,.0f}/{prod.unidad_medida}"
 
+    # Caso B.2: Búsqueda exacta por Código Corto / PLU rápido de caja (ej: 2323, 101, 12)
+    if not prod:
+        prod = Producto.objects.filter(
+            establecimiento=est,
+            codigo_corto__iexact=codigo,
+            estado="activo",
+        ).first()
+
     # Caso C: Búsqueda exacta por código de barras o SKU
     if not prod:
         prod = Producto.objects.filter(
@@ -1509,6 +1520,7 @@ def api_buscar_producto_codigo(request):
             "encontrado": True,
             "id": prod.pk,
             "nombre": prod.nombre,
+            "codigo_corto": prod.codigo_corto,
             "codigo_barras": prod.codigo_barras,
             "categoria": prod.categoria,
             "precio": precio_final,

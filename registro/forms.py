@@ -214,6 +214,7 @@ class ProductoForm(forms.ModelForm):
     class Meta:
         model = Producto
         fields = [
+            "codigo_corto",
             "codigo_barras",
             "nombre",
             "categoria",
@@ -225,7 +226,8 @@ class ProductoForm(forms.ModelForm):
             "estado",
         ]
         labels = {
-            "codigo_barras": "Código de Barras / SKU / EAN-13",
+            "codigo_corto": "Código Corto / PLU (Marcación rápida caja ej: 101, 2323)",
+            "codigo_barras": "Código de Barras / SKU / EAN-13 (Pistola USB)",
             "nombre": "Nombre del Producto o Servicio",
             "categoria": "Categoría",
             "es_servicio": "¿Es un servicio / mano de obra? (Sin stock físico)",
@@ -236,8 +238,9 @@ class ProductoForm(forms.ModelForm):
             "estado": "Estado",
         }
         widgets = {
+            "codigo_corto": forms.TextInput(attrs={"placeholder": "Ej. 2323, 101, 45 (tecleo rápido)"}),
             "codigo_barras": forms.TextInput(attrs={"placeholder": "Ej. 7701234567890 (o escanear con pistola USB)"}),
-            "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res, Arroz Diana 1kg, Servicio de Afilado"}),
+            "nombre": forms.TextInput(attrs={"placeholder": "Ej. Lomo fino de res, Arroz Diana 1kg, Pan rollito"}),
             "stock_kilos": forms.NumberInput(attrs={"step": "0.1", "min": "0"}),
             "precio_kilo": forms.NumberInput(attrs={"step": "100", "min": "0"}),
             "costo_unitario": forms.NumberInput(attrs={"step": "100", "min": "0"}),

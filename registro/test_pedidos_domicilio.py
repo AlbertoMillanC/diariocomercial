@@ -578,4 +578,66 @@ class PedidosDomicilioTestCase(TestCase):
         self.assertEqual(pedido.estado, "entregado")
         self.assertIsNotNone(pedido.venta)
 
+    def test_pedido_con_codigo_corto_plu(self):
+        """Prueba pedidos usando Código Corto / PLU (ej: 40 mil 2323 o 5 2323)."""
+        self.prod_pan.codigo_corto = "2323"
+        self.prod_pan.stock_kilos = Decimal("200")
+        self.prod_pan.save()
+
+        self.prod_aceite.codigo_corto = "101"
+        self.prod_aceite.stock_kilos = Decimal("50")
+        self.prod_aceite.save()
+
+        # Caso 1: Pedido con monto de dinero y código corto ('40 mil 2323')
+        msg = "pedido 40 mil 2323 Calle 15 # 8-20 casa azul"
+        resp, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo="3112223344",
+            texto_mensaje=msg,
+            return_adjuntos=True,
+        )
+        self.assertIn("Cotizado", resp)
+        self.assertIn("Pan Rollito", resp)
+        self.assertIn("80 Und", resp)
+        self.assertIn("$40.000", resp)
+
+        _PEDIDOS_PENDIENTES.clear()
+
+        # Caso 2: Pedido con unidades y múltiples productos usando código corto ('5 2323 y 2 101')
+        msg_multi = "pedido 5 2323 y 2 101 Calle 15 # 8-20 casa azul"
+        resp_multi, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo="3112223344",
+            texto_mensaje=msg_multi,
+            return_adjuntos=True,
+        )
+        self.assertIn("Cotizado", resp_multi)
+        self.assertIn("5 Und", resp_multi)
+        self.assertIn("Pan Rollito", resp_multi)
+        self.assertIn("$2.500", resp_multi)
+        self.assertIn("2 Und", resp_multi)
+        self.assertIn("Aceite 500ml", resp_multi)
+        self.assertIn("$16.000", resp_multi)
+
+    def test_api_buscar_producto_por_codigo_corto(self):
+        """Prueba que el buscador de caja POS encuentre el producto por su código corto / PLU."""
+        self.prod_pan.codigo_corto = "2323"
+        self.prod_pan.save()
+
+        client = HttpClient()
+        client.force_login(self.user)
+        session = client.session
+        session["establecimiento_id"] = self.est.pk
+        session.save()
+
+        url = reverse("api_buscar_producto_codigo") + "?codigo=2323"
+        resp = client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["encontrado"])
+        self.assertEqual(data["nombre"], "Pan Rollito")
+        self.assertEqual(data["codigo_corto"], "2323")
+        self.assertEqual(data["precio"], 500.0)
+
+
 

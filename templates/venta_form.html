@@ -23,9 +23,9 @@
       <span style="font-size:24px;">🏷️</span>
       <div style="flex:1;">
         <label for="barcode-scanner" style="display:block; font-size:12px; font-weight:bold; color:#166534; margin-bottom:4px;">
-          PISTOLA LECTORA DE CÓDIGO DE BARRAS, QR DE TIENDA O BÁSCULA (USB / ÓPTICO)
+          ⚡ CÓDIGO CORTO / PLU (ej: 2323, 101), PISTOLA DE CÓDIGO DE BARRAS O NOMBRE
         </label>
-        <input type="text" id="barcode-scanner" placeholder="Pase el escáner sobre el producto, QR de tienda o etiqueta de báscula..." style="width:100%; padding:9px 12px; border:2px solid #10b981; border-radius:6px; font-size:15px; font-weight:bold;" autofocus>
+        <input type="text" id="barcode-scanner" placeholder="Teclee Código Corto / PLU (ej: 2323), pase el escáner de código de barras o escriba el nombre..." style="width:100%; padding:9px 12px; border:2px solid #10b981; border-radius:6px; font-size:15px; font-weight:bold;" autofocus>
       </div>
       <div id="barcode-info-box" style="font-size:12px; color:#15803d; font-weight:bold; min-width:200px; text-align:right;"></div>
     </div>
@@ -707,19 +707,21 @@ if (scannerInput) {
 
             if (motivoInput && !motivoInput.value) motivoInput.value = data.nombre;
             if (obsInput && !obsInput.value) {
-              obsInput.value = data.es_bascula ? data.detalle_bascula : `SKU: ${data.codigo_barras || 'QR-TIENDA'}`;
+              const tagCod = data.codigo_corto ? `PLU: ${data.codigo_corto}` : `SKU: ${data.codigo_barras || 'QR-TIENDA'}`;
+              obsInput.value = data.es_bascula ? data.detalle_bascula : tagCod;
             }
 
             let extraInfo = "";
             if (data.es_bascula) {
               extraInfo = `<br><span style="color:#0284c7; font-weight:bold;">${data.detalle_bascula}</span>`;
+            } else if (data.codigo_corto) {
+              extraInfo = ` <span style="background:#0f172a; color:#facc15; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold;">⚡ PLU: ${data.codigo_corto}</span>`;
             }
 
             infoBox.innerHTML = `
               <span style="color:#065f46; font-size:12px;">
-                ✅ <strong>${data.nombre}</strong><br>
+                ✅ <strong>${data.nombre}</strong>${extraInfo}<br>
                 Precio: <strong>$${Math.round(data.precio).toLocaleString('es-CO')} COP</strong> | Stock: ${data.stock} ${data.unidad}
-                ${extraInfo}
               </span>
             `;
           } else {

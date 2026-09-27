@@ -255,20 +255,44 @@ def parsear_volumen(texto: str) -> Optional[Tuple[Decimal, str]]:
     return None
 
 
-def parsear_unidades(texto: str) -> Optional[Tuple[Decimal, str]]:
+def parsear_unidades(texto: str, producto: Optional[Producto] = None) -> Optional[Tuple[Decimal, str]]:
     """
     Detecta y extrae cantidades de unidades discretas (und, cajas, paquetes, etc.).
     Retorna: (cantidad, unidad_str) o None
     Ejemplos:
       '3 cervezas' -> (Decimal('3'), 'und')
       '5 panes' -> (Decimal('5'), 'und')
+      '5 2323' -> (Decimal('5'), 'und')
       '10 pan' -> (Decimal('10'), 'und')
       '2 cajas de leche' -> (Decimal('2'), 'cajas')
       '1 cubeta de huevos' -> (Decimal('1'), 'cubeta')
-      'dos cervezas' -> (Decimal('2'), 'und')
-      'un pan' -> (Decimal('1'), 'und')
     """
     t = normalizar_texto(texto)
+
+    # Si se conoce el producto con código corto, buscar patrón de unidades + código corto DIRECTAMENTE
+    # Ejemplos: '5 2323', '2 101', '5 del 2323', '5 de 2323', '5x 2323', 'dos 2323'
+    # Evitando montos de dinero como '40 mil 2323' o '$40000 2323'
+    if producto and producto.codigo_corto:
+        cc = re.escape(normalizar_texto(producto.codigo_corto))
+        m_cod = re.search(
+            rf"\b([1-9]\d{{0,2}})\s*(?:del?\s+|x\s+|de\s+|unidades?\s+(?:del?\s+|de\s+)?|und\s+(?:del?\s+|de\s+)?|\s+)?(?<!mil\s)(?<!lucas\s)(?<!\$\s){cc}\b",
+            t,
+        )
+        if m_cod:
+            u = producto.unidad_medida if producto.unidad_medida in ("und", "cajas", "pqt", "cubeta") else "und"
+            return Decimal(m_cod.group(1)), u
+
+        # Palabras numéricas con código corto: 'dos 2323', 'cinco 2323'
+        palabras_cc = {
+            "un": Decimal("1"), "uno": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"),
+            "tres": Decimal("3"), "cuatro": Decimal("4"), "cinco": Decimal("5"), "seis": Decimal("6"),
+            "siete": Decimal("7"), "ocho": Decimal("8"), "nueve": Decimal("9"), "diez": Decimal("10"), "doce": Decimal("12"),
+        }
+        for pal, val in palabras_cc.items():
+            if re.search(rf"\b{pal}\s*(?:del?\s+|x\s+|de\s+|\s+)?{cc}\b", t):
+                u = producto.unidad_medida if producto.unidad_medida in ("und", "cajas", "pqt", "cubeta") else "und"
+                return val, u
+
     # Limpiar dinero primero para no confundir con montos
     t_clean = re.sub(r"(?:\$|\b)(\d+(?:[\.,]\d+)?)\s*(?:mil|k|lucas)\b", " ", t)
     t_clean = re.sub(r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{4,})\b", " ", t_clean)
@@ -286,17 +310,16 @@ def parsear_unidades(texto: str) -> Optional[Tuple[Decimal, str]]:
 
     # 2. Palabras numéricas seguidas de sustantivo: 'un', 'una', 'dos', 'tres', etc.
     palabras_num = {
-        "un": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"), "tres": Decimal("3"),
+        "un": Decimal("1"), "uno": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"), "tres": Decimal("3"),
         "cuatro": Decimal("4"), "cinco": Decimal("5"), "seis": Decimal("6"), "siete": Decimal("7"),
         "ocho": Decimal("8"), "nueve": Decimal("9"), "diez": Decimal("10"), "doce": Decimal("12"),
     }
     for pal, val in palabras_num.items():
-        m_pal = re.search(rf"\b{pal}\s+([a-z]+)\b", t_clean)
+        m_pal = re.search(rf"\b{pal}\s+([a-z0-9]+)\b", t_clean)
         if m_pal and m_pal.group(1) not in ("mil", "kilo", "kilos", "kg", "libra", "libras", "lb", "litro", "litros", "lt", "gramo", "gramos", "g", "ml", "dian", "tipo", "codigo", "doc", "documento"):
             return val, "und"
 
     # 3. Número al inicio o antes de la palabra del producto: '3 cervezas', '5 panes', '20 pan', '10 huevos'
-    # No debe ser un número de cédula (longitud >= 5)
     m_num = re.search(r"\b([1-9]\d{0,2})\s+([a-z]+)\b", t_clean)
     if m_num:
         palabra_sig = m_num.group(2)
@@ -316,8 +339,21 @@ def buscar_producto_en_texto(establecimiento, texto: str) -> Optional[Producto]:
     # Ordenar por longitud de nombre descendente para priorizar "carne molida" sobre "carne"
     productos.sort(key=lambda p: len(p.nombre), reverse=True)
 
-    # 0. Búsqueda prioritaria por Código Rápido / Código de Barras / SKU (ej: 2311412413 o 101)
-    for p in productos:
+    # 0. Búsqueda prioritaria por Código Corto (PLU) o Código de Barras / SKU (ej: 2323, 101 o 770...)
+    # Priorizar códigos más largos para que '2323' se evalúe antes de '2' o '3'
+    prods_con_codigo = [p for p in productos if p.codigo_corto or p.codigo_barras]
+    prods_con_codigo.sort(key=lambda p: max(len(p.codigo_corto or ""), len(p.codigo_barras or "")), reverse=True)
+    for p in prods_con_codigo:
+        if p.codigo_corto:
+            cc_norm = normalizar_texto(p.codigo_corto)
+            if cc_norm and re.search(rf"\b{re.escape(cc_norm)}\b", t):
+                # Descartar si el número es seguido de una unidad de medida física o dinero (ej: '2 libras', '40 mil')
+                es_unidad_o_plata = bool(re.search(
+                    rf"\b{re.escape(cc_norm)}\s*(?:libras?|lb|kilos?|kg|gramos?|gr|g|mililitros?|ml|cc|litros?|lts?|lt|mil\b|lucas|pesos?)\b",
+                    t
+                ))
+                if not es_unidad_o_plata:
+                    return p
         if p.codigo_barras:
             cb_norm = normalizar_texto(p.codigo_barras)
             if cb_norm and re.search(rf"\b{re.escape(cb_norm)}\b", t):
@@ -453,7 +489,14 @@ def procesar_salida_inventario(
     Descuenta el inventario en la escala correcta y formatea el concepto exacto para ticket/factura.
     """
     prod = buscar_producto_en_texto(establecimiento, texto_venta)
-    val_extraido, texto_sin_dinero = parsear_dinero(texto_venta)
+
+    # Si se identificó un producto con código corto (ej: 2323, 101), enmascarar ese código
+    # para que parsear_dinero no lo tome erróneamente como dinero en frases como '5 2323'
+    texto_para_dinero = texto_venta
+    if prod and prod.codigo_corto:
+        texto_para_dinero = re.sub(rf"\b{re.escape(prod.codigo_corto)}\b", " ", texto_venta, flags=re.IGNORECASE)
+
+    val_extraido, texto_sin_dinero = parsear_dinero(texto_para_dinero)
     valor_final = valor_ingresado if (valor_ingresado and valor_ingresado > 1) else val_extraido
 
     if not prod:
@@ -492,7 +535,7 @@ def procesar_salida_inventario(
 
     kilos_peso = parsear_peso(texto_venta)
     volumen_ml = parsear_volumen(texto_venta)
-    unidades_und = parsear_unidades(texto_venta)
+    unidades_und = parsear_unidades(texto_venta, producto=prod)
 
     # -------------------------------------------------------------
     # CASO 1: PESO (Carnes, Fruver, etc. medidos por Gramos/Kg/lb)
