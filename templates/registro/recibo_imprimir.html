@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Recibo de Venta #{{ venta.pk }} — {{ establecimiento.nombre }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* RESET & ESTILOS BASE */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* BARRA DE ACCIÓN SUPERIOR (SOLO PANTALLA) */
+    .barra-acciones {
+      background: #0f172a;
+      color: #fff;
+      border-radius: 10px;
+      padding: 12px 20px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .barra-acciones a, .barra-acciones button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+    }
+    .btn-print { background: #0284c7; color: #fff; }
+    .btn-print:hover { background: #0369a1; }
+    .btn-pdf { background: #334155; color: #e2e8f0; }
+    .btn-volver { background: #166534; color: #fff; }
+
+    /* CONTENEDOR DEL COMPROBANTE */
+    .recibo-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      padding: 24px 20px;
+      width: 100%;
+      max-width: {% if formato_recibo == 'factura_carta' %}680px{% elif formato_recibo == 'media_carta' %}480px{% else %}360px{% endif %};
+      margin: 0 auto;
+    }
+
+    .centrado { text-align: center; }
+    .derecha { text-align: right; }
+    .linea-sep { border-top: 1px dashed #64748b; margin: 10px 0; }
+    .linea-doble { border-top: 2px solid #0f172a; margin: 10px 0; }
+
+    .titulo-comercio { font-size: 18px; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+    .subtitulo { font-size: 11px; color: #334155; line-height: 1.4; }
+    .tipo-doc { font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 6px 0 2px; }
+    .num-doc { font-size: 15px; font-weight: 900; }
+
+    .fila-dato { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
+    .fila-total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; margin: 6px 0; color: #0f172a; }
+
+    .pie-recibo { font-size: 10px; color: #475569; text-align: center; margin-top: 14px; line-height: 1.4; }
+
+    /* ESTILOS DE IMPRESIÓN (CTRL + P / WINDOW.PRINT) */
+    @media print {
+      body {
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .recibo-card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+      }
+      @page {
+        margin: {% if tipo_impresora == 'normal' %}10mm{% else %}0mm{% endif %};
+        size: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA NO IMPRIMIBLE -->
+  <div class="barra-acciones no-print">
+    <div>
+      <span style="font-size:11px; color:#94a3b8; display:block;">Impresora: <strong>{{ nombre_impresora|default:"Predeterminada / Epson" }}</strong></span>
+      <span style="font-size:12px; font-weight:bold; color:#facc15;">
+        {% if autoprint %}⚡ Impresión directa enviada{% else %}Modo Manual{% endif %}
+      </span>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button onclick="window.print();" class="btn-print">🖨️ Imprimir</button>
+      <a href="{% url 'venta_recibo_pdf' venta.pk %}" target="_blank" class="btn-pdf">📄 PDF</a>
+      <a href="{% url 'venta_nueva' %}" class="btn-volver">➕ Nueva Venta</a>
+    </div>
+  </div>
+
+  <!-- COMPROBANTE -->
+  <div class="recibo-card">
+    <div class="centrado">
+      <div class="titulo-comercio">{{ establecimiento.nombre }}</div>
+      <div class="subtitulo">
+        NIT: {{ establecimiento.nit|default:"891800846-1" }}<br>
+        {% if establecimiento.direccion %}{{ establecimiento.direccion }}<br>{% endif %}
+        {% if establecimiento.municipio %}{{ establecimiento.municipio.nombre }}{% else %}Tunja{% endif %} - Boyacá
+      </div>
+    </div>
+
+    <div class="linea-sep"></div>
+
+    <div class="centrado">
+      {% if venta.solicita_factura_electronica and venta.numero_factura_electronica %}
+        <div class="tipo-doc">FACTURA ELECTRÓNICA DE VENTA</div>
+        <div class="num-doc">N° {{ venta.numero_factura_electronica }}</div>
+      {% else %}
+        <div class="tipo-doc">COMPROBANTE DE PAGO</div>
+        <div class="num-doc">TICKET #{{ venta.pk|stringformat:"05d" }}</div>
+      {% endif %}
+    </div>
+
+    <div class="linea-sep"></div>
+
+    <div class="fila-dato">
+      <span>Fecha:</span>
+      <strong>{{ venta.fecha_hora|date:"d/m/Y  h:i A" }}</strong>
+    </div>
+    <div class="fila-dato">
+      <span>Atendido por:</span>
+      <span>{{ venta.usuario.get_full_name|default:venta.usuario.username }}</span>
+    </div>
+    <div class="fila-dato">
+      <span>Cliente:</span>
+      <strong>{% if venta.cliente %}{{ venta.cliente.nombre }}{% else %}Consumidor Final{% endif %}</strong>
+    </div>
+    {% if venta.cliente and not venta.cliente.es_consumidor_final %}
+      <div class="fila-dato">
+        <span>Doc. Cliente:</span>
+        <span>{{ venta.cliente.nit_cedula }}</span>
+      </div>
+    {% endif %}
+
+    <div class="linea-sep"></div>
+
+    <div style="font-size:11px; font-weight:bold; margin-bottom:4px; text-transform:uppercase;">Detalle de la Operación:</div>
+    <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">
+      {% if venta.concepto %}{{ venta.concepto }}{% elif venta.motivo %}{{ venta.motivo.nombre }}{% else %}Venta de mostrador{% endif %}
+    </div>
+    <div class="fila-dato">
+      <span>Medio de Pago:</span>
+      <strong style="text-transform:uppercase;">{{ venta.get_medio_pago_display }}</strong>
+    </div>
+
+    <div class="linea-sep"></div>
+
+    <div class="fila-dato">
+      <span>Subtotal:</span>
+      <span>${{ venta.valor|floatformat:0 }} COP</span>
+    </div>
+    {% if venta.ica_estimado and venta.ica_estimado > 0 %}
+    <div class="fila-dato" style="font-size:11px; color:#475569;">
+      <span>ICA Tunja (Acuerdo 0032):</span>
+      <span>${{ venta.ica_estimado|floatformat:0 }} COP</span>
+    </div>
+    {% endif %}
+
+    <div class="linea-doble"></div>
+
+    <div class="fila-total">
+      <span>TOTAL PAGADO:</span>
+      <span>${{ venta.valor|floatformat:0 }} COP</span>
+    </div>
+
+    <div class="linea-doble"></div>
+
+    <div class="centrado" style="margin:10px 0;">
+      <span style="font-size:11px; font-weight:bold; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:4px;">
+        ✓ ESTADO: PAGADO Y CUADRADO
+      </span>
+    </div>
+
+    <div class="pie-recibo">
+      ¡Muchas gracias por su compra!<br>
+      Visítenos de nuevo en <strong>{{ establecimiento.nombre }}</strong><br>
+      <div style="margin-top:8px; font-size:9px; color:#94a3b8;">
+        DIARIO COMERCIAL • SISTEMA DE GESTIÓN & POS<br>
+        Contacto Ventas / Soporte: 3146922087
+      </div>
+    </div>
+  </div>
+
+  {% if autoprint %}
+  <script>
+    // Auto-disparo de impresión inmediata
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        window.print();
+      }, 350);
+    });
+  </script>
+  {% endif %}
+
+</body>
+</html>

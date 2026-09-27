@@ -548,3 +548,53 @@ class InventarioExcelPagosTests(TestCase):
         self.assertTrue(res.content.startswith(b"%PDF-"))
         self.assertGreater(len(res.content), 2000)
 
+    def test_15_configurar_opciones_impresion_y_recibo(self):
+        """Verifica el guardado de configuración de impresoras (Epson vs Térmica) y emisión de recibo."""
+        self.client.login(username="maria.admin", password="password123")
+
+        # 1. Configurar modo directo con impresora Epson normal
+        res_cfg = self.client.post(reverse("configuracion"), {
+            "accion": "impresoras",
+            "modo_impresion": "directa",
+            "tipo_impresora": "normal",
+            "nombre_impresora": "Epson EcoTank L3210 Mostrador",
+            "formato_recibo": "media_carta",
+            "copias_impresion_defecto": 2,
+        })
+        self.assertEqual(res_cfg.status_code, 302)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.impresion_directa_ventas)
+        self.assertEqual(self.est.tipo_impresora, "normal")
+        self.assertEqual(self.est.nombre_impresora, "Epson EcoTank L3210 Mostrador")
+        self.assertEqual(self.est.formato_recibo, "media_carta")
+        self.assertEqual(self.est.copias_impresion_defecto, 2)
+
+        # 2. Crear una venta y verificar la vista de impresión HTML
+        venta = Venta.objects.create(
+            establecimiento=self.est,
+            usuario=self.user_admin,
+            valor=Decimal("35000"),
+            concepto="Venta Mostrador Lomo de Res",
+            medio_pago="efectivo",
+            fecha=timezone.localdate(),
+        )
+        url_recibo = reverse("venta_recibo_imprimir", kwargs={"pk": venta.pk})
+        res_recibo = self.client.get(f"{url_recibo}?autoprint=1")
+        self.assertEqual(res_recibo.status_code, 200)
+        self.assertIn(b"Recibo de Venta", res_recibo.content)
+        self.assertIn(b"Epson EcoTank L3210 Mostrador", res_recibo.content)
+        self.assertIn(b"window.print()", res_recibo.content)
+
+        # 3. Verificar generación de PDF del recibo
+        url_pdf = reverse("venta_recibo_pdf", kwargs={"pk": venta.pk})
+        res_pdf = self.client.get(url_pdf)
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertEqual(res_pdf["Content-Type"], "application/pdf")
+        self.assertTrue(res_pdf.content.startswith(b"%PDF-"))
+
+        # 4. Probar página de prueba de impresora
+        res_test = self.client.get(reverse("configuracion_probar_impresora"))
+        self.assertEqual(res_test.status_code, 200)
+        self.assertIn(b"IMPRESI", res_test.content)
+
+

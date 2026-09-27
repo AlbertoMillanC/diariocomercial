@@ -199,6 +199,42 @@ class Establecimiento(models.Model):
         help_text="Motivo temporal si se pausa el servicio de recojo en tienda"
     )
 
+    # Configuración de Impresión e Impresoras (Normal Epson/HP vs Térmica POS)
+    impresion_directa_ventas = models.BooleanField(
+        default=False,
+        help_text="Imprime automáticamente el ticket/factura apenas se genera una venta (sin clics adicionales)"
+    )
+    tipo_impresora = models.CharField(
+        max_length=30,
+        choices=(
+            ("normal", "Impresora Normal de Oficina (Epson, HP, Canon - Carta / Media Carta)"),
+            ("termica_80", "Impresora Térmica de Rollo POS 80mm"),
+            ("termica_58", "Impresora Térmica de Rollo POS 58mm"),
+        ),
+        default="normal",
+        help_text="Tipo de impresora principal conectada al equipo"
+    )
+    nombre_impresora = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Nombre de la impresora conectada (ej: Epson EcoTank L3210, Xprinter POS-80)"
+    )
+    formato_recibo = models.CharField(
+        max_length=30,
+        choices=(
+            ("ticket", "Tirilla / Ticket de Venta Estándar"),
+            ("factura_carta", "Factura Completa Tamaño Carta"),
+            ("media_carta", "Comprobante Media Carta (Ahorro de papel en impresora normal)"),
+        ),
+        default="ticket",
+        help_text="Formato de salida predeterminado"
+    )
+    copias_impresion_defecto = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Número de copias a imprimir automáticamente por venta"
+    )
+
     def servicio_domicilio_disponible(self, dt=None):
         """
         Evalúa si el servicio de domicilios está operativo en este momento.

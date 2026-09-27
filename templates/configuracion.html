@@ -19,6 +19,7 @@
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-usuarios')">👥 Usuarios ({{ usuarios|length }})</button>
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-tributario')">🏷️ Actividades CIIU</button>
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-correo')">📧 Correo Contador</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-impresoras')">🖨️ Impresoras</button>
 </div>
 
 <style>
@@ -318,7 +319,129 @@
       <input type="hidden" name="accion" value="correo">
       <label>Correo para los reportes:</label>
       <input type="email" name="correo_reportes" value="{{ establecimiento.correo_reportes }}" style="width:100%; max-width:400px; padding:8px; border-radius:6px; border:1px solid #cbd5e1; display:block; margin:6px 0 12px;">
-      <button class="btn btn-primary" type="submit">Guardar correo</button>
+    </form>
+  </div>
+</div>
+
+<!-- TAB 5: IMPRESORAS Y OPCIONES DE IMPRESIÓN -->
+<div id="tab-impresoras" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+      <div>
+        <h3 style="font-size:18px; color:#0f172a; margin:0 0 4px;">🖨️ Centro de Impresoras y Opciones de Impresión</h3>
+        <p style="font-size:13px; color:#64748b; margin:0;">
+          Configura cómo emite los recibos y facturas tu negocio: si deseas impresión directa automática al vender o impresión manual, y asocia tu impresora (Epson normal, HP o térmica de rollo).
+        </p>
+      </div>
+      <div>
+        <a href="{% url 'configuracion_probar_impresora' %}" target="_blank" class="btn" style="background:#0284c7; color:#fff; font-weight:bold; font-size:13px; padding:8px 14px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+          🖨️ Probar Impresora Ahora
+        </a>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'configuracion' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="impresoras">
+
+      <!-- LAS DOS OPCIONES PRINCIPALES SOLICITADAS POR EL USUARIO -->
+      <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:20px;">
+        <label style="display:block; font-size:14px; font-weight:bold; color:#0f172a; margin-bottom:12px;">
+          ⚡ Modo de Impresión al Generar Venta o Factura:
+        </label>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <!-- OPCION 1: IMPRESION DIRECTA -->
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:14px; border:2px solid {% if establecimiento.impresion_directa_ventas %}#0284c7; background:#eff6ff;{% else %}#e2e8f0; background:#fff;{% endif %} border-radius:8px; cursor:pointer;">
+            <input type="radio" name="modo_impresion" value="directa" {% if establecimiento.impresion_directa_ventas %}checked{% endif %} style="margin-top:4px;">
+            <div>
+              <strong style="color:#0369a1; font-size:14px; display:block;">⚡ Impresión Directa Automática</strong>
+              <p style="margin:4px 0 0; font-size:12px; color:#475569; line-height:1.4;">
+                Apenas el cajero o tú registren una venta en el mostrador, se dispara <strong>automáticamente la ventana de impresión</strong> hacia tu impresora sin clics extras. Ideal para agilizar filas de clientes.
+              </p>
+            </div>
+          </label>
+
+          <!-- OPCION 2: DESACTIVAR IMPRESION DIRECTA (MANUAL) -->
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:14px; border:2px solid {% if not establecimiento.impresion_directa_ventas %}#059669; background:#ecfdf5;{% else %}#e2e8f0; background:#fff;{% endif %} border-radius:8px; cursor:pointer;">
+            <input type="radio" name="modo_impresion" value="manual" {% if not establecimiento.impresion_directa_ventas %}checked{% endif %} style="margin-top:4px;">
+            <div>
+              <strong style="color:#047857; font-size:14px; display:block;">✋ Desactivar Impresión Directa (Manual)</strong>
+              <p style="margin:4px 0 0; font-size:12px; color:#475569; line-height:1.4;">
+                La venta se guarda en silencio sin mandar nada a la impresora. Tú o el cajero deciden si imprimen el recibo desde el botón <code>🖨️ Recibo</code> cuando el cliente lo pida. Ahorra papel y tinta.
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- DETALLES DE HARDWARE E IMPRESORA -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px;">
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Tipo de Impresora Conectada:
+          </label>
+          <select name="tipo_impresora" style="width:100%; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+            <option value="normal" {% if establecimiento.tipo_impresora == 'normal' %}selected{% endif %}>
+              🖨️ Impresora Normal de Oficina (Epson EcoTank, HP, Canon - Carta / Media Carta)
+            </option>
+            <option value="termica_80" {% if establecimiento.tipo_impresora == 'termica_80' %}selected{% endif %}>
+              🧾 Impresora Térmica de Rollo POS 80mm (Estándar de mostrador)
+            </option>
+            <option value="termica_58" {% if establecimiento.tipo_impresora == 'termica_58' %}selected{% endif %}>
+              🧾 Impresora Térmica de Rollo POS 58mm (Mini rollo angosto)
+            </option>
+          </select>
+          <small style="color:#64748b; font-size:11px; display:block; margin-top:4px;">
+            Si usas tu Epson normal (EcoTank L3110, L3210, etc.), déjalo en «Impresora Normal de Oficina».
+          </small>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Nombre o Modelo de tu Impresora (Identificador):
+          </label>
+          <input type="text" name="nombre_impresora" value="{{ establecimiento.nombre_impresora }}" placeholder="Ej: Epson EcoTank L3210 Mostrador 1" style="width:100%; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+          <small style="color:#64748b; font-size:11px; display:block; margin-top:4px;">
+            Nombre descriptivo para que tu equipo reconozca a cuál impresora física se envía el trabajo.
+          </small>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px;">
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Formato de Comprobante Predeterminado:
+          </label>
+          <select name="formato_recibo" style="width:100%; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+            <option value="ticket" {% if establecimiento.formato_recibo == 'ticket' %}selected{% endif %}>
+              Tirilla / Ticket de Venta Estándar (Recomendado)
+            </option>
+            <option value="media_carta" {% if establecimiento.formato_recibo == 'media_carta' %}selected{% endif %}>
+              Media Carta Económica (14 x 21 cm - Ahorro de papel en Epson normal)
+            </option>
+            <option value="factura_carta" {% if establecimiento.formato_recibo == 'factura_carta' %}selected{% endif %}>
+              Factura Completa Tamaño Carta (Hoja entera estándar)
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Número de Copias por Venta:
+          </label>
+          <input type="number" name="copias_impresion_defecto" min="1" max="5" value="{{ establecimiento.copias_impresion_defecto|default:1 }}" style="width:100px; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:14px; font-weight:bold;">
+          <small style="color:#64748b; font-size:11px; display:block; margin-top:4px;">
+            1 copia = Para el cliente. 2 copias = 1 para cliente + 1 archivo de contabilidad.
+          </small>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="submit" class="btn btn-primary" style="background:#059669; border-color:#059669; font-weight:bold; padding:10px 20px;">
+          💾 Guardar Opciones de Impresión
+        </button>
+      </div>
     </form>
   </div>
 </div>

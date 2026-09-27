@@ -528,6 +528,8 @@ def venta_nueva(request):
             if prod and kilos > 0:
                 msg_exito += f" Stock actualizado: -{kilos} Kg (-{libras} lb) de '{prod.nombre}'."
             messages.success(request, msg_exito)
+            if getattr(est, "impresion_directa_ventas", False):
+                return redirect(f"/ventas/{venta.pk}/recibo/imprimir/?autoprint=1")
             return redirect("inicio")
     return render(
         request,
@@ -865,6 +867,28 @@ def configuracion(request):
             v.save()
             _audit(request.user, "canal_movil", v, "desvincular", True, False, f"Desvinculado {v.canal} {v.identificador_externo}")
             messages.success(request, f"Canal {v.canal} de {v.usuario.username} desvinculado.")
+            return redirect("configuracion")
+        elif accion == "impresoras":
+            modo = request.POST.get("modo_impresion", "manual")
+            est.impresion_directa_ventas = (modo == "directa")
+            est.tipo_impresora = request.POST.get("tipo_impresora", "normal")
+            est.nombre_impresora = request.POST.get("nombre_impresora", "").strip()
+            est.formato_recibo = request.POST.get("formato_recibo", "ticket")
+            try:
+                copias = max(1, int(request.POST.get("copias_impresion_defecto") or 1))
+            except (ValueError, TypeError):
+                copias = 1
+            est.copias_impresion_defecto = copias
+            est.save(update_fields=[
+                "impresion_directa_ventas",
+                "tipo_impresora",
+                "nombre_impresora",
+                "formato_recibo",
+                "copias_impresion_defecto",
+            ])
+            _audit(request.user, "configuracion", est, "actualizar_impresoras", None, None, f"Modo impresión: {modo}, Tipo: {est.tipo_impresora}")
+            estado_txt = "ACTIVADA (Apenas se genere la venta)" if est.impresion_directa_ventas else "DESACTIVADA (Modo manual)"
+            messages.success(request, f"🖨️ Configuración de impresoras guardada: Impresión directa {estado_txt}.")
             return redirect("configuracion")
 
     from django.utils import timezone
@@ -2016,6 +2040,83 @@ def imprimir_ticket_escpos(request, pk, ancho=58):
     resp = HttpResponse(bytes_raw, content_type="application/octet-stream")
     resp["Content-Disposition"] = f'inline; filename="ticket_{venta.pk}_{ancho}mm.bin"'
     return resp
+
+
+@login_required
+def venta_recibo_imprimir_html(request, pk):
+    """
+    Vista web optimizada para imprimir el recibo/ticket de venta en cualquier impresora:
+    - Impresora Normal de Oficina (Epson EcoTank, HP, Canon - Carta o Media Carta).
+    - Impresora Térmica de Mostrador (58mm u 80mm).
+    Soporta auto-impresión inmediata con ?autoprint=1 si está activada la opción en configuración.
+    """
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    est = perfil.establecimiento if perfil else None
+    if request.user.is_superuser:
+        venta = get_object_or_404(Venta, pk=pk)
+        if not est:
+            est = venta.establecimiento
+    else:
+        venta = get_object_or_404(Venta, pk=pk, establecimiento=est)
+
+    autoprint = request.GET.get("autoprint") == "1"
+    copias = int(request.GET.get("copias") or getattr(est, "copias_impresion_defecto", 1) or 1)
+
+    return render(
+        request,
+        "registro/recibo_imprimir.html",
+        {
+            "venta": venta,
+            "establecimiento": est,
+            "autoprint": autoprint,
+            "copias": copias,
+            "tipo_impresora": getattr(est, "tipo_impresora", "normal"),
+            "formato_recibo": getattr(est, "formato_recibo", "ticket"),
+            "nombre_impresora": getattr(est, "nombre_impresora", ""),
+        }
+    )
+
+
+@login_required
+def venta_recibo_pdf(request, pk):
+    """Retorna el comprobante de venta oficial en PDF."""
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return redirect("inicio")
+
+    if request.user.is_superuser:
+        venta = get_object_or_404(Venta, pk=pk)
+    else:
+        venta = get_object_or_404(Venta, pk=pk, establecimiento=perfil.establecimiento)
+
+    from .recibo_service import generar_pdf_recibo_venta
+    pdf_bytes = generar_pdf_recibo_venta(venta)
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="recibo_venta_{venta.pk}.pdf"'
+    return resp
+
+
+@login_required
+def configuracion_probar_impresora(request):
+    """Página de prueba para verificar que la impresora conectada (Epson o térmica) responda."""
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    return render(
+        request,
+        "registro/recibo_prueba.html",
+        {
+            "establecimiento": est,
+            "tipo_impresora": getattr(est, "tipo_impresora", "normal"),
+            "formato_recibo": getattr(est, "formato_recibo", "ticket"),
+            "nombre_impresora": getattr(est, "nombre_impresora", ""),
+            "fecha_hora": timezone.localtime(timezone.now()),
+        }
+    )
 
 
 # ============================================================================

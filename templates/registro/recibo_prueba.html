@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Página de Prueba de Impresión — DiarioComercial</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .no-print {
+      background: #0f172a;
+      color: #fff;
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .no-print button, .no-print a {
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+    }
+    .btn-print { background: #0284c7; color: #fff; }
+    .btn-volver { background: #475569; color: #fff; }
+
+    .test-card {
+      background: #fff;
+      border: 2px dashed #0284c7;
+      border-radius: 8px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+    .linea { border-top: 1px dashed #64748b; margin: 12px 0; }
+
+    @media print {
+      body { background: transparent; padding: 0; margin: 0; }
+      .no-print { display: none !important; }
+      .test-card { border: none; padding: 0; width: 100%; max-width: none; }
+      @page { margin: 5mm; size: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print">
+    <div>
+      <strong style="color:#38bdf8;">🖨️ Prueba de Impresora</strong>
+      <div style="font-size:11px; color:#cbd5e1;">Destino: {{ nombre_impresora|default:"Epson / Predeterminada" }}</div>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button onclick="window.print();" class="btn-print">🖨️ Mandar a Imprimir</button>
+      <a href="{% url 'configuracion' %}" class="btn-volver">← Configuración</a>
+    </div>
+  </div>
+
+  <div class="test-card">
+    <div style="font-size:24px; margin-bottom:4px;">🖨️</div>
+    <h2 style="font-size:16px; text-transform:uppercase; margin-bottom:4px;">{{ establecimiento.nombre }}</h2>
+    <div style="font-size:11px; color:#475569;">
+      NIT: {{ establecimiento.nit|default:"891800846-1" }} • {% if establecimiento.municipio %}{{ establecimiento.municipio.nombre }}{% else %}Tunja{% endif %}<br>
+      Fecha y Hora de Prueba: {{ fecha_hora|date:"d/m/Y  h:i:s A" }}
+    </div>
+
+    <div class="linea"></div>
+
+    <div style="background:#f0fdf4; border:1px solid #86efac; padding:10px; border-radius:6px; margin-bottom:12px;">
+      <strong style="color:#166534; font-size:13px; display:block;">✅ ¡IMPRESIÓN EXITOSA!</strong>
+      <span style="font-size:11px; color:#15803d;">
+        Tu impresora está correctamente conectada y comunicándose con DiarioComercial.
+      </span>
+    </div>
+
+    <div style="font-size:11px; text-align:left; line-height:1.6; margin-bottom:10px;">
+      • <strong>Tipo de Hardware:</strong> {{ tipo_impresora|upper }}<br>
+      • <strong>Impresora Asignada:</strong> {{ nombre_impresora|default:"Predeterminada del Sistema" }}<br>
+      • <strong>Formato Predeterminado:</strong> {{ formato_recibo|upper }}<br>
+      • <strong>Modo Directo:</strong> {% if establecimiento.impresion_directa_ventas %}ACTIVADO (Auto-print al vender){% else %}MANUAL (Por botón){% endif %}
+    </div>
+
+    <div class="linea"></div>
+
+    <!-- Patrón de prueba de fuentes -->
+    <div style="font-size:10px; color:#64748b; margin-bottom:10px;">
+      1234567890 ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>
+      ¡Prueba de caracteres especiales, tildes y eñes!
+    </div>
+
+    <div style="font-size:9px; color:#94a3b8; margin-top:8px;">
+      DIARIO COMERCIAL • SOPORTE TÉCNICO: 3146922087
+    </div>
+  </div>
+
+</body>
+</html>

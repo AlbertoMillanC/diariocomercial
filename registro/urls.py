@@ -37,8 +37,10 @@ urlpatterns = [
     # Cobro rápido Bre-B & ESC/POS
     path("api/bre-b/generar/", views.api_generar_cobro_bre_b, name="api_generar_cobro_bre_b"),
     path("api/bre-b/status/<str:referencia>/", views.api_status_bre_b, name="api_status_bre_b"),
-    path("api/bre-b/mock-webhook/<str:referencia>/", views.api_mock_webhook_bre_b, name="api_mock_webhook_bre_b"),
     path("ventas/<int:pk>/ticket-escpos/<int:ancho>/", views.imprimir_ticket_escpos, name="ticket_escpos"),
+    path("ventas/<int:pk>/recibo/imprimir/", views.venta_recibo_imprimir_html, name="venta_recibo_imprimir"),
+    path("ventas/<int:pk>/recibo/pdf/", views.venta_recibo_pdf, name="venta_recibo_pdf"),
+    path("configuracion/probar-impresora/", views.configuracion_probar_impresora, name="configuracion_probar_impresora"),
     # Administrador Multi-Tienda (Empresario & Store Switcher)
     path("mis-tiendas/", views.tiendas_lista_consolidada, name="tiendas_lista_consolidada"),
     path("mis-tiendas/nueva/", views.tiendas_crear, name="tiendas_crear"),
