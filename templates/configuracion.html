@@ -20,6 +20,8 @@
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-tributario')">🏷️ Actividades CIIU</button>
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-correo')">📧 Correo Contador</button>
   <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-impresoras')">🖨️ Impresoras</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-cajon')">💵 Cajón Monedero</button>
+  <button type="button" class="tab-btn" onclick="cambiarTab(event, 'tab-lectoras')">🔫 Lectoras de Barras ({{ lectoras|length }})</button>
 </div>
 
 <style>
@@ -446,12 +448,387 @@
   </div>
 </div>
 
+<!-- TAB 6: CAJÓN MONEDERO / GAVETA DE DINERO -->
+<div id="tab-cajon" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+      <div>
+        <h3 style="font-size:18px; color:#0f172a; margin:0 0 4px;">💵 Cajón Monedero / Gaveta de Dinero POS</h3>
+        <p style="font-size:13px; color:#64748b; margin:0;">
+          Configura la apertura automática y manual de la gaveta de billetes y monedas conectada a tu punto de venta.
+        </p>
+      </div>
+      <div>
+        <button type="button" onclick="probarAperturaCajon()" class="btn" style="background:#0f172a; color:#facc15; font-weight:bold; font-size:13px; padding:8px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; border:1px solid #ca8a04;">
+          ⚡ Probar Apertura del Cajón Ahora
+        </button>
+      </div>
+    </div>
+
+    <!-- BANNER DE RESPUESTA EN VIVO -->
+    <div id="alerta-cajon-status" style="display:none; padding:12px; border-radius:8px; margin-bottom:16px; font-size:13px; font-weight:bold;"></div>
+
+    <form method="post" action="{% url 'configuracion' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="cajon_monedero">
+
+      <!-- INTERRUPTORES DE FUNCIONAMIENTO -->
+      <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:18px;">
+        <label style="display:block; font-size:14px; font-weight:bold; color:#0f172a; margin-bottom:12px;">
+          ⚙️ Modos de Activación y Apertura:
+        </label>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; cursor:pointer;">
+            <input type="checkbox" name="cajon_monedero_activo" {% if establecimiento.cajon_monedero_activo %}checked{% endif %} style="margin-top:3px; width:18px; height:18px;">
+            <div>
+              <strong style="color:#0f172a; font-size:13px; display:block;">Habilitar Cajón Monedero</strong>
+              <small style="color:#64748b; font-size:11px;">Muestra los botones de apertura manual en mostrador y permite el control de gaveta.</small>
+            </div>
+          </label>
+
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; cursor:pointer;">
+            <input type="checkbox" name="cajon_apertura_automatica" {% if establecimiento.cajon_apertura_automatica %}checked{% endif %} style="margin-top:3px; width:18px; height:18px;">
+            <div>
+              <strong style="color:#059669; font-size:13px; display:block;">Apertura Automática al Cobrar Efectivo</strong>
+              <small style="color:#64748b; font-size:11px;">Dispara automáticamente el pulso eléctrico para abrir la caja cuando la venta es en efectivo.</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- TIPO DE CONEXIÓN Y PIN ESC/POS -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px;">
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Tipo de Conexión del Cajón:
+          </label>
+          <select name="cajon_tipo_conexion" style="width:100%; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+            <option value="impresora_rj11" {% if establecimiento.cajon_tipo_conexion == 'impresora_rj11' %}selected{% endif %}>
+              🔌 Conectado a la Impresora (Cable telefónico RJ11 - Estándar ESC/POS)
+            </option>
+            <option value="usb_directo" {% if establecimiento.cajon_tipo_conexion == 'usb_directo' %}selected{% endif %}>
+              💻 Conexión USB Directa / Disparador Serial
+            </option>
+            <option value="manual" {% if establecimiento.cajon_tipo_conexion == 'manual' %}selected{% endif %}>
+              🔑 Apertura Manual con Llave Física
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+            Pin de Señal RJ11:
+          </label>
+          <select name="cajon_pin" style="width:100%; padding:9px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+            <option value="pin2" {% if establecimiento.cajon_pin == 'pin2' %}selected{% endif %}>
+              Pin 2 (Estándar Epson, Xprinter, Citizen, Star)
+            </option>
+            <option value="pin5" {% if establecimiento.cajon_pin == 'pin5' %}selected{% endif %}>
+              Pin 5 (Secundario / Gaveta auxiliar 2)
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- GUÍA TÉCNICA CLARA -->
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; margin-bottom:18px; font-size:12px; color:#1e40af; line-height:1.5;">
+        💡 <strong>¿Cómo se conecta el cajón monedero?</strong><br>
+        La mayoría de cajones monederos no se conectan directo al computador, sino que tienen un cable tipo telefónico (RJ11) que se enchufa en la parte trasera de tu impresora (Epson o térmica). Cuando el sistema envía el recibo o pulsas "Abrir Cajón", la impresora emite una descarga de 12V/24V y la gaveta se abre al instante.
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="submit" class="btn btn-primary" style="background:#059669; border-color:#059669; font-weight:bold; padding:10px 20px;">
+          💾 Guardar Configuración de Cajón Monedero
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TAB 7: LECTORAS DE CÓDIGOS DE BARRAS -->
+<div id="tab-lectoras" class="tab-content">
+  <div class="panel" style="margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+      <div>
+        <h3 style="font-size:18px; color:#0f172a; margin:0 0 4px;">🔫 Lectoras de Códigos de Barras y Escáneres</h3>
+        <p style="font-size:13px; color:#64748b; margin:0;">
+          Registra, configura, modifica o desactiva las pistolas lectoras USB, escáneres omnidireccionales o lectores Bluetooth de tu negocio.
+        </p>
+      </div>
+      <div>
+        <button type="button" onclick="abrirModalLectoraCrear()" class="btn btn-primary" style="background:#059669; border-color:#059669; font-weight:bold; font-size:13px; padding:8px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          ➕ Agregar Nueva Lectora
+        </button>
+      </div>
+    </div>
+
+    <!-- ÁREA INTERACTIVA DE PRUEBA EN VIVO -->
+    <div style="background:#0f172a; color:#fff; border-radius:10px; padding:16px 20px; margin-bottom:20px; border:1px solid #334155; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="color:#38bdf8; font-size:13px; display:flex; align-items:center; gap:6px;">
+          🎯 Campo de Prueba de Disparo en Vivo:
+        </strong>
+        <span style="font-size:11px; color:#94a3b8;">Conecta tu lectora USB o Bluetooth y dispara aquí</span>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="input-prueba-lectora" placeholder="👉 Haz clic aquí y dispara con tu pistola lectora..." style="flex:1; padding:12px 16px; font-size:15px; font-family:monospace; font-weight:bold; border-radius:8px; border:2px solid #38bdf8; background:#1e293b; color:#facc15; outline:none;">
+        <button type="button" onclick="limpiarPruebaLectora()" class="btn" style="background:#334155; color:#e2e8f0; padding:10px 14px; font-size:12px; border:none; border-radius:6px; cursor:pointer;">Limpiar</button>
+      </div>
+      <div id="resultado-prueba-lectora" style="margin-top:10px; font-size:12px; min-height:22px; color:#4ade80;"></div>
+    </div>
+
+    <!-- TABLA DE LECTORAS REGISTRADAS -->
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre / Identificador</th>
+            <th>Modelo / Marca</th>
+            <th>Conexión</th>
+            <th>Sufijo</th>
+            <th>Sonido Beep</th>
+            <th>Auto-Enter</th>
+            <th>Estado</th>
+            <th style="text-align:center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lectoras %}
+          <tr>
+            <td>
+              <strong>{{ l.nombre }}</strong>
+              <small style="display:block; color:#64748b; font-size:10px;">ID: #{{ l.pk }}</small>
+            </td>
+            <td>{{ l.modelo_marca|default:"Genérica / Estándar" }}</td>
+            <td><span class="tag" style="background:#e0f2fe; color:#0369a1;">{{ l.get_tipo_conexion_display }}</span></td>
+            <td><code>{{ l.get_sufijo_display }}</code></td>
+            <td>{% if l.beep_sonido %}🔔 Sí{% else %}🔕 No{% endif %}</td>
+            <td>{% if l.auto_enter_busqueda %}⚡ Sí{% else %}No{% endif %}</td>
+            <td>
+              {% if l.activo %}
+                <span class="tag" style="background:#dcfce7; color:#166534; font-weight:bold;">● Activa</span>
+              {% else %}
+                <span class="tag" style="background:#fee2e2; color:#991b1b; font-weight:bold;">○ Inactiva</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center; white-space:nowrap;">
+              <!-- TOGGLE ACTIVO / INACTIVO -->
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="lectora_toggle_activa">
+                <input type="hidden" name="lectora_id" value="{{ l.pk }}">
+                <button type="submit" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:11px;" title="{% if l.activo %}Desactivar{% else %}Activar{% endif %}">
+                  {% if l.activo %}⏸️ Desactivar{% else %}▶️ Activar{% endif %}
+                </button>
+              </form>
+
+              <!-- EDITAR -->
+              <button type="button" onclick="abrirModalLectoraEditar('{{ l.pk }}', '{{ l.nombre|escapejs }}', '{{ l.modelo_marca|escapejs }}', '{{ l.tipo_conexion }}', '{{ l.sufijo }}', {{ l.beep_sonido|yesno:'true,false' }}, {{ l.auto_enter_busqueda|yesno:'true,false' }})" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:11px;" title="Modificar configuración de esta lectora">
+                ✏️ Editar
+              </button>
+
+              <!-- ELIMINAR -->
+              <form method="post" style="display:inline;" onsubmit="return confirm('¿Está seguro de eliminar la lectora \'{{ l.nombre|escapejs }}\'?');">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="lectora_eliminar">
+                <input type="hidden" name="lectora_id" value="{{ l.pk }}">
+                <button type="submit" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:13px; padding:4px;" title="Eliminar lectora">
+                  🗑️
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" style="text-align:center; padding:24px; color:#64748b;">
+              No tienes lectoras registradas aún. Las lectoras USB genéricas funcionan inmediatamente conectándolas al computador, pero puedes registrarlas aquí para personalizar sus nombres y funciones.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREAR / EDITAR LECTORA -->
+<div id="modal-lectora" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:480px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+      <h3 style="margin:0; font-size:17px; color:#0f172a;" id="modal-lectora-titulo">🔫 Registrar Lectora de Código de Barras</h3>
+      <button onclick="document.getElementById('modal-lectora').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+
+    <form method="post" action="{% url 'configuracion' %}" id="form-lectora">
+      {% csrf_token %}
+      <input type="hidden" name="accion" id="modal-lectora-accion" value="lectora_crear">
+      <input type="hidden" name="lectora_id" id="modal-lectora-id" value="">
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#334155;">Nombre o Ubicación *:</label>
+        <input type="text" name="nombre" id="modal-lectora-nombre" required placeholder="Ej: Pistola USB Mostrador 1" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#334155;">Marca o Modelo (Opcional):</label>
+        <input type="text" name="modelo_marca" id="modal-lectora-modelo" placeholder="Ej: Honeywell Voyager, Netum, Xprinter" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; box-sizing:border-box;">
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#334155;">Tipo de Conexión:</label>
+          <select name="tipo_conexion" id="modal-lectora-conexion" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px;">
+            <option value="usb_hid">USB Teclado HID (Estándar)</option>
+            <option value="bluetooth">Inalámbrico Bluetooth / 2.4G</option>
+            <option value="serial_com">Puerto Serial COM</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:4px; color:#334155;">Sufijo del Disparo:</label>
+          <select name="sufijo" id="modal-lectora-sufijo" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px;">
+            <option value="enter">Enter (Recomendado)</option>
+            <option value="tab">Tabulador</option>
+            <option value="ninguno">Ninguno</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:18px; display:flex; flex-direction:column; gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" name="beep_sonido" id="modal-lectora-beep" checked style="width:16px; height:16px;">
+          <span>🔔 Emitir sonido de confirmación al escanear</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" name="auto_enter_busqueda" id="modal-lectora-autoenter" checked style="width:16px; height:16px;">
+          <span>⚡ Búsqueda automática instantánea al detectar código completo</span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-lectora').style.display='none'" class="btn btn-ghost" style="padding:8px 16px;">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#059669; border-color:#059669; font-weight:bold; padding:8px 18px;">
+          💾 Guardar Lectora
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   function cambiarTab(evt, tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('activo'));
     evt.currentTarget.classList.add('activo');
     document.getElementById(tabId).classList.add('activo');
+  }
+
+  // --- PRUEBA DE APERTURA DE CAJÓN MONEDERO ---
+  function probarAperturaCajon() {
+    const alertBox = document.getElementById('alerta-cajon-status');
+    alertBox.style.display = 'block';
+    alertBox.style.background = '#fef3c7';
+    alertBox.style.color = '#854d0e';
+    alertBox.innerText = '⏳ Enviando pulso de apertura eléctrica al cajón monedero...';
+
+    fetch("{% url 'cajon_monedero_abrir' %}", {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+      // Reproducir sonido de caja registradora ding
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // A6
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch(e) {}
+
+      alertBox.style.background = '#dcfce7';
+      alertBox.style.color = '#166534';
+      alertBox.innerHTML = '✅ ' + data.mensaje + ' (Señal registrada en Auditoría).';
+    })
+    .catch(err => {
+      alertBox.style.background = '#fee2e2';
+      alertBox.style.color = '#991b1b';
+      alertBox.innerText = '❌ Error al comunicar con el cajón monedero.';
+    });
+  }
+
+  // --- LECTORAS DE CÓDIGOS DE BARRAS ---
+  function abrirModalLectoraCrear() {
+    document.getElementById('modal-lectora-titulo').innerText = '➕ Registrar Nueva Lectora de Código de Barras';
+    document.getElementById('modal-lectora-accion').value = 'lectora_crear';
+    document.getElementById('modal-lectora-id').value = '';
+    document.getElementById('modal-lectora-nombre').value = '';
+    document.getElementById('modal-lectora-modelo').value = '';
+    document.getElementById('modal-lectora-conexion').value = 'usb_hid';
+    document.getElementById('modal-lectora-sufijo').value = 'enter';
+    document.getElementById('modal-lectora-beep').checked = true;
+    document.getElementById('modal-lectora-autoenter').checked = true;
+    document.getElementById('modal-lectora').style.display = 'flex';
+  }
+
+  function abrirModalLectoraEditar(id, nombre, modelo, conexion, sufijo, beep, autoenter) {
+    document.getElementById('modal-lectora-titulo').innerText = '✏️ Modificar Lectora: ' + nombre;
+    document.getElementById('modal-lectora-accion').value = 'lectora_editar';
+    document.getElementById('modal-lectora-id').value = id;
+    document.getElementById('modal-lectora-nombre').value = nombre;
+    document.getElementById('modal-lectora-modelo').value = modelo || '';
+    document.getElementById('modal-lectora-conexion').value = conexion || 'usb_hid';
+    document.getElementById('modal-lectora-sufijo').value = sufijo || 'enter';
+    document.getElementById('modal-lectora-beep').checked = beep;
+    document.getElementById('modal-lectora-autoenter').checked = autoenter;
+    document.getElementById('modal-lectora').style.display = 'flex';
+  }
+
+  // Campo de prueba en vivo para pistolas lectoras
+  const inputPrueba = document.getElementById('input-prueba-lectora');
+  const resPrueba = document.getElementById('resultado-prueba-lectora');
+  let startTime = null;
+
+  if (inputPrueba) {
+    inputPrueba.addEventListener('keydown', function(e) {
+      if (!startTime) startTime = performance.now();
+      if (e.key === 'Enter') {
+        const elapsed = Math.round(performance.now() - startTime);
+        startTime = null;
+        const val = this.value.trim();
+        if (val) {
+          // Beep de confirmación
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(1200, ctx.currentTime);
+            g.gain.setValueAtTime(0.2, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.start();
+            o.stop(ctx.currentTime + 0.1);
+          } catch(err) {}
+
+          resPrueba.innerHTML = '🎉 <strong style="color:#facc15;">¡Disparo Exitoso!</strong> Código leído: <code>' + val + '</code> (' + val.length + ' dígitos, leído en ' + elapsed + 'ms con sufijo ENTER)';
+          this.value = '';
+        }
+      }
+    });
+  }
+
+  function limpiarPruebaLectora() {
+    if (inputPrueba) inputPrueba.value = '';
+    if (resPrueba) resPrueba.innerHTML = '';
+    startTime = null;
   }
 </script>
 

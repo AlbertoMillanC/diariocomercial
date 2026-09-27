@@ -16,6 +16,7 @@ from registro.models import (
     Compra,
     TransaccionBreB,
     Auditoria,
+    LectoraCodigoBarras,
 )
 from registro.excel_service import (
     generar_plantilla_pedido_excel,
@@ -596,5 +597,95 @@ class InventarioExcelPagosTests(TestCase):
         res_test = self.client.get(reverse("configuracion_probar_impresora"))
         self.assertEqual(res_test.status_code, 200)
         self.assertIn(b"IMPRESI", res_test.content)
+
+    def test_16_cajon_monedero_y_lectoras_crud(self):
+        """Verifica configuración de cajón monedero, endpoint de apertura auditada y CRUD de lectoras."""
+        self.client.login(username="maria.admin", password="password123")
+
+        # 1. Configurar cajón monedero activo con apertura automática y Pin 2
+        res_cajon = self.client.post(reverse("configuracion"), {
+            "accion": "cajon_monedero",
+            "cajon_monedero_activo": "on",
+            "cajon_apertura_automatica": "on",
+            "cajon_tipo_conexion": "impresora_rj11",
+            "cajon_pin": "pin2",
+        })
+        self.assertEqual(res_cajon.status_code, 302)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.cajon_monedero_activo)
+        self.assertTrue(self.est.cajon_apertura_automatica)
+        self.assertEqual(self.est.cajon_tipo_conexion, "impresora_rj11")
+        self.assertEqual(self.est.cajon_pin, "pin2")
+
+        # 2. Abrir cajón monedero manual vía endpoint
+        conteo_audit_prev = Auditoria.objects.filter(entidad_afectada="cajon_monedero", accion="apertura_manual").count()
+        res_abrir = self.client.post(reverse("cajon_monedero_abrir"), {
+            "motivo": "Prueba de apertura desde panel de control"
+        })
+        self.assertEqual(res_abrir.status_code, 200)
+        data = res_abrir.json()
+        self.assertTrue(data.get("ok"))
+        self.assertEqual(data.get("pin"), "pin2")
+        self.assertIn("1b700019fa", data.get("esc_pos_hex"))
+        
+        # Verificar que se auditó la apertura
+        self.assertEqual(
+            Auditoria.objects.filter(entidad_afectada="cajon_monedero", accion="apertura_manual").count(),
+            conteo_audit_prev + 1
+        )
+
+        # 3. Crear una lectora de código de barras
+        res_crear_lectora = self.client.post(reverse("configuracion"), {
+            "accion": "lectora_crear",
+            "nombre": "Pistola Láser Honeywell Mostrador 1",
+            "modelo_marca": "Honeywell Voyager 1200g USB",
+            "tipo_conexion": "usb_hid",
+            "sufijo": "enter",
+            "beep_sonido": "on",
+            "auto_enter_busqueda": "on",
+            "activo": "on",
+        })
+        self.assertEqual(res_crear_lectora.status_code, 302)
+        lectora = LectoraCodigoBarras.objects.filter(establecimiento=self.est).first()
+        self.assertIsNotNone(lectora)
+        self.assertEqual(lectora.nombre, "Pistola Láser Honeywell Mostrador 1")
+        self.assertEqual(lectora.modelo_marca, "Honeywell Voyager 1200g USB")
+        self.assertTrue(lectora.activo)
+        self.assertTrue(lectora.auto_enter_busqueda)
+
+        # 4. Toggle activa / inactiva
+        res_toggle = self.client.post(reverse("configuracion"), {
+            "accion": "lectora_toggle_activa",
+            "lectora_id": lectora.pk,
+        })
+        self.assertEqual(res_toggle.status_code, 302)
+        lectora.refresh_from_db()
+        self.assertFalse(lectora.activo)
+
+        # 5. Editar lectora
+        res_edit = self.client.post(reverse("configuracion"), {
+            "accion": "lectora_editar",
+            "lectora_id": lectora.pk,
+            "nombre": "Pistola Láser Zebra DS2208",
+            "modelo_marca": "Zebra DS2208 2D",
+            "tipo_conexion": "usb_hid",
+            "sufijo": "enter",
+            "beep_sonido": "on",
+            "auto_enter_busqueda": "on",
+            "activo": "on",
+        })
+        self.assertEqual(res_edit.status_code, 302)
+        lectora.refresh_from_db()
+        self.assertEqual(lectora.nombre, "Pistola Láser Zebra DS2208")
+        self.assertTrue(lectora.activo)
+
+        # 6. Eliminar lectora
+        res_del = self.client.post(reverse("configuracion"), {
+            "accion": "lectora_eliminar",
+            "lectora_id": lectora.pk,
+        })
+        self.assertEqual(res_del.status_code, 302)
+        self.assertFalse(LectoraCodigoBarras.objects.filter(pk=lectora.pk).exists())
+
 
 

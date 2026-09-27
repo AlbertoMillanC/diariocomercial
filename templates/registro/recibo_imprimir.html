@@ -113,6 +113,9 @@
     </div>
     <div style="display:flex; gap:6px;">
       <button onclick="window.print();" class="btn-print">🖨️ Imprimir</button>
+      {% if establecimiento.cajon_monedero_activo %}
+      <button onclick="abrirCajonManual()" style="background:#ca8a04; color:#fff;" title="Pulsar para abrir gaveta/cajón monedero">💵 Cajón</button>
+      {% endif %}
       <a href="{% url 'venta_recibo_pdf' venta.pk %}" target="_blank" class="btn-pdf">📄 PDF</a>
       <a href="{% url 'venta_nueva' %}" class="btn-volver">➕ Nueva Venta</a>
     </div>
@@ -210,6 +213,51 @@
       </div>
     </div>
   </div>
+
+  <script>
+    function abrirCajonManual() {
+      fetch("{% url 'cajon_monedero_abrir' %}", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": "{{ csrf_token }}",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "motivo=Apertura manual desde recibo #{{ venta.pk }}"
+      }).then(r => r.json()).then(data => {
+        if (data.ok) {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+          } catch(e) {}
+          alert("⚡ Señal de apertura enviada al cajón monedero.");
+        }
+      }).catch(err => console.log(err));
+    }
+  </script>
+
+  {% if establecimiento.cajon_monedero_activo and establecimiento.cajon_apertura_automatica and venta.medio_pago == 'efectivo' %}
+  <script>
+    // Apertura automática de gaveta / cajón monedero para cobros en efectivo
+    window.addEventListener('DOMContentLoaded', () => {
+      fetch("{% url 'cajon_monedero_abrir' %}", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": "{{ csrf_token }}",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "motivo=Venta Efectivo #{{ venta.pk }}"
+      }).catch(err => console.log("Cajón monedero status:", err));
+    });
+  </script>
+  {% endif %}
 
   {% if autoprint %}
   <script>

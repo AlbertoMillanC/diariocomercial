@@ -73,6 +73,7 @@ from .models import (
     obtener_configuracion_saas,
     Pedido,
     LineaPedido,
+    LectoraCodigoBarras,
 )
 from .email_service import enviar_correo_plataforma
 from .bot_service import generar_token_vinculacion
@@ -890,6 +891,68 @@ def configuracion(request):
             estado_txt = "ACTIVADA (Apenas se genere la venta)" if est.impresion_directa_ventas else "DESACTIVADA (Modo manual)"
             messages.success(request, f"🖨️ Configuración de impresoras guardada: Impresión directa {estado_txt}.")
             return redirect("configuracion")
+        elif accion == "cajon_monedero":
+            est.cajon_monedero_activo = request.POST.get("cajon_monedero_activo") == "on"
+            est.cajon_apertura_automatica = request.POST.get("cajon_apertura_automatica") == "on"
+            est.cajon_tipo_conexion = request.POST.get("cajon_tipo_conexion", "impresora_rj11")
+            est.cajon_pin = request.POST.get("cajon_pin", "pin2")
+            est.save(update_fields=[
+                "cajon_monedero_activo",
+                "cajon_apertura_automatica",
+                "cajon_tipo_conexion",
+                "cajon_pin",
+            ])
+            _audit(request.user, "configuracion", est, "actualizar_cajon", None, None, f"Cajón activo={est.cajon_monedero_activo}, Auto={est.cajon_apertura_automatica}")
+            messages.success(request, "💵 Configuración del cajón monedero guardada con éxito.")
+            return redirect("configuracion")
+        elif accion == "lectora_crear":
+            nom = request.POST.get("nombre", "").strip()
+            if nom:
+                LectoraCodigoBarras.objects.create(
+                    establecimiento=est,
+                    nombre=nom,
+                    modelo_marca=request.POST.get("modelo_marca", "").strip(),
+                    tipo_conexion=request.POST.get("tipo_conexion", "usb_hid"),
+                    sufijo=request.POST.get("sufijo", "enter"),
+                    beep_sonido=request.POST.get("beep_sonido") == "on",
+                    auto_enter_busqueda=request.POST.get("auto_enter_busqueda") == "on",
+                    activo=True,
+                )
+                messages.success(request, f"🔫 Lectora de código de barras '{nom}' agregada exitosamente.")
+            else:
+                messages.error(request, "El nombre de la lectora es obligatorio.")
+            return redirect("configuracion")
+        elif accion == "lectora_editar":
+            lid = request.POST.get("lectora_id")
+            lectora = get_object_or_404(LectoraCodigoBarras, pk=lid, establecimiento=est)
+            nom = request.POST.get("nombre", "").strip()
+            if nom:
+                lectora.nombre = nom
+                lectora.modelo_marca = request.POST.get("modelo_marca", "").strip()
+                lectora.tipo_conexion = request.POST.get("tipo_conexion", "usb_hid")
+                lectora.sufijo = request.POST.get("sufijo", "enter")
+                lectora.beep_sonido = request.POST.get("beep_sonido") == "on"
+                lectora.auto_enter_busqueda = request.POST.get("auto_enter_busqueda") == "on"
+                if "activo" in request.POST:
+                    lectora.activo = request.POST.get("activo") == "on"
+                lectora.save()
+                messages.success(request, f"Lectora '{lectora.nombre}' actualizada.")
+            return redirect("configuracion")
+        elif accion == "lectora_toggle_activa":
+            lid = request.POST.get("lectora_id")
+            lectora = get_object_or_404(LectoraCodigoBarras, pk=lid, establecimiento=est)
+            lectora.activo = not lectora.activo
+            lectora.save(update_fields=["activo"])
+            estado_txt = "ACTIVADA" if lectora.activo else "DESACTIVADA"
+            messages.info(request, f"Lectora '{lectora.nombre}' {estado_txt}.")
+            return redirect("configuracion")
+        elif accion == "lectora_eliminar":
+            lid = request.POST.get("lectora_id")
+            lectora = get_object_or_404(LectoraCodigoBarras, pk=lid, establecimiento=est)
+            nombre_l = lectora.nombre
+            lectora.delete()
+            messages.success(request, f"Lectora '{nombre_l}' eliminada.")
+            return redirect("configuracion")
 
     from django.utils import timezone
     usuarios = Perfil.objects.filter(establecimiento=est).select_related("user").order_by("rol", "user__username")
@@ -897,6 +960,7 @@ def configuracion(request):
     token_activo = TokenVinculacion.objects.filter(establecimiento=est, usuario=request.user, usado=False, expira__gt=timezone.now()).order_by("-id").first()
     pin_6 = token_activo.token.replace("auth_", "") if token_activo else None
     deep_link = f"https://t.me/DiarioComercial_bot?start={token_activo.token}" if token_activo else None
+    lectoras = est.lectoras_codigo_barras.all()
 
     return render(
         request,
@@ -913,6 +977,7 @@ def configuracion(request):
             "token_activo": token_activo,
             "pin_6": pin_6,
             "deep_link": deep_link,
+            "lectoras": lectoras,
         },
     )
 
@@ -2117,6 +2182,53 @@ def configuracion_probar_impresora(request):
             "fecha_hora": timezone.localtime(timezone.now()),
         }
     )
+
+
+@login_required
+def cajon_monedero_abrir_manual(request):
+    """
+    Dispara la apertura manual del cajón monedero registrando evento de auditoría.
+    Retorna bytes ESC/POS de apertura o respuesta JSON según el cliente solicitante.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return JsonResponse({"error": "No autorizado"}, status=403)
+    est = perfil.establecimiento
+
+    pin = getattr(est, "cajon_pin", "pin2") or "pin2"
+    pin_code = b"\x00" if pin == "pin2" else b"\x01"
+    # Pulso estándar ESC/POS: ESC p m t1 t2
+    comando_bytes = b"\x1b\x70" + pin_code + b"\x19\xfa"
+
+    Auditoria.objects.create(
+        establecimiento=est,
+        usuario=request.user,
+        entidad_afectada="cajon_monedero",
+        id_registro=est.pk,
+        accion="apertura_manual",
+        valor_nuevo=f"Pin: {pin}, Conexión: {est.cajon_tipo_conexion}",
+        motivo="Apertura manual de gaveta de dinero",
+    )
+
+    if (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.GET.get("format") == "json"
+        or request.content_type == "application/json"
+        or "application/json" in request.headers.get("accept", "")
+        or request.method == "POST"
+    ):
+        return JsonResponse({
+            "ok": True,
+            "mensaje": f"⚡ Pulso de apertura enviado al Cajón Monedero ({pin.upper()}).",
+            "pin": pin,
+            "esc_pos_hex": comando_bytes.hex(),
+            "auditoria_registrada": True,
+        })
+
+    resp = HttpResponse(comando_bytes, content_type="application/octet-stream")
+    resp["Content-Disposition"] = 'inline; filename="abrir_cajon.bin"'
+    return resp
+
 
 
 # ============================================================================

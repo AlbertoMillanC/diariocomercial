@@ -235,6 +235,35 @@ class Establecimiento(models.Model):
         help_text="Número de copias a imprimir automáticamente por venta"
     )
 
+    # Configuración de Cajón Monedero / Gaveta de Dinero
+    cajon_monedero_activo = models.BooleanField(
+        default=True,
+        help_text="Habilita el uso y control de cajón monedero en este negocio"
+    )
+    cajon_apertura_automatica = models.BooleanField(
+        default=True,
+        help_text="Abre automáticamente el cajón al registrar ventas pagadas en efectivo"
+    )
+    cajon_tipo_conexion = models.CharField(
+        max_length=30,
+        choices=(
+            ("impresora_rj11", "Conectado a la Impresora (Cable RJ11 - Estándar ESC/POS)"),
+            ("usb_directo", "Conexión USB Directa / Puerto Serial"),
+            ("manual", "Apertura Manual con Llave"),
+        ),
+        default="impresora_rj11",
+        help_text="Tipo de conexión física del cajón monedero"
+    )
+    cajon_pin = models.CharField(
+        max_length=10,
+        choices=(
+            ("pin2", "Pin 2 (Estándar Epson, Xprinter, Star)"),
+            ("pin5", "Pin 5 (Secundario / Segundo cajón)"),
+        ),
+        default="pin2",
+        help_text="Pin del conector RJ11 que recibe el pulso eléctrico"
+    )
+
     def servicio_domicilio_disponible(self, dt=None):
         """
         Evalúa si el servicio de domicilios está operativo en este momento.
@@ -1408,6 +1437,73 @@ def obtener_configuracion_saas(municipio=None):
         "segmentado": bool(seg and (seg.llave_bre_b or seg.whatsapp_soporte or seg.tarifa_mensual_cop)),
         "municipio_nombre": municipio.nombre if municipio else None,
     }
+
+
+class LectoraCodigoBarras(models.Model):
+    """
+    Periférico: Lectora / Pistola de Códigos de Barras y Escáneres de Mostrador.
+    Permite asociar múltiples lectoras (USB, Bluetooth, etc.), configurarlas,
+    modificarlas o desactivarlas individualmente por establecimiento.
+    """
+    TIPO_CONEXION_CHOICES = (
+        ("usb_hid", "USB Teclado Emulado (HID - Conectar y listo)"),
+        ("bluetooth", "Inalámbrico Bluetooth / 2.4 GHz"),
+        ("serial_com", "Puerto Serial / Virtual COM"),
+    )
+    SUFIJO_CHOICES = (
+        ("enter", "Enter / Retorno de carro (Estándar recomendado)"),
+        ("tab", "Tabulador (Tab)"),
+        ("ninguno", "Sin sufijo (Solo dígitos)"),
+    )
+
+    establecimiento = models.ForeignKey(
+        Establecimiento,
+        on_delete=models.CASCADE,
+        related_name="lectoras_codigo_barras",
+    )
+    nombre = models.CharField(
+        max_length=100,
+        help_text="Nombre descriptivo (ej: Pistola USB Mostrador 1, Honeywell Voyager)",
+    )
+    modelo_marca = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Marca o modelo (ej: Xprinter, Honeywell, Netum, Zebra, Genérica)",
+    )
+    tipo_conexion = models.CharField(
+        max_length=30,
+        choices=TIPO_CONEXION_CHOICES,
+        default="usb_hid",
+    )
+    sufijo = models.CharField(
+        max_length=20,
+        choices=SUFIJO_CHOICES,
+        default="enter",
+    )
+    beep_sonido = models.BooleanField(
+        default=True,
+        help_text="Emite sonido 'beep' de confirmación en el navegador al escanear",
+    )
+    auto_enter_busqueda = models.BooleanField(
+        default=True,
+        help_text="Dispara la búsqueda o suma automática del producto al recibir el código",
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="Activa o desactiva la lectora",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-activo", "nombre"]
+        verbose_name = "Lectora de Código de Barras"
+        verbose_name_plural = "Lectoras de Código de Barras"
+
+    def __str__(self):
+        estado = "Activa" if self.activo else "Inactiva"
+        return f"{self.nombre} ({self.get_tipo_conexion_display()}) - {estado}"
+
 
 
 
