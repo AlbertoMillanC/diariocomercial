@@ -85,6 +85,8 @@ urlpatterns = [
     path("api/superadmin/metricas-tiempo-real/", views.superadmin_metricas_tiempo_real, name="superadmin_metricas_tiempo_real"),
     # Webhook Oficial WhatsApp Cloud API (Meta)
     path("webhook/whatsapp/", views.webhook_whatsapp, name="webhook_whatsapp"),
+    # Webhook Oficial Telegram Bot API (Producción HTTPS)
+    path("webhook/telegram/", views.webhook_telegram, name="webhook_telegram"),
     # Módulo de Domicilios, KDS y Cola de Impresión Térmica POS
     path("domicilios/", views.domicilios_lista, name="domicilios_lista"),
     path("domicilios/configurar-servicio/", views.domicilios_toggle_servicio, name="domicilios_toggle_servicio"),

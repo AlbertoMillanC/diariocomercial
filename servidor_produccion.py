@@ -27,6 +27,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("diariocomercial.server")
 
+def arrancar_bot_background():
+    """Ejecuta el bot de Telegram en un hilo daemon con autoreconexión continua y watchdog."""
+    import time
+    from django.core.management import call_command
+    # Pequeña pausa para permitir que el servidor WSGI enlace el puerto primero
+    time.sleep(1.5)
+    while True:
+        try:
+            logger.info("🤖 Supervisor: Iniciando Bot de Telegram integrado...")
+            call_command("bot_telegram")
+        except Exception as e:
+            logger.error(f"⚠️ Supervisor: Reintentando bot de Telegram tras error: {e}")
+            time.sleep(3)
+
 def main():
     port = int(os.environ.get("PORT", "8001"))
     host = os.environ.get("HOST", "127.0.0.1")
@@ -38,6 +52,11 @@ def main():
     logger.info(f"Pool de Hilos Concurrente: {threads} threads")
     logger.info("Proteccion Activa: Cero fugas de kernel, memoria < 50MB RAM")
     logger.info("================================================================")
+
+    # Iniciar bot integrado en segundo plano si no se usa webhook externo
+    import threading
+    t_bot = threading.Thread(target=arrancar_bot_background, daemon=True, name="DiarioComercial-BotWorker")
+    t_bot.start()
     
     app = get_wsgi_application()
     serve(

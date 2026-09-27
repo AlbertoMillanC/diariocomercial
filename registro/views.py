@@ -4078,6 +4078,78 @@ def webhook_whatsapp(request):
     return HttpResponse("Método no permitido", status=405)
 
 
+@csrf_exempt
+def webhook_telegram(request):
+    """
+    Webhook oficial para Telegram Bot API en producción (HTTPS).
+    Recibe actualizaciones en tiempo real (push) directamente en el servidor web Django.
+    Elimina la necesidad de scripts externos o procesos de polling separados.
+    """
+    if request.method != "POST":
+        return HttpResponse("Método no permitido", status=405)
+
+    try:
+        import json
+        data = json.loads(request.body.decode("utf-8"))
+        msg = data.get("message") or data.get("edited_message")
+        if not msg:
+            return JsonResponse({"ok": True, "status": "no_message"})
+
+        chat_id = msg.get("chat", {}).get("id")
+        texto = msg.get("text", "").strip()
+        autor = msg.get("from", {}).get("first_name", "Usuario")
+        msg_id = msg.get("message_id")
+
+        if not chat_id or not texto:
+            return JsonResponse({"ok": True, "status": "empty_text"})
+
+        from registro.bot_service import despachar_mensaje
+        resultado = despachar_mensaje(
+            canal="telegram",
+            identificador_externo=str(chat_id),
+            texto_mensaje=texto,
+            identificador_mensaje=str(msg_id) if msg_id else None,
+            nombre_remitente=autor,
+            return_adjuntos=True,
+        )
+
+        token = getattr(settings, "TELEGRAM_BOT_TOKEN", None) or os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not token and os.path.exists(".env"):
+            try:
+                with open(".env", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("TELEGRAM_BOT_TOKEN="):
+                            token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+            except Exception:
+                pass
+
+        if token:
+            from registro.management.commands.bot_telegram import TelegramClient
+            client = TelegramClient(token)
+
+            if isinstance(resultado, tuple):
+                respuesta, venta_obj, cobro_info = resultado
+            else:
+                respuesta, venta_obj, cobro_info = resultado, None, None
+
+            if respuesta:
+                client.send_message(chat_id, respuesta)
+
+            if venta_obj:
+                try:
+                    from registro.recibo_service import preparar_paquete_omnicanal_venta
+                    paquete = preparar_paquete_omnicanal_venta(venta_obj)
+                    client.send_photo(chat_id, paquete["qr_bytes"], caption=paquete["qr_caption"])
+                    client.send_document(chat_id, paquete["pdf_bytes"], paquete["pdf_filename"], caption=paquete["pdf_caption"])
+                except Exception:
+                    pass
+
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
 # ============================================================================
 # FASE 7: DOMICILIOS, KDS Y COLA DE IMPRESIÓN POS (ESC/POS)
 # ============================================================================
