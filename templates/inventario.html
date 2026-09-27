@@ -13,8 +13,8 @@
     </p>
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <button onclick="document.getElementById('modal-etiquetas-qr').style.display='flex'" class="btn" style="background:#7c3aed; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Imprimir etiquetas con códigos QR de la tienda para pegar a los productos">
-      🏷️ Imprimir Etiquetas QR Tienda
+    <button onclick="document.getElementById('modal-etiquetas-qr').style.display='flex'" class="btn" style="background:#7c3aed; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Imprimir lote de etiquetas con selección de copias y formato (Código de Barras o QR)">
+      🏷️ Imprimir Etiquetas (Barras / QR)
     </button>
     <a href="{% url 'inventario_descargar_plantilla_excel' %}" class="btn" style="background:#065f46; color:#fff; text-decoration:none; padding:8px 14px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px;" title="Descargar formato estándar compatible con sistemas POS y retail">
       📥 Descargar Plantilla Excel (.xlsx)
@@ -106,12 +106,32 @@
   </form>
 </div>
 
+<!-- BARRA FLOTANTE DE ACCIÓN PARA PRODUCTOS SELECCIONADOS -->
+<div id="barra-seleccion-masiva" style="display:none; background:#1e1b4b; border:1px solid #6366f1; color:#fff; border-radius:10px; padding:12px 18px; margin-bottom:16px; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow:0 4px 14px rgba(99,102,241,0.25);">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span style="font-size:22px;">🏷️</span>
+    <div>
+      <strong style="color:#facc15; font-size:14px;"><span id="cant-seleccionados">0</span> producto(s) seleccionados</strong>
+      <p style="margin:2px 0 0 0; font-size:11px; color:#c7d2fe;">Puedes imprimir etiquetas en lote con las copias que elijas para estos productos.</p>
+    </div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button type="button" onclick="abrirModalImprimirSeleccionados()" class="btn btn-primary" style="background:#4f46e5; border-color:#6366f1; font-weight:bold; font-size:13px; padding:8px 16px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+      🖨️ Imprimir Etiquetas Seleccionadas
+    </button>
+    <button type="button" onclick="deseleccionarTodos()" class="btn btn-ghost" style="color:#e0e7ff; border:1px solid #4338ca; padding:8px 12px; font-size:12px; cursor:pointer;">
+      Desmarcar
+    </button>
+  </div>
+</div>
+
 <!-- TABLA DE INVENTARIO -->
 <div class="panel" style="margin-bottom: 24px;">
   <div class="tabla-wrap">
     <table>
       <thead>
         <tr>
+          <th style="width:36px; text-align:center;"><input type="checkbox" id="check-seleccionar-todos" onchange="toggleSeleccionarTodos(this)" title="Seleccionar todos"></th>
           <th>⚡ Código Corto (PLU)</th>
           <th>Código de Barras / SKU</th>
           <th>Tipo / Categoría</th>
@@ -127,6 +147,9 @@
       <tbody>
         {% for p in productos %}
         <tr id="fila-prod-{{ p.pk }}" style="{% if p.stock_kilos <= 0 and not p.es_servicio %}background:rgba(239, 68, 68, 0.05);{% endif %}">
+          <td style="text-align:center;">
+            <input type="checkbox" class="check-producto-item" value="{{ p.pk }}" data-nombre="{{ p.nombre|escapejs }}" data-codigo="{{ p.codigo_barras|escapejs }}" data-plu="{{ p.codigo_corto|escapejs }}" onchange="actualizarBarraSeleccionados()">
+          </td>
           <td>
             <div style="display:flex; align-items:center; gap:6px;">
               <code style="background:#0f172a; color:#facc15; padding:4px 8px; border-radius:6px; font-size:13px; font-weight:900; letter-spacing:0.5px; border:1px solid #ca8a04;">⚡ {{ p.codigo_corto }}</code>
@@ -195,14 +218,9 @@
             {% endif %}
           </td>
           <td style="text-align:center;">
-            <div style="display:inline-flex; gap:4px; flex-wrap:wrap; justify-content:center;">
-              <a href="{% url 'inventario_producto_etiqueta_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:3px 7px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; color:#7c3aed; border:1px solid #c4b5fd; font-weight:bold;" title="Generar e imprimir etiqueta adhesiva con código QR de la tienda para este producto">
-                🏷️ Imprimir QR
-              </a>
-              <a href="{% url 'inventario_producto_etiqueta_barras' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:3px 7px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; color:#1d4ed8; border:1px solid #93c5fd;" title="Imprimir etiqueta térmica con código de barras Code128">
-                🏷️ Barra
-              </a>
-            </div>
+            <button type="button" onclick="abrirImprimirEtiquetasUnico('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.codigo_corto|escapejs }}', '{{ p.precio_kilo|floatformat:0 }}')" class="btn btn-sm" style="background:#0f172a; color:#facc15; border:1px solid #ca8a04; font-size:11px; font-weight:bold; padding:4px 9px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.1);" title="Imprimir N copias (ej: 100 etiquetas) de este producto con Código de Barras o QR">
+              🖨️ Imprimir (Copias)
+            </button>
           </td>
           <td style="text-align:center;">
             <a href="{% url 'inventario_producto_qr' p.pk %}" target="_blank" class="btn btn-ghost" style="padding:4px 8px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#065f46; border:1px solid #10b981; font-weight:bold;" title="Ver tarjeta QR Bre-B para cobrar este producto">
@@ -212,7 +230,7 @@
           <td>
             {% if puede_editar %}
               <!-- BOTÓN EDITAR DETALLES Y CÓDIGO -->
-              <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" class="btn btn-ghost" style="padding:3px 6px; font-size:12px; margin-right:2px;" title="Editar código de barras, nombre y precios">✏️</button>
+              <button type="button" onclick="abrirEditarProducto('{{ p.pk }}', '{{ p.nombre|escapejs }}', '{{ p.codigo_corto|escapejs }}', '{{ p.codigo_barras|escapejs }}', '{{ p.stock_kilos }}', '{{ p.precio_kilo|floatformat:0 }}', '{{ p.costo_unitario|floatformat:0 }}')" class="btn btn-ghost" style="padding:3px 6px; font-size:12px; margin-right:2px;" title="Editar código de barras, nombre y precios">✏️</button>
               <!-- FORMULARIO DE AJUSTE EXCLUSIVO ADMINISTRADOR -->
               <form method="post" action="{% url 'inventario_ajustar' p.pk %}" style="display:inline-flex; gap:4px; align-items:center; margin:0;">
                 {% csrf_token %}
@@ -425,34 +443,160 @@
   </div>
 </div>
 
-<!-- MODAL PARA IMPRIMIR ETIQUETAS QR MASIVAS -->
-<div id="modal-etiquetas-qr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
-  <div style="background:#ffffff; border-radius:12px; max-width:520px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
+<!-- MODAL PARA IMPRIMIR ETIQUETAS DE UN PRODUCTO ÚNICO (CON CANTIDAD DE COPIAS) -->
+<div id="modal-imprimir-unico" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:480px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
-      <h3 style="margin:0; font-size:18px; color:#6b21a8; display:flex; align-items:center; gap:8px;">
-        🏷️ Imprimir Etiquetas QR de Tienda (Adhesivas / Térmicas)
+      <h3 style="margin:0; font-size:18px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+        🖨️ Imprimir Etiquetas para Producto
+      </h3>
+      <button onclick="document.getElementById('modal-imprimir-unico').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:16px;">
+      <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="modal-unico-nombre">-</div>
+      <div style="display:flex; gap:12px; margin-top:6px; font-size:12px; color:#475569; flex-wrap:wrap;">
+        <span>⚡ PLU: <strong id="modal-unico-plu" style="color:#d97706;">-</strong></span>
+        <span>📶 Barras: <strong id="modal-unico-codigo" style="font-family:monospace; color:#0284c7;">-</strong></span>
+        <span>💰 Precio: <strong id="modal-unico-precio" style="color:#059669;">-</strong></span>
+      </div>
+    </div>
+
+    <form method="get" action="{% url 'inventario_etiquetas_imprimir_lote' %}" target="_blank">
+      <input type="hidden" name="filtro" value="producto_unico">
+      <input type="hidden" name="producto_id" id="modal-unico-id" value="">
+
+      <!-- FORMATO -->
+      <div style="margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">Tipo de Etiqueta / Formato:</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <label style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #3b82f6; border-radius:8px; background:#eff6ff; cursor:pointer;">
+            <input type="radio" name="formato" value="barras" checked>
+            <div>
+              <strong style="color:#1d4ed8; font-size:13px; display:block;">📶 Código de Barras</strong>
+              <small style="color:#60a5fa; font-size:11px;">Estándar 1D (Code128 / EAN-13)</small>
+            </div>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #cbd5e1; border-radius:8px; background:#f8fafc; cursor:pointer;">
+            <input type="radio" name="formato" value="qr">
+            <div>
+              <strong style="color:#475569; font-size:13px; display:block;">🏷️ Código QR</strong>
+              <small style="color:#94a3b8; font-size:11px;">Estándar 2D para celular</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- CANTIDAD DE COPIAS -->
+      <div style="margin-bottom:18px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#334155;">
+          Cantidad de Etiquetas a Imprimir:
+        </label>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <button type="button" onclick="sumarCopias('modal-unico-copias', -1)" class="btn" style="background:#e2e8f0; color:#1e293b; padding:8px 14px; font-weight:bold; border-radius:6px; border:none; cursor:pointer;">-</button>
+          <input type="number" id="modal-unico-copias" name="copias" value="1" min="1" max="1000" required style="width:100px; text-align:center; padding:8px; font-size:18px; font-weight:900; border:2px solid #0f172a; border-radius:6px; box-sizing:border-box;">
+          <button type="button" onclick="sumarCopias('modal-unico-copias', 1)" class="btn" style="background:#e2e8f0; color:#1e293b; padding:8px 14px; font-weight:bold; border-radius:6px; border:none; cursor:pointer;">+</button>
+          <span style="font-size:13px; color:#64748b;">etiquetas</span>
+        </div>
+        <!-- BOTONES RÁPIDOS (1, 10, 25, 50, 100) -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" onclick="fijarCopias('modal-unico-copias', 1)" class="btn" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 10px; font-size:12px; border-radius:4px; cursor:pointer;">1</button>
+          <button type="button" onclick="fijarCopias('modal-unico-copias', 10)" class="btn" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 10px; font-size:12px; border-radius:4px; cursor:pointer;">10</button>
+          <button type="button" onclick="fijarCopias('modal-unico-copias', 25)" class="btn" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 10px; font-size:12px; border-radius:4px; cursor:pointer;">25</button>
+          <button type="button" onclick="fijarCopias('modal-unico-copias', 50)" class="btn" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:3px 10px; font-size:12px; border-radius:4px; cursor:pointer;">50</button>
+          <button type="button" onclick="fijarCopias('modal-unico-copias', 100)" class="btn" style="background:#fef08a; color:#854d0e; border:1px solid #ca8a04; font-weight:bold; padding:3px 10px; font-size:12px; border-radius:4px; cursor:pointer;">⚡ 100 (Recomendado Lote)</button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-imprimir-unico').style.display='none'" class="btn btn-ghost" style="padding:8px 16px;">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#0f172a; border-color:#0f172a; color:#facc15; font-weight:bold; padding:8px 18px;" onclick="setTimeout(() => document.getElementById('modal-imprimir-unico').style.display='none', 800)">
+          🖨️ Imprimir Etiquetas Ahora (PDF)
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL PARA CENTRO DE IMPRESIÓN DE ETIQUETAS (LOTE / MASIVO) -->
+<div id="modal-etiquetas-qr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; padding:16px;">
+  <div style="background:#ffffff; border-radius:12px; max-width:550px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+      <h3 style="margin:0; font-size:18px; color:#4338ca; display:flex; align-items:center; gap:8px;">
+        🏷️ Centro de Impresión de Etiquetas Adhesivas (Térmicas)
       </h3>
       <button onclick="document.getElementById('modal-etiquetas-qr').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
     </div>
 
     <p style="font-size:13px; color:#475569; margin-bottom:14px; line-height:1.5;">
-      Genera un documento PDF estándar de etiquetas adhesivas (58mm x 40mm) con el <strong>Código QR propio de la tienda</strong>, nombre del producto, precio por kilo/unidad y código interno. Ideal para productos a granel, carnes al corte, fruver o productos que no traen código de fábrica.
+      Genera tu rollo o archivo PDF de etiquetas autoadhesivas estándar (58mm x 40mm). Puedes seleccionar productos específicos marcando las casillas de la tabla o imprimir un producto con hasta 100 copias.
     </p>
 
-    <form method="get" action="{% url 'inventario_etiquetas_qr_masivo' %}" target="_blank">
-      <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:12px; margin-bottom:14px;">
-        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:8px; color:#581c87;">
-          ¿Cuáles productos deseas incluir en el lote de etiquetas?
+    <form method="get" action="{% url 'inventario_etiquetas_imprimir_lote' %}" target="_blank" id="form-etiquetas-lote">
+      <!-- Hidden input for selected product IDs if filtro=seleccionados -->
+      <input type="hidden" name="productos_seleccionados" id="hidden-productos-seleccionados" value="">
+
+      <!-- SELECCIÓN DE PRODUCTOS A INCLUIR -->
+      <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:12px; margin-bottom:14px;">
+        <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:8px; color:#4338ca;">
+          ¿Cuáles productos deseas imprimir?
         </label>
         <div style="display:flex; flex-direction:column; gap:8px; font-size:13px; color:#374151;">
           <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
-            <input type="radio" name="filtro" value="sin_codigo" checked>
-            <strong>Solo productos SIN código de fábrica</strong> (los que necesitan QR de tienda)
+            <input type="radio" name="filtro" value="seleccionados" id="radio-filtro-seleccionados">
+            <span style="font-weight:bold; color:#4f46e5;">🔘 Solo los productos marcados con casilla en la tabla</span>
+            <span id="badge-conteo-seleccionados" style="background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:bold;">0 marcados</span>
           </label>
           <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
-            <input type="radio" name="filtro" value="todos">
-            <span>Todos los productos activos del catálogo</span>
+            <input type="radio" name="filtro" value="producto_unico" id="radio-filtro-unico">
+            <span>🔘 Un solo producto específico:</span>
+            <select name="producto_id" id="select-producto-lote" style="padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; max-width:230px;" onchange="document.getElementById('radio-filtro-unico').checked=true;">
+              <option value="">-- Elige un producto --</option>
+              {% for p in productos %}
+                <option value="{{ p.pk }}">{{ p.nombre }} [PLU: {{ p.codigo_corto|default:'N/A' }}]</option>
+              {% endfor %}
+            </select>
           </label>
+          <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <input type="radio" name="filtro" value="sin_codigo" id="radio-filtro-sin-codigo">
+            <span>🔘 Productos con código interno / generados automáticamente</span>
+          </label>
+          <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <input type="radio" name="filtro" value="todos" id="radio-filtro-todos" checked>
+            <span>🔘 Todo el catálogo activo</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- TIPO DE FORMATO Y COPIAS -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#374151;">Tipo de Etiqueta:</label>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+              <input type="radio" name="formato" value="barras" checked>
+              <strong>📶 Código de Barras (1D)</strong>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+              <input type="radio" name="formato" value="qr">
+              <span>🏷️ Código QR (2D)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- COPIAS POR PRODUCTO -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+          <label style="display:block; font-weight:bold; font-size:12px; margin-bottom:6px; color:#374151;">Copias por producto:</label>
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            <input type="number" id="lote-copias" name="copias" value="1" min="1" max="1000" style="width:70px; padding:6px; font-size:15px; font-weight:bold; text-align:center; border:1px solid #cbd5e1; border-radius:6px;">
+            <span style="font-size:12px; color:#64748b;">copia(s)</span>
+          </div>
+          <div style="display:flex; gap:4px; flex-wrap:wrap;">
+            <button type="button" onclick="fijarCopias('lote-copias', 1)" class="btn" style="background:#fff; padding:2px 6px; font-size:11px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">1</button>
+            <button type="button" onclick="fijarCopias('lote-copias', 10)" class="btn" style="background:#fff; padding:2px 6px; font-size:11px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">10</button>
+            <button type="button" onclick="fijarCopias('lote-copias', 50)" class="btn" style="background:#fff; padding:2px 6px; font-size:11px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">50</button>
+            <button type="button" onclick="fijarCopias('lote-copias', 100)" class="btn" style="background:#fef08a; color:#854d0e; padding:2px 6px; font-size:11px; font-weight:bold; border:1px solid #ca8a04; border-radius:4px; cursor:pointer;">⚡ 100</button>
+          </div>
         </div>
       </div>
 
@@ -473,7 +617,7 @@
 
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="document.getElementById('modal-etiquetas-qr').style.display='none'" class="btn btn-ghost" style="padding:8px 16px;">Cerrar</button>
-        <button type="submit" class="btn btn-primary" style="background:#7c3aed; border-color:#7c3aed; font-weight:bold; padding:8px 18px;" onclick="setTimeout(() => document.getElementById('modal-etiquetas-qr').style.display='none', 800)">
+        <button type="submit" class="btn btn-primary" style="background:#4338ca; border-color:#4338ca; font-weight:bold; padding:8px 18px;" onclick="setTimeout(() => document.getElementById('modal-etiquetas-qr').style.display='none', 800)">
           🖨️ Generar y Descargar Etiquetas (PDF)
         </button>
       </div>
@@ -564,6 +708,79 @@ function abrirSurtir(id, nombre, stock, unidad) {
   document.getElementById('modal-surtir').style.display = 'flex';
 }
 
+function toggleSeleccionarTodos(masterCheckbox) {
+  const checkboxes = document.querySelectorAll('.check-producto-item');
+  checkboxes.forEach(cb => {
+    cb.checked = masterCheckbox.checked;
+  });
+  actualizarBarraSeleccionados();
+}
+
+function deseleccionarTodos() {
+  const master = document.getElementById('check-seleccionar-todos');
+  if (master) master.checked = false;
+  const checkboxes = document.querySelectorAll('.check-producto-item');
+  checkboxes.forEach(cb => {
+    cb.checked = false;
+  });
+  actualizarBarraSeleccionados();
+}
+
+function actualizarBarraSeleccionados() {
+  const seleccionados = document.querySelectorAll('.check-producto-item:checked');
+  const count = seleccionados.length;
+  const barra = document.getElementById('barra-seleccion-masiva');
+  const cantSpan = document.getElementById('cant-seleccionados');
+  const badgeConteo = document.getElementById('badge-conteo-seleccionados');
+  const hiddenInput = document.getElementById('hidden-productos-seleccionados');
+  
+  if (cantSpan) cantSpan.innerText = count;
+  if (badgeConteo) badgeConteo.innerText = count + ' marcados';
+  
+  const ids = Array.from(seleccionados).map(cb => cb.value);
+  if (hiddenInput) hiddenInput.value = ids.join(',');
+
+  if (barra) {
+    barra.style.display = count > 0 ? 'flex' : 'none';
+  }
+}
+
+function abrirModalImprimirSeleccionados() {
+  const seleccionados = document.querySelectorAll('.check-producto-item:checked');
+  if (seleccionados.length === 0) {
+    alert('Por favor selecciona al menos un producto usando las casillas de la tabla.');
+    return;
+  }
+  actualizarBarraSeleccionados();
+  const radioSel = document.getElementById('radio-filtro-seleccionados');
+  if (radioSel) radioSel.checked = true;
+  document.getElementById('modal-etiquetas-qr').style.display = 'flex';
+}
+
+function abrirImprimirEtiquetasUnico(id, nombre, codigo, plu, precio) {
+  document.getElementById('modal-unico-id').value = id;
+  document.getElementById('modal-unico-nombre').innerText = nombre;
+  document.getElementById('modal-unico-plu').innerText = plu || 'N/A';
+  document.getElementById('modal-unico-codigo').innerText = codigo || 'Auto EAN-13';
+  document.getElementById('modal-unico-precio').innerText = '$' + Number(precio).toLocaleString('es-CO');
+  document.getElementById('modal-unico-copias').value = 1;
+  document.getElementById('modal-imprimir-unico').style.display = 'flex';
+}
+
+function fijarCopias(inputId, val) {
+  const inp = document.getElementById(inputId);
+  if (inp) inp.value = val;
+}
+
+function sumarCopias(inputId, delta) {
+  const inp = document.getElementById(inputId);
+  if (inp) {
+    let cur = parseInt(inp.value, 10) || 1;
+    cur = Math.max(1, Math.min(1000, cur + delta));
+    inp.value = cur;
+  }
+}
+
 // Búsqueda instantánea si se usa pistola lectora de código de barras
 const inputBuscador = document.getElementById('buscador-codigo');
 if (inputBuscador) {
@@ -571,7 +788,6 @@ if (inputBuscador) {
   inputBuscador.addEventListener('input', function() {
     clearTimeout(timerScan);
     const val = this.value.trim();
-    // Si tiene longitud típica de código de barras (8 a 14 dígitos numéricos)
     if (/^\d{8,14}$/.test(val)) {
       timerScan = setTimeout(() => {
         this.form.submit();

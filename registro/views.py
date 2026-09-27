@@ -106,6 +106,7 @@ from .recibo_service import (
     generar_pdf_etiqueta_barras,
     generar_pdf_etiqueta_qr_producto,
     generar_pdf_etiquetas_qr_masivo,
+    generar_pdf_etiquetas_lote,
 )
 from .reporte_excel_service import generar_excel_reporte_periodico
 
@@ -1369,9 +1370,14 @@ def inventario_producto_etiqueta_barras(request, pk):
     if not perfil:
         return redirect("inicio")
     prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
-    pdf_bytes = generar_pdf_etiqueta_barras(prod)
+    try:
+        copias = max(1, int(request.GET.get("copias") or request.POST.get("copias") or 1))
+    except (ValueError, TypeError):
+        copias = 1
+    pdf_bytes = generar_pdf_etiqueta_barras(prod, copias=copias)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="etiqueta_barras_{prod.pk}.pdf"'
+    fn = f"etiqueta_barras_{prod.pk}_{copias}copias.pdf" if copias > 1 else f"etiqueta_barras_{prod.pk}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{fn}"'
     return response
 
 
@@ -1382,36 +1388,93 @@ def inventario_producto_etiqueta_qr(request, pk):
     if not perfil:
         return redirect("inicio")
     prod = get_object_or_404(Producto, pk=pk, establecimiento=perfil.establecimiento)
-    pdf_bytes = generar_pdf_etiqueta_qr_producto(prod)
+    try:
+        copias = max(1, int(request.GET.get("copias") or request.POST.get("copias") or 1))
+    except (ValueError, TypeError):
+        copias = 1
+    pdf_bytes = generar_pdf_etiqueta_qr_producto(prod, copias=copias)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="etiqueta_qr_{prod.pk}.pdf"'
+    fn = f"etiqueta_qr_{prod.pk}_{copias}copias.pdf" if copias > 1 else f"etiqueta_qr_{prod.pk}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{fn}"'
     return response
 
 
 @login_required
-def inventario_etiquetas_qr_masivo(request):
+def inventario_etiquetas_imprimir_lote(request):
     """
-    Genera el lote/rollo de etiquetas QR para toda la tienda o para productos sin código de fábrica.
-    Permite imprimir masivamente en rollo térmico o adhesivo.
+    Vista potente y flexible para imprimir etiquetas térmicas (58x40mm):
+    - Permite imprimir N copias de un solo producto (ej: 100 etiquetas de Pan rollo).
+    - Permite imprimir lotes de productos seleccionados vía checkbox con sus copias.
+    - Soporta tanto formato de Código de Barras 1D como Código QR 2D.
+    - Soporta filtros: seleccionados, producto_unico, sin_codigo, o todos.
     """
     perfil = _perfil(request.user)
     if not perfil:
         return redirect("inicio")
     est = perfil.establecimiento
-    solo_sin_codigo = request.GET.get("filtro") == "sin_codigo"
-    categoria = request.GET.get("categoria") or "todas"
 
-    qs = Producto.objects.filter(establecimiento=est, estado="activo")
-    if solo_sin_codigo:
-        qs = qs.filter(Q(codigo_barras="") | Q(codigo_barras__isnull=True))
-    if categoria != "todas":
-        qs = qs.filter(categoria=categoria)
+    data = request.POST if request.method == "POST" else request.GET
 
-    productos = list(qs.order_by("categoria", "nombre"))
-    pdf_bytes = generar_pdf_etiquetas_qr_masivo(est, productos=productos)
+    formato = data.get("formato") or "barras"
+    filtro = data.get("filtro") or "seleccionados"
+    try:
+        copias_defecto = max(1, int(data.get("copias") or data.get("copias_defecto") or 1))
+    except (ValueError, TypeError):
+        copias_defecto = 1
+
+    items_lote = []
+
+    if filtro == "producto_unico":
+        prod_id = data.get("producto_id")
+        prod = get_object_or_404(Producto, pk=prod_id, establecimiento=est)
+        copias = max(1, int(data.get("copias") or 1))
+        items_lote.append((prod, copias))
+
+    elif filtro == "seleccionados":
+        prod_ids = data.getlist("producto_id") or [x.strip() for x in (data.get("productos_seleccionados") or data.get("productos_ids") or "").split(",") if x.strip()]
+        for pid in prod_ids:
+            try:
+                prod = Producto.objects.filter(pk=int(pid), establecimiento=est).first()
+                if prod:
+                    copias_item = max(1, int(data.get(f"copias_{prod.pk}") or copias_defecto))
+                    items_lote.append((prod, copias_item))
+            except (ValueError, TypeError):
+                continue
+
+    elif filtro == "sin_codigo":
+        categoria = data.get("categoria") or "todas"
+        qs = Producto.objects.filter(establecimiento=est, estado="activo").filter(
+            Q(codigo_barras="") | Q(codigo_barras__isnull=True) | Q(codigo_barras__startswith="20")
+        )
+        if categoria != "todas":
+            qs = qs.filter(categoria=categoria)
+        for p in qs.order_by("categoria", "nombre"):
+            items_lote.append((p, copias_defecto))
+
+    else:
+        categoria = data.get("categoria") or "todas"
+        qs = Producto.objects.filter(establecimiento=est, estado="activo")
+        if categoria != "todas":
+            qs = qs.filter(categoria=categoria)
+        for p in qs.order_by("categoria", "nombre"):
+            items_lote.append((p, copias_defecto))
+
+    if not items_lote and filtro == "seleccionados":
+        messages.warning(request, "No se seleccionó ningún producto para imprimir etiquetas.")
+        return redirect("inventario")
+
+    pdf_bytes = generar_pdf_etiquetas_lote(est, items_lote, tipo_formato=formato)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="etiquetas_qr_{est.pk}.pdf"'
+    total_etiquetas = sum(c for _, c in items_lote)
+    filename = f"etiquetas_{formato}_{est.pk}_{total_etiquetas}uds.pdf"
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+@login_required
+def inventario_etiquetas_qr_masivo(request):
+    """Redirige o procesa la solicitud mediante inventario_etiquetas_imprimir_lote."""
+    return inventario_etiquetas_imprimir_lote(request)
 
 
 @login_required

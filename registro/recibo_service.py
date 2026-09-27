@@ -558,18 +558,11 @@ def generar_tarjeta_qr_producto(producto) -> bytes:
     )
 
 
-def generar_pdf_etiqueta_barras(producto) -> bytes:
-    """
-    Genera una etiqueta de código de barras profesional para rollo térmico estándar (58mm x 40mm)
-    usada por impresoras POS o etiquetadoras de mostrador (Zebra, Xprinter, etc.).
-    """
+def _dibujar_etiqueta_barras_canvas(c, producto):
     from reportlab.lib.pagesizes import mm
     from reportlab.graphics.barcode import code128
 
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
     est = producto.establecimiento
-
     c.setFont("Helvetica-Bold", 8)
     c.drawCentredString(29 * mm, 35 * mm, est.nombre[:30].upper())
 
@@ -593,25 +586,18 @@ def generar_pdf_etiqueta_barras(producto) -> bytes:
         c.setFont("Helvetica-Bold", 10)
         c.drawCentredString(29 * mm, 12 * mm, f"* {codigo_val} *")
 
-    c.save()
-    return buf.getvalue()
+    if producto.codigo_corto:
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawCentredString(29 * mm, 1.5 * mm, f"⚡ PLU / CÓDIGO CORTO: {producto.codigo_corto}")
 
 
-def generar_pdf_etiqueta_qr_producto(producto) -> bytes:
-    """
-    Genera una etiqueta adhesiva térmica profesional (58mm x 40mm) con el Código QR de la Tienda.
-    Ideal para productos artesanales, carnes al corte, frutas/verduras y productos sin código de fábrica.
-    Permite pegar el adhesivo al empaque, bolsa o góndola para lectura óptica en mostrador.
-    """
+def _dibujar_etiqueta_qr_canvas(c, producto):
     from reportlab.lib.pagesizes import mm
     from reportlab.graphics.barcode import qr
     from reportlab.graphics.shapes import Drawing
     from reportlab.graphics import renderPDF
 
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
     est = producto.establecimiento
-
     # Encabezado: Nombre de la tienda
     c.setFont("Helvetica-Bold", 7.5)
     c.drawCentredString(29 * mm, 36 * mm, est.nombre[:30].upper())
@@ -655,88 +641,99 @@ def generar_pdf_etiqueta_qr_producto(producto) -> bytes:
             c.drawString(27 * mm, 12 * mm, f"Lb: ${producto.precio_libra:,.0f}".replace(",", "."))
 
     # Pie de etiqueta
+    plu_txt = f" • PLU: {producto.codigo_corto}" if producto.codigo_corto else ""
     c.setFont("Helvetica-Bold", 6.5)
-    c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val} • QR DE TIENDA")
+    c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val}{plu_txt}")
+
+
+def generar_pdf_etiqueta_barras(producto, copias: int = 1) -> bytes:
+    """
+    Genera una etiqueta de código de barras profesional para rollo térmico estándar (58mm x 40mm)
+    con soporte para repetir N copias.
+    """
+    from reportlab.lib.pagesizes import mm
+    copias = max(1, int(copias or 1))
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+    for i in range(copias):
+        if i > 0:
+            c.showPage()
+        _dibujar_etiqueta_barras_canvas(c, producto)
+    c.save()
+    return buf.getvalue()
+
+
+def generar_pdf_etiqueta_qr_producto(producto, copias: int = 1) -> bytes:
+    """
+    Genera una etiqueta adhesiva térmica profesional (58mm x 40mm) con el Código QR de la Tienda
+    con soporte para repetir N copias.
+    """
+    from reportlab.lib.pagesizes import mm
+    copias = max(1, int(copias or 1))
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+    for i in range(copias):
+        if i > 0:
+            c.showPage()
+        _dibujar_etiqueta_qr_canvas(c, producto)
+    c.save()
+    return buf.getvalue()
+
+
+def generar_pdf_etiquetas_lote(establecimiento, items_con_cantidad, tipo_formato: str = "barras") -> bytes:
+    """
+    Genera un archivo PDF con un lote de etiquetas a medida (58mm x 40mm por página).
+    items_con_cantidad: lista de tuplas [(producto, cantidad_copias), ...]
+    tipo_formato: 'barras' (Code128 / EAN-13) o 'qr' (QR 2D de Tienda).
+    Permite imprimir 100 etiquetas de un solo producto, o lotes seleccionados con sus cantidades exactas.
+    """
+    from reportlab.lib.pagesizes import mm
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
+    primera_pagina = True
+
+    for item in items_con_cantidad:
+        if isinstance(item, tuple) or isinstance(item, list):
+            prod = item[0]
+            copias = max(1, int(item[1] or 1))
+        else:
+            prod = item
+            copias = 1
+
+        for _ in range(copias):
+            if not primera_pagina:
+                c.showPage()
+            primera_pagina = False
+
+            if tipo_formato == "qr":
+                _dibujar_etiqueta_qr_canvas(c, prod)
+            else:
+                _dibujar_etiqueta_barras_canvas(c, prod)
+
+    if primera_pagina:
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(29 * mm, 20 * mm, "No hay productos para imprimir")
 
     c.save()
     return buf.getvalue()
 
 
-def generar_pdf_etiquetas_qr_masivo(establecimiento, productos=None, solo_sin_codigo=False) -> bytes:
+def generar_pdf_etiquetas_qr_masivo(establecimiento, productos=None, solo_sin_codigo=False, copias_por_producto: int = 1, tipo_formato: str = "qr") -> bytes:
     """
-    Genera un lote continuo de etiquetas QR (58mm x 40mm por página)
-    para imprimir todas las etiquetas de la tienda en impresoras térmicas de rollo
-    (Xprinter, Zebra, etc.) o impresoras POS.
+    Genera un lote de etiquetas (58mm x 40mm por página) en formato QR o Barras
+    para productos seleccionados o por filtro.
     """
     from django.db.models import Q
-    from reportlab.lib.pagesizes import mm
-    from reportlab.graphics.barcode import qr
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.graphics import renderPDF
 
     if productos is None:
         qs = establecimiento.productos.filter(estado="activo")
         if solo_sin_codigo:
-            qs = qs.filter(Q(codigo_barras="") | Q(codigo_barras__isnull=True))
+            qs = qs.filter(Q(codigo_barras="") | Q(codigo_barras__isnull=True) | Q(codigo_barras__startswith="20"))
         productos = list(qs.order_by("categoria", "nombre"))
 
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(58 * mm, 40 * mm))
-
-    if not productos:
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(29 * mm, 20 * mm, "No hay productos para imprimir")
-        c.save()
-        return buf.getvalue()
-
-    for idx, prod in enumerate(productos):
-        if idx > 0:
-            c.showPage()
-
-        # Encabezado
-        c.setFont("Helvetica-Bold", 7.5)
-        c.drawCentredString(29 * mm, 36 * mm, establecimiento.nombre[:30].upper())
-        c.setLineWidth(0.4)
-        c.line(4 * mm, 34.5 * mm, 54 * mm, 34.5 * mm)
-
-        # Nombre producto
-        c.setFont("Helvetica-Bold", 8.5)
-        c.drawCentredString(29 * mm, 30.5 * mm, prod.nombre[:30])
-
-        # QR
-        codigo_val = prod.codigo_barras or f"DC{prod.pk:05d}"
-        qr_payload = f"DC:P:{prod.pk}:SKU:{codigo_val}:COP:{int(prod.precio_kilo)}"
-        qr_code = qr.QrCodeWidget(qr_payload)
-        bounds = qr_code.getBounds()
-        qw = bounds[2] - bounds[0]
-        qh = bounds[3] - bounds[1]
-        lado_qr = 20 * mm
-        d = Drawing(lado_qr, lado_qr, transform=[lado_qr / qw, 0, 0, lado_qr / qh, 0, 0])
-        d.add(qr_code)
-        renderPDF.draw(d, c, 5 * mm, 9 * mm)
-
-        # Detalles
-        c.setFont("Helvetica", 6.5)
-        c.drawString(27 * mm, 25 * mm, f"CAT: {prod.get_categoria_display()[:15].upper()}")
-        c.setFont("Helvetica-Bold", 10.5)
-        unidad_str = prod.unidad_medida.upper()
-        if prod.es_servicio:
-            c.drawString(27 * mm, 19.5 * mm, f"${prod.precio_kilo:,.0f}".replace(",", "."))
-            c.setFont("Helvetica", 6.5)
-            c.drawString(27 * mm, 15.5 * mm, "SERVICIO")
-        else:
-            c.drawString(27 * mm, 19.5 * mm, f"${prod.precio_kilo:,.0f}".replace(",", "."))
-            c.setFont("Helvetica", 6.5)
-            c.drawString(27 * mm, 15.5 * mm, f"POR {unidad_str}")
-            if prod.unidad_medida == "kg":
-                c.drawString(27 * mm, 12 * mm, f"Lb: ${prod.precio_libra:,.0f}".replace(",", "."))
-
-        # Pie
-        c.setFont("Helvetica-Bold", 6.5)
-        c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val} • QR DE TIENDA")
-
-    c.save()
-    return buf.getvalue()
+    items = [(p, copias_por_producto) for p in productos]
+    return generar_pdf_etiquetas_lote(establecimiento, items, tipo_formato=tipo_formato)
 
 
 # ============================================================================

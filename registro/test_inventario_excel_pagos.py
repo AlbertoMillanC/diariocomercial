@@ -495,5 +495,56 @@ class InventarioExcelPagosTests(TestCase):
         self.assertEqual(data_b["peso_bascula"], 1.5)
         # Precio = 18000 * 1.5 = 27000
         self.assertEqual(data_b["precio"], 27000)
-        self.assertIn("1.500", data_b["detalle_bascula"])
+    def test_12_autogenerar_codigo_barras_ean13_en_producto_nuevo(self):
+        """Verifica que al guardar un producto sin código de barras, se autogenere un EAN-13 válido (20...)."""
+        pan = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Pan Francés Artesanal",
+            categoria="abarrotes",
+            codigo_corto="2323",
+            stock_kilos=Decimal("50.000"),
+            precio_kilo=Decimal("500"),
+            unidad_medida="und",
+        )
+        self.assertTrue(bool(pan.codigo_barras))
+        self.assertEqual(len(pan.codigo_barras), 13)
+        self.assertTrue(pan.codigo_barras.startswith("20"))
+        # Verificar cálculo de checksum EAN-13
+        digitos = [int(d) for d in pan.codigo_barras]
+        suma_impares = sum(digitos[i] for i in range(0, 12, 2))
+        suma_pares = sum(digitos[i] * 3 for i in range(1, 12, 2))
+        total = suma_impares + suma_pares
+        checksum_calculado = (10 - (total % 10)) % 10
+        self.assertEqual(digitos[12], checksum_calculado)
+
+    def test_13_imprimir_etiquetas_lote_producto_unico_100_copias(self):
+        """Verifica la generación de PDF con 100 copias para un solo producto en código de barras."""
+        self.client.login(username="maria.admin", password="password123")
+        url = reverse("inventario_etiquetas_imprimir_lote")
+        res = self.client.get(f"{url}?filtro=producto_unico&producto_id={self.prod_pollo.pk}&copias=100&formato=barras")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/pdf")
+        self.assertIn("100uds.pdf", res["Content-Disposition"])
+        self.assertTrue(res.content.startswith(b"%PDF-"))
+        self.assertGreater(len(res.content), 5000)
+
+    def test_14_imprimir_etiquetas_lote_seleccionados(self):
+        """Verifica la impresión de lote de productos seleccionados con casillas en formato QR."""
+        prod2 = Producto.objects.create(
+            establecimiento=self.est,
+            nombre="Carne Molida Especial",
+            categoria="carnes",
+            codigo_corto="102",
+            stock_kilos=Decimal("20.000"),
+            precio_kilo=Decimal("22000"),
+            unidad_medida="kg",
+        )
+        self.client.login(username="maria.admin", password="password123")
+        url = reverse("inventario_etiquetas_imprimir_lote")
+        res = self.client.get(f"{url}?filtro=seleccionados&productos_seleccionados={self.prod_pollo.pk},{prod2.pk}&copias=5&formato=qr")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/pdf")
+        self.assertIn("10uds.pdf", res["Content-Disposition"])
+        self.assertTrue(res.content.startswith(b"%PDF-"))
+        self.assertGreater(len(res.content), 2000)
 

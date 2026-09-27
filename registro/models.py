@@ -685,9 +685,24 @@ class Producto(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        if not self.codigo_corto:
+        updates = {}
+        if not self.codigo_corto or not self.codigo_corto.strip():
             self.codigo_corto = str(self.pk)
-            Producto.objects.filter(pk=self.pk).update(codigo_corto=str(self.pk))
+            updates["codigo_corto"] = str(self.pk)
+        if not self.codigo_barras or not self.codigo_barras.strip():
+            # Generar código de barras EAN-13 estándar interno para el comercio
+            # Prefijo 20 (Uso interno GS1) + Est (3 dígitos) + Prod (7 dígitos) + DV (1 dígito)
+            est_num = (self.establecimiento_id or 1) % 1000
+            prod_num = self.pk % 10000000
+            c12 = f"20{est_num:03d}{prod_num:07d}"
+            suma = sum(int(d) * (3 if i % 2 == 1 else 1) for i, d in enumerate(c12))
+            dv = (10 - (suma % 10)) % 10
+            ean13_auto = f"{c12}{dv}"
+            self.codigo_barras = ean13_auto
+            updates["codigo_barras"] = ean13_auto
+
+        if updates:
+            Producto.objects.filter(pk=self.pk).update(**updates)
 
     @property
     def codigo_sku(self) -> str:
