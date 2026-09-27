@@ -678,6 +678,13 @@ class Producto(models.Model):
         return f"{self.nombre} - ${self.precio_kilo}/kg"
 
     @property
+    def codigo_sku(self) -> str:
+        """Retorna el código de barras asignado o el SKU interno automático (ej: DC00005)."""
+        if self.codigo_barras and self.codigo_barras.strip():
+            return self.codigo_barras.strip()
+        return f"DC{self.pk:05d}"
+
+    @property
     def precio_libra(self):
         return (Decimal(str(self.precio_kilo)) / Decimal("2")).quantize(Decimal("1"))
 

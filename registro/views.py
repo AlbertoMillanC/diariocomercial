@@ -1198,8 +1198,11 @@ def inventario_ajustar(request, pk):
         nuevo_precio = request.POST.get("precio_kilo")
         nuevo_costo = request.POST.get("costo_unitario")
         nuevo_codigo = request.POST.get("codigo_barras")
+        nuevo_nombre = request.POST.get("nombre")
         try:
-            val_ant = f"Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}"
+            val_ant = f"Nombre: {prod.nombre}, Stock: {prod.stock_kilos}, Precio: {prod.precio_kilo}"
+            if nuevo_nombre is not None and nuevo_nombre.strip():
+                prod.nombre = nuevo_nombre.strip()
             if nuevo_stock is not None and nuevo_stock != "":
                 prod.stock_kilos = Decimal(nuevo_stock)
             if nuevo_precio is not None and nuevo_precio != "":

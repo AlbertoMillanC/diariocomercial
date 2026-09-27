@@ -1332,10 +1332,11 @@ def _consultar_stock(establecimiento: Establecimiento, texto: str) -> str:
     """Consulta existencias de uno o varios productos."""
     prod = buscar_producto_en_texto(establecimiento, texto)
     if prod:
+        u_str = prod.unidad_medida or "Kg"
         return (
-            f"📦 *Existencias de {prod.nombre}:*\n"
-            f"   • Stock: *{prod.stock_kilos} Kg* ({prod.stock_libras} lb / {prod.stock_gramos:,} g)\n"
-            f"   • Precio: *${prod.precio_kilo:,.0f}/Kg* (${prod.precio_libra:,.0f}/lb)"
+            f"📦 *Existencias de {prod.nombre}* [Cód: `{prod.codigo_sku}`]:\n"
+            f"   • Stock: *{prod.stock_kilos} {u_str}*" + (f" ({prod.stock_libras} lb)" if prod.es_peso() else "") + "\n"
+            f"   • Precio: *${prod.precio_kilo:,.0f}/{u_str}*" + (f" (${prod.precio_libra:,.0f}/lb)" if prod.es_peso() else "")
         )
 
     # Si no especificó producto, mostrar los 5 productos con menos stock
@@ -1343,7 +1344,7 @@ def _consultar_stock(establecimiento: Establecimiento, texto: str) -> str:
     if not bajos:
         return "📦 No hay productos registrados en el inventario de este establecimiento."
 
-    items_txt = "\n".join([f"• *{p.nombre}*: {p.stock_kilos} Kg (${p.precio_kilo:,.0f}/Kg)" for p in bajos])
+    items_txt = "\n".join([f"• *{p.nombre}* [Cód: `{p.codigo_sku}`]: {p.stock_kilos} {p.unidad_medida} (${p.precio_kilo:,.0f}/{p.unidad_medida})" for p in bajos])
     return f"📦 *Productos con menor stock:*\n{items_txt}"
 
 
