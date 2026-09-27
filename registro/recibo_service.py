@@ -758,24 +758,35 @@ def generar_comanda_termica_texto(pedido: Pedido, ancho: int = 42) -> str:
     nombre_cli = (pedido.nombre_contacto or (pedido.cliente.nombre if pedido.cliente else "Cliente")).upper()
     tel_cli = pedido.telefono_contacto or (pedido.cliente.telefono if pedido.cliente else "No registra")
 
+    es_recojo = (pedido.tipo_entrega == "recojo_tienda")
+    titulo_comanda = "*** RECOJO EN TIENDA / PARA LLEVAR ***" if es_recojo else "DIARIOCOMERCIAL - COMANDA DE DESPACHO"
+
     lineas = [
         linea_sep,
-        "DIARIOCOMERCIAL - COMANDA DE DESPACHO".center(ancho),
+        titulo_comanda.center(ancho),
         (est.nombre or "COMERCIO").upper()[:ancho].center(ancho),
         linea_sep,
         f"PEDIDO #{pedido.numero_pedido:04d}   HORA: {hora_str}",
         f"CLIENTE: {nombre_cli[:30]}",
         f"TEL: [ {tel_cli} ]",
         linea_guion,
-        "DESTINO DE ENTREGA:",
-        f"  {pedido.direccion_entrega or 'Recoge en mostrador'}",
     ]
 
-    if pedido.punto_referencia:
+    if es_recojo:
         lineas.extend([
-            "PUNTOS DE REFERENCIA:",
-            f"  * {pedido.punto_referencia}",
+            "MODALIDAD: RECOJO EN TIENDA / MOSTRADOR",
+            f"  Punto: {est.direccion or est.nombre}",
         ])
+    else:
+        lineas.extend([
+            "DESTINO DE ENTREGA:",
+            f"  {pedido.direccion_entrega or 'Recoge en mostrador'}",
+        ])
+        if pedido.punto_referencia:
+            lineas.extend([
+                "PUNTOS DE REFERENCIA:",
+                f"  * {pedido.punto_referencia}",
+            ])
 
     lineas.extend([
         linea_guion,
@@ -825,9 +836,10 @@ def generar_comanda_termica_texto(pedido: Pedido, ancho: int = 42) -> str:
     else:
         lineas.append(f"[ ! ] ESTADO: {pedido.get_estado_display().upper()}".center(ancho))
 
+    pie_entrega = "ENTREGA: EN MOSTRADOR / CAJA AL CLIENTE" if es_recojo else f"DOMICILIARIO: {pedido.nombre_domiciliario or '[           ]'}"
     lineas.extend([
         linea_sep,
-        f"DOMICILIARIO: {pedido.nombre_domiciliario or '[           ]'}",
+        pie_entrega,
         linea_sep,
         "\n\n",
     ])
@@ -849,15 +861,19 @@ def generar_bytes_escpos_comanda(pedido: Pedido) -> bytes:
     buf += ESC + b"@"
 
     # 2. Encabezado centrado
+    es_recojo = (pedido.tipo_entrega == "recojo_tienda")
     buf += ESC + b"a\x01"  # Centrado
     buf += ESC + b"!\x08"  # Negrita
-    buf += b"DIARIOCOMERCIAL - COMANDA DE DESPACHO\n"
+    if es_recojo:
+        buf += b"*** RECOJO EN TIENDA / PARA LLEVAR ***\n"
+    else:
+        buf += b"DIARIOCOMERCIAL - COMANDA DE DESPACHO\n"
     est_nombre = (pedido.establecimiento.nombre or "COMERCIO").upper()[:32]
     buf += ESC + b"!\x20"  # Doble alto
     buf += est_nombre.encode("cp850", "replace") + b"\n"
     buf += ESC + b"!\x00"  # Normal
 
-    # 3. Número de pedido y teléfono (Doble ancho/alto para el domiciliario)
+    # 3. Número de pedido y teléfono (Doble ancho/alto para el domiciliario o mostrador)
     hora_str = timezone.localtime(pedido.fecha_creacion).strftime("%d/%m/%Y %I:%M %p")
     buf += f"PEDIDO #{pedido.numero_pedido:04d}  {hora_str}\n".encode("cp850")
     buf += b"==========================================\n"
@@ -870,9 +886,14 @@ def generar_bytes_escpos_comanda(pedido: Pedido) -> bytes:
 
     nombre_cli = (pedido.nombre_contacto or (pedido.cliente.nombre if pedido.cliente else "Cliente")).upper()
     buf += f"CLIENTE: {nombre_cli[:35]}\n".encode("cp850", "replace")
-    buf += f"DESTINO: {pedido.direccion_entrega}\n".encode("cp850", "replace")
-    if pedido.punto_referencia:
-        buf += f"REF: {pedido.punto_referencia}\n".encode("cp850", "replace")
+    if es_recojo:
+        buf += b"MODALIDAD: RECOJO EN TIENDA / MOSTRADOR\n"
+        if pedido.establecimiento.direccion:
+            buf += f"PUNTO: {pedido.establecimiento.direccion[:35]}\n".encode("cp850", "replace")
+    else:
+        buf += f"DESTINO: {pedido.direccion_entrega}\n".encode("cp850", "replace")
+        if pedido.punto_referencia:
+            buf += f"REF: {pedido.punto_referencia}\n".encode("cp850", "replace")
     buf += b"------------------------------------------\n"
 
     # 4. Ítems a empacar con checkbox [ ]
@@ -914,7 +935,10 @@ def generar_bytes_escpos_comanda(pedido: Pedido) -> bytes:
 
     buf += ESC + b"a\x00"
     buf += b"==========================================\n"
-    buf += f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                     ]'}\n".encode("cp850", "replace")
+    if es_recojo:
+        buf += b"ENTREGA: EN MOSTRADOR / CAJA AL CLIENTE\n"
+    else:
+        buf += f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                     ]'}\n".encode("cp850", "replace")
     buf += b"\n\n\n"
 
     # 6. Corte de papel automático (GS V 65 0)
@@ -941,12 +965,13 @@ def generar_pdf_comanda_pedido(pedido: Pedido) -> bytes:
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(ancho_pt, alto_pt))
     est = pedido.establecimiento
+    es_recojo = (pedido.tipo_entrega == "recojo_tienda")
 
     y = alto_pt - 15 * mm
 
     # Título
     c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(ancho_pt / 2, y, "COMANDA DE DESPACHO")
+    c.drawCentredString(ancho_pt / 2, y, "RECOJO EN TIENDA / PARA LLEVAR" if es_recojo else "COMANDA DE DESPACHO")
     y -= 5 * mm
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(ancho_pt / 2, y, (est.nombre or "COMERCIO").upper()[:28])
@@ -973,11 +998,18 @@ def generar_pdf_comanda_pedido(pedido: Pedido) -> bytes:
     y -= 5 * mm
 
     c.setFont("Helvetica", 8)
-    c.drawString(6 * mm, y, f"DESTINO: {pedido.direccion_entrega[:35]}")
-    y -= 5 * mm
-    if pedido.punto_referencia:
-        c.drawString(6 * mm, y, f"REF: {pedido.punto_referencia[:35]}")
+    if es_recojo:
+        c.drawString(6 * mm, y, "MODALIDAD: RECOJO EN TIENDA")
         y -= 5 * mm
+        if est.direccion:
+            c.drawString(6 * mm, y, f"PUNTO: {est.direccion[:35]}")
+            y -= 5 * mm
+    else:
+        c.drawString(6 * mm, y, f"DESTINO: {pedido.direccion_entrega[:35]}")
+        y -= 5 * mm
+        if pedido.punto_referencia:
+            c.drawString(6 * mm, y, f"REF: {pedido.punto_referencia[:35]}")
+            y -= 5 * mm
 
     c.line(4 * mm, y, ancho_pt - 4 * mm, y)
     y -= 6 * mm
@@ -1026,7 +1058,10 @@ def generar_pdf_comanda_pedido(pedido: Pedido) -> bytes:
         y -= 6 * mm
 
     c.setFont("Helvetica", 7.5)
-    c.drawString(6 * mm, y, f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                      ]'}")
+    if es_recojo:
+        c.drawString(6 * mm, y, "ENTREGA: EN MOSTRADOR / CAJA AL CLIENTE")
+    else:
+        c.drawString(6 * mm, y, f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                      ]'}")
 
     c.save()
     return buf.getvalue()

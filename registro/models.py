@@ -188,6 +188,16 @@ class Establecimiento(models.Model):
         default="",
         help_text="Motivo temporal de pausa opcional (ej: 'Alta congestión por lluvia')"
     )
+    recojo_tienda_activo = models.BooleanField(
+        default=True,
+        help_text="Permite pedidos en línea para recoger en tienda física / mostrador"
+    )
+    recojo_tienda_mensaje_pausa = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Motivo temporal si se pausa el servicio de recojo en tienda"
+    )
 
     def servicio_domicilio_disponible(self, dt=None):
         """
@@ -226,7 +236,7 @@ class Establecimiento(models.Model):
                 f"Hola, en este momento el servicio de entregas a domicilio en *{self.nombre}* "
                 f"se encuentra pausado temporalmente.\n\n"
                 f"⏰ *Horario habitual de domicilios:* {horario_texto}.\n"
-                f"📍 Puedes visitarnos directamente en nuestro local{' (' + self.direccion + ')' if self.direccion else ''}.\n\n"
+                f"📍 Puedes visitarnos o pedir para recoger directamente en nuestro local{' (' + self.direccion + ')' if self.direccion else ''}.\n\n"
                 f"¡Disculpa las molestias, te avisaremos tan pronto reactivemos los despachos!"
             )
             return False, "pausado", msg
@@ -258,6 +268,78 @@ class Establecimiento(models.Model):
             f"En *{self.nombre}* estamos tomando y despachando pedidos.\n"
             f"⏰ *Horario de atención:* {horario_texto}.\n"
             f"Tarifa base: ${self.costo_domicilio_defecto:,.0f} COP (Gratis en compras superiores a ${self.monto_minimo_domicilio_gratis:,.0f}).".replace(",", ".")
+        )
+        return True, "activo", msg_activo
+
+    def servicio_recojo_disponible(self, dt=None):
+        """
+        Evalúa si el servicio de pedidos para recoger en tienda está operativo en este momento.
+        Retorna: (disponible: bool, motivo: str, mensaje_informativo: str)
+        """
+        now = dt or timezone.localtime(timezone.now())
+        hora_actual = now.time()
+
+        from datetime import datetime, time
+        if isinstance(self.domicilio_hora_apertura, str):
+            try:
+                h_apertura = datetime.strptime(self.domicilio_hora_apertura, "%H:%M:%S").time()
+            except ValueError:
+                h_apertura = datetime.strptime(self.domicilio_hora_apertura, "%H:%M").time()
+        else:
+            h_apertura = self.domicilio_hora_apertura
+
+        if isinstance(self.domicilio_hora_cierre, str):
+            try:
+                h_cierre = datetime.strptime(self.domicilio_hora_cierre, "%H:%M:%S").time()
+            except ValueError:
+                h_cierre = datetime.strptime(self.domicilio_hora_cierre, "%H:%M").time()
+        else:
+            h_cierre = self.domicilio_hora_cierre
+
+        hora_apertura_str = h_apertura.strftime("%I:%M %p").lstrip("0")
+        hora_cierre_str = h_cierre.strftime("%I:%M %p").lstrip("0")
+        horario_texto = f"{hora_apertura_str} a {hora_cierre_str}"
+
+        # 1. Interruptor Maestro Apagado
+        if not self.recojo_tienda_activo:
+            motivo_extra = f" ({self.recojo_tienda_mensaje_pausa})" if self.recojo_tienda_mensaje_pausa.strip() else ""
+            msg = (
+                f"🛍️ *Servicio de Recojo en Tienda Temporalmente Pausado*{motivo_extra}\n\n"
+                f"Hola, en este momento los pedidos anticipados para recoger en *{self.nombre}* "
+                f"se encuentran pausados temporalmente.\n\n"
+                f"⏰ *Horario de atención:* {horario_texto}.\n"
+                f"📍 Puedes realizar tu compra directamente en nuestro mostrador{' (' + self.direccion + ')' if self.direccion else ''}.\n\n"
+                f"¡Te esperamos!"
+            )
+            return False, "pausado", msg
+
+        # 2. Control por Horario Programado
+        if self.domicilio_programar_horario:
+            inicio = h_apertura
+            fin = h_cierre
+
+            if inicio <= fin:
+                en_horario = (inicio <= hora_actual <= fin)
+            else:
+                en_horario = (hora_actual >= inicio or hora_actual <= fin)
+
+            if not en_horario:
+                hora_actual_fmt = hora_actual.strftime("%I:%M %p").lstrip("0")
+                msg = (
+                    f"🌙 *Tienda Cerrada en este momento*\n\n"
+                    f"Hola, en este momento nos encontramos fuera del horario de atención en *{self.nombre}*.\n\n"
+                    f"⏰ *Horario de atención:* {horario_texto}.\n"
+                    f"⌚ *Hora actual:* {hora_actual_fmt}.\n\n"
+                    f"Con gusto prepararemos tu pedido para recoger dentro de nuestro horario habitual. ¡Te esperamos!"
+                )
+                return False, "fuera_de_horario", msg
+
+        dir_local = f" ({self.direccion})" if self.direccion else ""
+        msg_activo = (
+            f"🟢 *Servicio de Recojo en Tienda ACTIVO*\n\n"
+            f"En *{self.nombre}*{dir_local} estamos alistando pedidos para entrega rápida en mostrador.\n"
+            f"⏰ *Horario de atención:* {horario_texto}.\n"
+            f"✨ ¡Pide en línea y recoge sin filas ni costos de envío!"
         )
         return True, "activo", msg_activo
 
@@ -911,12 +993,17 @@ class Pedido(models.Model):
     Soporta pagos en Efectivo contra entrega (con cálculo de vueltas) y Bre-B/Nequi con
     confirmación en tiempo real e impresión automática en comandas POS térmicas.
     """
+    TIPOS_ENTREGA = (
+        ("domicilio", "Domicilio a Dirección"),
+        ("recojo_tienda", "Recojo en Tienda / Para Llevar"),
+    )
     ESTADOS = (
         ("borrador", "Borrador"),
         ("cotizado", "Cotizado / Esperando Confirmación"),
         ("esperando_pago", "Esperando Pago Digital"),
         ("pagado", "Pagado / En Preparación"),
         ("en_preparacion", "En Preparación"),
+        ("listo_para_recoger", "Listo para Recoger en Tienda"),
         ("en_camino", "En Camino / Despachado"),
         ("entregado", "Entregado y Liquidado"),
         ("cancelado", "Cancelado"),
@@ -940,6 +1027,10 @@ class Pedido(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_domicilio")
     numero_pedido = models.PositiveIntegerField(db_index=True)
     canal_origen = models.CharField(max_length=20, choices=CANALES, default="whatsapp")
+    tipo_entrega = models.CharField(
+        max_length=20, choices=TIPOS_ENTREGA, default="domicilio", db_index=True,
+        help_text="Modalidad: domicilio a dirección o recojo en tienda física"
+    )
 
     # Destino y ubicación
     telefono_contacto = models.CharField(max_length=25, db_index=True, help_text="Celular WhatsApp del cliente")
@@ -990,6 +1081,7 @@ class Pedido(models.Model):
         indexes = [
             models.Index(fields=["establecimiento", "estado", "fecha_creacion"], name="pedido_est_fec_idx"),
             models.Index(fields=["establecimiento", "impreso_pos"], name="pedido_imp_pos_idx"),
+            models.Index(fields=["establecimiento", "tipo_entrega"], name="pedido_est_tipo_idx"),
         ]
 
     def __str__(self):
@@ -1004,6 +1096,8 @@ class Pedido(models.Model):
     def calcular_totales(self):
         subt = sum((linea.subtotal for linea in self.lineas.all()), Decimal("0"))
         self.subtotal = subt
+        if self.tipo_entrega == "recojo_tienda":
+            self.costo_domicilio = Decimal("0")
         self.total = subt + (self.costo_domicilio or Decimal("0"))
         if self.paga_con and self.paga_con > self.total:
             self.vueltas = self.paga_con - self.total

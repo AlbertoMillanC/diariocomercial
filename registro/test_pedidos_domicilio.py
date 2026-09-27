@@ -411,3 +411,171 @@ class PedidosDomicilioTestCase(TestCase):
         self.assertEqual(self.est.costo_domicilio_defecto, Decimal("4000"))
         self.assertEqual(self.est.monto_minimo_domicilio_gratis, Decimal("60000"))
 
+    def test_flujo_pedido_recojo_tienda_efectivo(self):
+        """Prueba pedido en línea con recojo en tienda / para llevar."""
+        telefono_cliente = "3123456789"
+
+        # Paso 1: Pedido con keyword de recojo
+        msg_1 = "pedido 4 pan rollito para recoger en tienda"
+        resp_1, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo=telefono_cliente,
+            texto_mensaje=msg_1,
+            return_adjuntos=True
+        )
+
+        self.assertIn("Recojo en Tienda", resp_1)
+        self.assertIn("Sin costo de envío", resp_1)
+        self.assertIn("Punto de recogida", resp_1)
+
+        # Paso 2: Selección Efectivo
+        resp_2, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo=telefono_cliente,
+            texto_mensaje="1",
+            return_adjuntos=True
+        )
+
+        self.assertIn("Pago en Efectivo Seleccionado (En Caja)", resp_2)
+        self.assertIn("Total a pagar en mostrador", resp_2)
+
+        # Paso 3: Paga exacto en caja
+        resp_3, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo=telefono_cliente,
+            texto_mensaje="exacto",
+            return_adjuntos=True
+        )
+
+        self.assertIn("Confirmado para Recoger en Tienda", resp_3)
+        self.assertIn("Punto de recogida", resp_3)
+
+        # Validar en base de datos
+        pedido = Pedido.objects.filter(telefono_contacto=telefono_cliente).latest("id")
+        self.assertEqual(pedido.tipo_entrega, "recojo_tienda")
+        self.assertEqual(pedido.costo_domicilio, Decimal("0"))
+        self.assertEqual(pedido.medio_pago, "efectivo")
+        self.assertEqual(pedido.estado, "en_preparacion")
+
+    def test_recojo_tienda_cuando_domicilios_pausados(self):
+        """Domicilios en moto pausados (ej. lluvia) pero recojo en tienda sigue activo."""
+        self.est.domicilios_activos = False
+        self.est.domicilio_mensaje_pausa = "Fuerte lluvia en la zona"
+        self.est.recojo_tienda_activo = True
+        self.est.save()
+
+        # Domicilio debe ser rechazado
+        resp_domi, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo="3111111111",
+            texto_mensaje="pedido 2 pan Calle 10 # 5-20",
+            return_adjuntos=True
+        )
+        self.assertIn("Servicio de Domicilios Temporalmente Pausado", resp_domi)
+        self.assertIn("Fuerte lluvia", resp_domi)
+
+        # Recojo en tienda DEBE funcionar normalmente
+        resp_recojo, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo="3222222222",
+            texto_mensaje="/recojo 2 pan rollito",
+            return_adjuntos=True
+        )
+        self.assertIn("Recojo en Tienda", resp_recojo)
+        self.assertIn("Sin costo de envío", resp_recojo)
+
+    def test_recojo_tienda_pausado_rechaza_y_comando_staff_reactiva(self):
+        """Si recojo en tienda se pausa, rechaza pedidos de recojo; staff lo reactiva con /recojo on."""
+        from registro.models import VinculoCanal
+        id_staff = "99887766"
+        VinculoCanal.objects.create(
+            canal="telegram",
+            identificador_externo=id_staff,
+            usuario=self.user,
+            establecimiento=self.est,
+            activo=True,
+        )
+
+        # Staff pausa recojo
+        resp_off, _, _ = despachar_mensaje(
+            canal="telegram",
+            identificador_externo=id_staff,
+            texto_mensaje="/recojo off Mantenimiento en horno",
+            return_adjuntos=True
+        )
+        self.assertIn("PAUSADO", resp_off)
+        self.est.refresh_from_db()
+        self.assertFalse(self.est.recojo_tienda_activo)
+
+        # Cliente intenta pedir para recoger
+        resp_cliente, _, _ = despachar_mensaje(
+            canal="whatsapp",
+            identificador_externo="3555555555",
+            texto_mensaje="pedido 2 pan para llevar",
+            return_adjuntos=True
+        )
+        self.assertIn("Servicio de Recojo en Tienda Temporalmente Pausado", resp_cliente)
+        self.assertIn("Mantenimiento en horno", resp_cliente)
+
+        # Staff reactiva
+        resp_on, _, _ = despachar_mensaje(
+            canal="telegram",
+            identificador_externo=id_staff,
+            texto_mensaje="/recojo on",
+            return_adjuntos=True
+        )
+        self.assertIn("ACTIVADO", resp_on)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.recojo_tienda_activo)
+
+    def test_kds_estados_recojo_tienda_y_comanda(self):
+        """Transición en KDS: en_preparacion -> listo_para_recoger -> entregado."""
+        pedido = Pedido.objects.create(
+            establecimiento=self.est,
+            tipo_entrega="recojo_tienda",
+            canal_origen="whatsapp",
+            telefono_contacto="3199999999",
+            nombre_contacto="Carlos Recogedor",
+            direccion_entrega="Retiro en tienda",
+            subtotal=Decimal("1000"),
+            costo_domicilio=Decimal("0"),
+            total=Decimal("1000"),
+            medio_pago="efectivo",
+            estado="en_preparacion",
+        )
+        LineaPedido.objects.create(
+            pedido=pedido,
+            producto=self.prod_pan,
+            nombre_producto="Pan Rollito",
+            cantidad=Decimal("2"),
+            precio_unitario=Decimal("500"),
+            subtotal=Decimal("1000"),
+        )
+
+        # Verificar comanda de recojo en tienda
+        comanda_txt = generar_comanda_termica_texto(pedido)
+        self.assertIn("RECOJO EN TIENDA / PARA LLEVAR", comanda_txt)
+        self.assertIn("ENTREGA: EN MOSTRADOR / CAJA AL CLIENTE", comanda_txt)
+
+        pdf_bytes = generar_pdf_comanda_pedido(pedido)
+        self.assertTrue(len(pdf_bytes) > 500)
+
+        client = HttpClient()
+        client.force_login(self.user)
+
+        # Cambiar estado a listo_para_recoger
+        url_estado = reverse("domicilio_cambiar_estado", kwargs={"pk": pedido.id, "nuevo_estado": "listo_para_recoger"})
+        resp = client.post(url_estado)
+        self.assertEqual(resp.status_code, 302)
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, "listo_para_recoger")
+
+        # Cambiar estado a entregado (crea venta)
+        url_entregado = reverse("domicilio_cambiar_estado", kwargs={"pk": pedido.id, "nuevo_estado": "entregado"})
+        resp2 = client.post(url_entregado)
+        self.assertEqual(resp2.status_code, 302)
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, "entregado")
+        self.assertIsNotNone(pedido.venta)
+
+

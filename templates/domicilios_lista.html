@@ -23,76 +23,125 @@
   </div>
 </div>
 
-<!-- BARRA DE CONTROL DE DISPONIBILIDAD Y HORARIOS DE DOMICILIOS -->
-<div style="background:{% if est.domicilios_activos %}#064e3b{% else %}#7f1d1d{% endif %}; border:1px solid {% if est.domicilios_activos %}#059669{% else %}#dc2626{% endif %}; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#fff; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-  <div style="display:flex; align-items:center; gap:12px;">
-    <div style="font-size:24px;">
-      {% if est.domicilios_activos %}🟢{% else %}🔴{% endif %}
-    </div>
+<!-- BARRA DE CONTROL DUAL DE DISPONIBILIDAD Y HORARIOS (DOMICILIOS Y RECOJO EN TIENDA) -->
+<div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:14px 18px; margin-bottom:16px; color:#fff;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px; border-bottom:1px solid #1e293b; padding-bottom:12px;">
     <div>
-      <div style="font-size:15px; font-weight:700;">
-        {% if est.domicilios_activos %}
-          SERVICIO DE DOMICILIOS ACTIVO
-        {% else %}
-          SERVICIO DE DOMICILIOS PAUSADO / APAGADO
-        {% endif %}
+      <div style="font-size:16px; font-weight:700; color:#f8fafc; display:flex; align-items:center; gap:8px;">
+        🕹️ Centro de Control de Canales de Venta Online
       </div>
-      <div style="font-size:12px; opacity:0.9; margin-top:2px;">
-        ⏰ <strong>Horario de atención:</strong> {{ est.domicilio_hora_apertura|time:"g:i A" }} a {{ est.domicilio_hora_cierre|time:"g:i A" }}
+      <div style="font-size:12px; color:#94a3b8; margin-top:2px;">
+        ⏰ <strong>Horario oficial de atención:</strong> {{ est.domicilio_hora_apertura|time:"g:i A" }} a {{ est.domicilio_hora_cierre|time:"g:i A" }}
         {% if est.domicilio_programar_horario %}
-          <span style="background:rgba(255,255,255,0.2); padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Restricción horaria activa</span>
+          <span style="background:rgba(59,130,246,0.2); color:#93c5fd; padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Restricción horaria activa</span>
         {% else %}
-          <span style="background:rgba(255,255,255,0.2); padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Horario libre</span>
-        {% endif %}
-        {% if not est.domicilios_activos and est.domicilio_mensaje_pausa %}
-          &bull; Motivo informado a clientes: <em>"{{ est.domicilio_mensaje_pausa }}"</em>
+          <span style="background:rgba(100,116,139,0.2); color:#cbd5e1; padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Horario libre 24h</span>
         {% endif %}
       </div>
     </div>
-  </div>
-
-  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <!-- BOTÓN APAGAR / ENCENDER (1 CLIC) -->
-    {% if est.domicilios_activos %}
-      <button type="button" onclick="document.getElementById('modal-pausa-domicilio').style.display='flex';" style="background:#dc2626; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
-        ⏸️ Pausar Domicilios
-      </button>
-    {% else %}
-      <form method="post" action="{% url 'domicilios_toggle_servicio' %}" style="margin:0; display:inline;">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="toggle">
-        <button type="submit" style="background:#10b981; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
-          ▶️ Reactivar Domicilios Ahora
-        </button>
-      </form>
-    {% endif %}
 
     <!-- BOTÓN PROGRAMAR HORARIOS -->
     <button type="button" onclick="document.getElementById('modal-horarios-domicilio').style.display='flex';" style="background:#1e293b; color:#cbd5e1; border:1px solid #475569; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
-      ⚙️ Programar Horas y Tarifas
+      ⚙️ Horas y Tarifas
     </button>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">
+    <!-- CANAL 1: DOMICILIOS EN MOTO -->
+    <div style="background:{% if est.domicilios_activos %}rgba(5,150,105,0.15){% else %}rgba(220,38,38,0.15){% endif %}; border:1px solid {% if est.domicilios_activos %}#059669{% else %}#dc2626{% endif %}; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px; color:{% if est.domicilios_activos %}#34d399{% else %}#f87171{% endif %};">
+          <span>{% if est.domicilios_activos %}🟢{% else %}🔴{% endif %}</span>
+          <span>DOMICILIOS EN MOTO</span>
+        </div>
+        <div style="font-size:11px; color:#cbd5e1; margin-top:2px;">
+          {% if est.domicilios_activos %}
+            Despachos activos a dirección
+          {% else %}
+            Pausado: <em>"{{ est.domicilio_mensaje_pausa|default:'Pausa temporal' }}"</em>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        {% if est.domicilios_activos %}
+          <button type="button" onclick="document.getElementById('modal-pausa-domicilio').style.display='flex';" style="background:#dc2626; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+            ⏸️ Pausar
+          </button>
+        {% else %}
+          <form method="post" action="{% url 'domicilios_toggle_servicio' %}" style="margin:0; display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="toggle">
+            <button type="submit" style="background:#10b981; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+              ▶️ Activar
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CANAL 2: RECOJO EN TIENDA / PARA LLEVAR -->
+    <div style="background:{% if est.recojo_tienda_activo %}rgba(99,102,241,0.15){% else %}rgba(220,38,38,0.15){% endif %}; border:1px solid {% if est.recojo_tienda_activo %}#6366f1{% else %}#dc2626{% endif %}; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px; color:{% if est.recojo_tienda_activo %}#a5b4fc{% else %}#f87171{% endif %};">
+          <span>{% if est.recojo_tienda_activo %}🟢{% else %}🔴{% endif %}</span>
+          <span>RECOJO EN TIENDA</span>
+        </div>
+        <div style="font-size:11px; color:#cbd5e1; margin-top:2px;">
+          {% if est.recojo_tienda_activo %}
+            Retiro en mostrador sin filas
+          {% else %}
+            Pausado: <em>"{{ est.recojo_tienda_mensaje_pausa|default:'Pausa temporal' }}"</em>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        {% if est.recojo_tienda_activo %}
+          <button type="button" onclick="document.getElementById('modal-pausa-recojo').style.display='flex';" style="background:#dc2626; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+            ⏸️ Pausar
+          </button>
+        {% else %}
+          <form method="post" action="{% url 'domicilios_toggle_servicio' %}" style="margin:0; display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="toggle_recojo">
+            <button type="submit" style="background:#6366f1; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">
+              ▶️ Activar
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- MÉTRICAS DE OPERACIÓN DE DOMICILIOS -->
+<!-- MÉTRICAS DE OPERACIÓN DE DOMICILIOS Y RECOJO -->
 <div class="cards" style="margin-bottom:16px;">
   <div class="card">
     <span>Pedidos Hoy</span>
     <strong style="color:#38bdf8;">{{ total_hoy }}</strong>
-    <small style="color:var(--muted); font-size:11px;">Registrados en la jornada</small>
+    <small style="color:var(--muted); font-size:11px;">Jornada actual</small>
   </div>
   <div class="card">
-    <span>Esperando Pago</span>
-    <strong style="color:#f59e0b;">{{ esperando_pago }}</strong>
-    <small style="color:var(--muted); font-size:11px;">Pendiente Bre-B / QR</small>
+    <span>🛵 Domicilios</span>
+    <strong style="color:#0ea5e9;">{{ total_domi_hoy }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Envíos en moto</small>
+  </div>
+  <div class="card">
+    <span>🛍️ Recojo Tienda</span>
+    <strong style="color:#818cf8;">{{ total_recojo_hoy }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Para llevar / local</small>
   </div>
   <div class="card">
     <span>En Preparación</span>
     <strong style="color:#a855f7;">{{ en_preparacion }}</strong>
-    <small style="color:var(--muted); font-size:11px;">En cocina o alistamiento</small>
+    <small style="color:var(--muted); font-size:11px;">Cocina o mostrador</small>
   </div>
   <div class="card">
-    <span>En Camino</span>
+    <span>📦 Listos Recoger</span>
+    <strong style="color:#10b981;">{{ listos_recoger }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Esperando al cliente</small>
+  </div>
+  <div class="card">
+    <span>🛵 En Camino</span>
     <strong style="color:#06b6d4;">{{ en_camino }}</strong>
     <small style="color:var(--muted); font-size:11px;">Con el domiciliario</small>
   </div>
@@ -101,28 +150,20 @@
     <strong style="color:{% if pendientes_impresion > 0 %}#f97316{% else %}#10b981{% endif %};">
       {{ pendientes_impresion }}
     </strong>
-    <small style="color:var(--muted); font-size:11px;">Comandas térmicas por salir</small>
+    <small style="color:var(--muted); font-size:11px;">Comandas térmicas</small>
   </div>
 </div>
 
-<!-- BANNER EXPLICATIVO DEL FLUJO DESATENDIDO -->
-<div style="background:#0f172a; border:1px solid #1e293b; border-left:4px solid #f59e0b; border-radius:8px; padding:14px 16px; margin-bottom:18px; color:#f8fafc;">
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
-    <div>
-      <h4 style="margin:0 0 4px 0; font-size:14px; color:#fbbf24; display:flex; align-items:center; gap:8px;">
-        ⚡ Flujo Industrial de Pedidos a Domicilio (Cero clics, Cero Datáfonos)
-      </h4>
-      <p style="margin:0; font-size:12px; color:#94a3b8; line-height:1.4;">
-        1. El cliente pide por WhatsApp o Telegram &bull; 2. El bot cotiza con domicilio (${{ est.costo_domicilio_defecto|floatformat:0 }} o gratis > ${{ est.monto_minimo_domicilio_gratis|floatformat:0 }}) &bull; 3. Si paga Efectivo, pide valor del billete y calcula vueltas; si paga Bre-B, manda llave y QR por separado &bull; 4. Al confirmar, la impresora térmica del mostrador pita, imprime la comanda y corta el papel automáticamente.
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- FILTROS POR ESTADO -->
+<!-- FILTROS POR MODALIDAD Y ESTADO -->
 <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:16px;">
-  <a href="{% url 'domicilios_lista' %}" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if not estado_filtro %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+  <a href="{% url 'domicilios_lista' %}" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if not estado_filtro and not tipo_filtro %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
     Todos los pedidos
+  </a>
+  <a href="{% url 'domicilios_lista' %}?tipo=domicilio" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if tipo_filtro == 'domicilio' %}background:#0284c7; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    🛵 Domicilios ({{ total_domi_hoy }})
+  </a>
+  <a href="{% url 'domicilios_lista' %}?tipo=recojo_tienda" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if tipo_filtro == 'recojo_tienda' %}background:#6366f1; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    🛍️ Recojo en Tienda ({{ total_recojo_hoy }})
   </a>
   <a href="{% url 'domicilios_lista' %}?estado=esperando_pago" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'esperando_pago' %}background:#f59e0b; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
     ⏳ Esperando Pago ({{ esperando_pago }})
@@ -130,10 +171,13 @@
   <a href="{% url 'domicilios_lista' %}?estado=en_preparacion" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'en_preparacion' %}background:#a855f7; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
     🍳 En Preparación ({{ en_preparacion }})
   </a>
+  <a href="{% url 'domicilios_lista' %}?estado=listo_para_recoger" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'listo_para_recoger' %}background:#10b981; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    📦 Listos para Recoger ({{ listos_recoger }})
+  </a>
   <a href="{% url 'domicilios_lista' %}?estado=en_camino" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'en_camino' %}background:#06b6d4; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
     🛵 En Camino ({{ en_camino }})
   </a>
-  <a href="{% url 'domicilios_lista' %}?estado=entregado" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'entregado' %}background:#10b981; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+  <a href="{% url 'domicilios_lista' %}?estado=entregado" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'entregado' %}background:#059669; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
     ✅ Entregados
   </a>
 </div>
@@ -157,6 +201,15 @@
               <span style="font-size:10px; text-transform:uppercase; padding:2px 6px; border-radius:4px; margin-left:4px; {% if ped.canal_origen == 'whatsapp' %}background:#065f46; color:#a7f3d0;{% elif ped.canal_origen == 'telegram' %}background:#0369a1; color:#bae6fd;{% else %}background:#334155; color:#cbd5e1;{% endif %}">
                 {{ ped.get_canal_origen_display }}
               </span>
+              {% if ped.tipo_entrega == 'recojo_tienda' %}
+                <span style="font-size:10px; font-weight:700; background:#3730a3; color:#c7d2fe; padding:2px 6px; border-radius:4px; margin-left:4px;">
+                  🛍️ RECOJO
+                </span>
+              {% else %}
+                <span style="font-size:10px; font-weight:700; background:#0369a1; color:#bae6fd; padding:2px 6px; border-radius:4px; margin-left:4px;">
+                  🛵 DOMI
+                </span>
+              {% endif %}
             </div>
 
             <!-- ESTADO DEL PEDIDO -->
@@ -167,6 +220,8 @@
                 <span style="background:#78350f; color:#fde68a; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">⏳ Esperando Bre-B</span>
               {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
                 <span style="background:#581c87; color:#e9d5ff; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">🍳 En Preparación</span>
+              {% elif ped.estado == 'listo_para_recoger' %}
+                <span style="background:#065f46; color:#a7f3d0; font-size:11px; font-weight:700; padding:3px 8px; border-radius:12px; border:1px solid #10b981;">📦 Listo para Recoger</span>
               {% elif ped.estado == 'en_camino' %}
                 <span style="background:#164e63; color:#a5f3fc; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">🛵 En Camino</span>
               {% elif ped.estado == 'entregado' %}
@@ -177,19 +232,28 @@
             </div>
           </div>
 
-          <!-- DATOS DEL CLIENTE Y DIRECCIÓN -->
+          <!-- DATOS DEL CLIENTE Y DIRECCIÓN / RETIRO -->
           <div style="background:#0f172a; padding:10px 12px; border-radius:8px; border:1px solid #1e293b; margin-bottom:12px;">
-            <div style="font-size:14px; font-weight:700; color:#38bdf8; display:flex; align-items:center; gap:6px;">
-              📍 {{ ped.direccion_entrega }}
-            </div>
-            {% if ped.punto_referencia %}
-              <div style="font-size:12px; color:#cbd5e1; margin-top:2px;">
-                🔎 <em>Ref: {{ ped.punto_referencia }}</em>
+            {% if ped.tipo_entrega == 'recojo_tienda' %}
+              <div style="font-size:13px; font-weight:700; color:#a5b4fc; display:flex; align-items:center; gap:6px;">
+                🛍️ RETIRO EN TIENDA / MOSTRADOR
               </div>
+              <div style="font-size:12px; color:#cbd5e1; margin-top:2px;">
+                🏬 <em>Punto: {{ est.direccion|default:"Mostrador principal de la tienda" }}</em>
+              </div>
+            {% else %}
+              <div style="font-size:14px; font-weight:700; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+                📍 {{ ped.direccion_entrega }}
+              </div>
+              {% if ped.punto_referencia %}
+                <div style="font-size:12px; color:#cbd5e1; margin-top:2px;">
+                  🔎 <em>Ref: {{ ped.punto_referencia }}</em>
+                </div>
+              {% endif %}
             {% endif %}
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;">
               <span style="color:#94a3b8;">
-                👤 {{ ped.nombre_contacto|default:"Cliente WhatsApp" }}
+                👤 {{ ped.nombre_contacto|default:"Cliente" }}
               </span>
               <a href="https://wa.me/57{{ ped.telefono_contacto }}" target="_blank" style="color:#22c55e; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
                 💬 {{ ped.telefono_contacto }}
@@ -229,7 +293,7 @@
               <span>${{ ped.subtotal|floatformat:0 }}</span>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-bottom:4px;">
-              <span>Costo Domicilio:</span>
+              <span>Costo Envío:</span>
               <span>{% if ped.costo_domicilio > 0 %}${{ ped.costo_domicilio|floatformat:0 }}{% else %}<strong style="color:#10b981;">GRATIS</strong>{% endif %}</span>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:700; color:#f8fafc; border-top:1px solid #334155; padding-top:4px;">
@@ -241,10 +305,10 @@
             <div style="margin-top:8px; padding-top:6px; border-top:1px dashed #1e293b; font-size:12px;">
               {% if ped.medio_pago == 'efectivo' %}
                 <div style="background:#78350f; color:#fde68a; padding:6px 8px; border-radius:6px; font-weight:600;">
-                  💵 PAGO EN EFECTIVO AL ENTREGAR
+                  💵 PAGO EN EFECTIVO ({% if ped.tipo_entrega == 'recojo_tienda' %}EN CAJA{% else %}AL ENTREGAR{% endif %})
                   {% if ped.paga_con %}
                     <div style="font-size:11px; margin-top:2px; color:#fef08a;">
-                      Paga con: ${{ ped.paga_con|floatformat:0 }} &bull; <strong>LLEVAR VUELTAS: ${{ ped.vueltas|floatformat:0 }}</strong>
+                      Paga con: ${{ ped.paga_con|floatformat:0 }} &bull; <strong>VUELTAS: ${{ ped.vueltas|floatformat:0 }}</strong>
                     </div>
                   {% endif %}
                 </div>
@@ -254,7 +318,7 @@
                   <small style="background:#047857; color:#fff; padding:1px 4px; border-radius:4px; font-size:10px;">VERIFICADO</small>
                 </div>
                 <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
-                  &gt;&gt; No cobrar nada en la puerta &lt;&lt;
+                  &gt;&gt; No cobrar nada en mostrador / entrega &lt;&lt;
                 </div>
               {% else %}
                 <div style="color:#cbd5e1;">
@@ -289,18 +353,34 @@
 
           <!-- BOTONES DE TRANSICIÓN DE ESTADO -->
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            {% if ped.estado == 'cotizado' or ped.estado == 'esperando_pago' %}
-              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_preparacion' %}" class="btn" style="flex:1; text-align:center; background:#8b5cf6; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
-                🍳 Pasar a Cocina
-              </a>
-            {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
-              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_camino' %}" class="btn" style="flex:1; text-align:center; background:#0284c7; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
-                🛵 Despachar (En Camino)
-              </a>
-            {% elif ped.estado == 'en_camino' %}
-              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'entregado' %}" class="btn" style="flex:1; text-align:center; background:#059669; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;" onclick="return confirm('¿Confirmas que el pedido fue entregado y liquidado?');">
-                ✅ Marcar Entregado
-              </a>
+            {% if ped.tipo_entrega == 'recojo_tienda' %}
+              {% if ped.estado == 'cotizado' or ped.estado == 'esperando_pago' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_preparacion' %}" class="btn" style="flex:1; text-align:center; background:#8b5cf6; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
+                  🍳 Alistar en Mostrador
+                </a>
+              {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'listo_para_recoger' %}" class="btn" style="flex:1; text-align:center; background:#10b981; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:700;">
+                  📦 Listo para Recoger
+                </a>
+              {% elif ped.estado == 'listo_para_recoger' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'entregado' %}" class="btn" style="flex:1; text-align:center; background:#059669; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:700;" onclick="return confirm('¿Confirmas que el cliente retiró su pedido en mostrador?');">
+                  ✅ Entregar al Cliente
+                </a>
+              {% endif %}
+            {% else %}
+              {% if ped.estado == 'cotizado' or ped.estado == 'esperando_pago' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_preparacion' %}" class="btn" style="flex:1; text-align:center; background:#8b5cf6; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
+                  🍳 Pasar a Cocina
+                </a>
+              {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_camino' %}" class="btn" style="flex:1; text-align:center; background:#0284c7; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
+                  🛵 Despachar (En Camino)
+                </a>
+              {% elif ped.estado == 'en_camino' %}
+                <a href="{% url 'domicilio_cambiar_estado' ped.pk 'entregado' %}" class="btn" style="flex:1; text-align:center; background:#059669; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;" onclick="return confirm('¿Confirmas que el pedido fue entregado y liquidado?');">
+                  ✅ Marcar Entregado
+                </a>
+              {% endif %}
             {% endif %}
 
             {% if ped.estado != 'entregado' and ped.estado != 'cancelado' %}
@@ -345,6 +425,37 @@
 
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="document.getElementById('modal-pausa-domicilio').style.display='none';" style="background:#334155; color:#cbd5e1; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">
+          Cancelar
+        </button>
+        <button type="submit" style="background:#dc2626; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+          Confirmar Pausa
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL PAUSA DE RECOJO EN TIENDA -->
+<div id="modal-pausa-recojo" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:440px; width:100%; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 8px 0; color:#f8fafc; font-size:17px; display:flex; align-items:center; gap:8px;">
+      ⏸️ Pausar Pedidos de Recojo en Tienda
+    </h3>
+    <p style="margin:0 0 16px 0; font-size:13px; color:#94a3b8; line-height:1.4;">
+      El bot informará amablemente a los clientes que intenten ordenar para recoger en mostrador que este canal se encuentra pausado temporalmente.
+    </p>
+
+    <form method="post" action="{% url 'domicilios_toggle_servicio' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="toggle_recojo">
+      
+      <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:6px;">
+        Motivo temporal (opcional, para informar al cliente):
+      </label>
+      <input type="text" name="motivo_pausa" placeholder="Ej: Inventario agotado en mostrador, mantenimiento..." style="width:100%; padding:8px 12px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; margin-bottom:18px; box-sizing:border-box;">
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-pausa-recojo').style.display='none';" style="background:#334155; color:#cbd5e1; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">
           Cancelar
         </button>
         <button type="submit" style="background:#dc2626; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">

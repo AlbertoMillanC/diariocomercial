@@ -249,15 +249,21 @@ def despachar_mensaje(
         if resultado_ped is not None:
             return resultado_ped
 
-    # 3.2 Consulta de Estado u Horario de Domicilios (Pregunta de Cliente o Bot)
+    # 3.2 Consulta de Estado u Horario de Domicilios o Recojo en Tienda (Pregunta de Cliente o Bot)
     target_est = establecimiento or (vinculo.establecimiento if vinculo else None)
     if not target_est:
         target_est = Establecimiento.objects.filter(estado="activo").first()
 
-    if target_est and _es_pregunta_horario_domicilios(texto):
-        _, _, msg_info = target_est.servicio_domicilio_disponible()
-        _cachear_respuesta(canal, identificador_mensaje, msg_info)
-        return (msg_info, None, None) if return_adjuntos else msg_info
+    if target_est:
+        if _es_pregunta_recojo_tienda(texto):
+            _, _, msg_info = target_est.servicio_recojo_disponible()
+            _cachear_respuesta(canal, identificador_mensaje, msg_info)
+            return (msg_info, None, None) if return_adjuntos else msg_info
+
+        if _es_pregunta_horario_domicilios(texto):
+            _, _, msg_info = target_est.servicio_domicilio_disponible()
+            _cachear_respuesta(canal, identificador_mensaje, msg_info)
+            return (msg_info, None, None) if return_adjuntos else msg_info
 
     # 3.3 Detección de Nuevo Pedido a Domicilio (WhatsApp/Telegram Delivery)
     if target_est and _es_mensaje_pedido_domicilio(target_est, texto):
@@ -703,20 +709,60 @@ def despachar_mensaje(
             else:
                 resp = "ℹ️ Para configurar horario usa: `/domicilios horario [HORA_INICIO] [HORA_FIN]` (ej: `/domicilios horario 08:00 21:00`)."
         else:
-            disp, motivo, msg_info = establecimiento.servicio_domicilio_disponible()
             prog_str = "Activo" if establecimiento.domicilio_programar_horario else "Desactivado (Siempre activo si está encendido)"
             resp = (
-                f"🛵 *Estado del Servicio de Domicilios*\n\n"
-                f"• Interruptor maestro: *{'🟢 ENCENDIDO' if establecimiento.domicilios_activos else '🔴 APAGADO / PAUSADO'}*\n"
+                f"🛵 *Estado Operativo de Pedidos*\n\n"
+                f"• Domicilios en moto: *{'🟢 ENCENDIDO' if establecimiento.domicilios_activos else '🔴 APAGADO / PAUSADO'}*\n"
+                f"• Recojo en tienda: *{'🟢 ENCENDIDO' if establecimiento.recojo_tienda_activo else '🔴 APAGADO / PAUSADO'}*\n"
                 f"• Programación horaria: *{prog_str}*\n"
-                f"• Horario configurado: *{establecimiento.domicilio_hora_apertura.strftime('%I:%M %p')} a {establecimiento.domicilio_hora_cierre.strftime('%I:%M %p')}*\n"
-                f"{'• Motivo de pausa: *' + establecimiento.domicilio_mensaje_pausa + '*\n' if establecimiento.domicilio_mensaje_pausa else ''}\n"
+                f"• Horario de atención: *{establecimiento.domicilio_hora_apertura.strftime('%I:%M %p')} a {establecimiento.domicilio_hora_cierre.strftime('%I:%M %p')}*\n"
+                f"{'• Motivo pausa domicilios: *' + establecimiento.domicilio_mensaje_pausa + '*\n' if establecimiento.domicilio_mensaje_pausa else ''}\n"
+                f"{'• Motivo pausa recojo: *' + establecimiento.recojo_tienda_mensaje_pausa + '*\n' if establecimiento.recojo_tienda_mensaje_pausa else ''}\n"
                 f"👉 *Comandos rápidos:*\n"
-                f"`/domicilios on` - Activar despachos\n"
-                f"`/domicilios off [motivo]` - Pausar despachos\n"
-                f"`/domicilios horario 08:00 20:00` - Configurar horas"
+                f"`/domicilios on` / `/domicilios off [motivo]`\n"
+                f"`/recojo on` / `/recojo off [motivo]`\n"
+                f"`/domicilios horario 08:00 20:00`"
             )
 
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    # 4.3.3 Control Operativo de Recojo en Tienda (Comandos para Tendero / Staff)
+    es_cmd_recojo = (
+        (t_norm.startswith(("/recojo", "/recojos", "pausar recojo", "abrir recojo")) and bool(re.search(r"\b(?:off|pausar|cerrar|apagar|pausa|on|activar|abrir|encender|abierto)\b", t_norm)))
+        or t_norm in ("/recojo", "/recojos", "recojo", "recojos", "recojo estado")
+    )
+    if es_cmd_recojo:
+        if re.search(r"\b(?:off|pausar|cerrar|apagar|pausa)\b", t_norm):
+            partes = texto.split(maxsplit=2)
+            motivo = partes[2].strip() if len(partes) > 2 else ""
+            establecimiento.recojo_tienda_activo = False
+            establecimiento.recojo_tienda_mensaje_pausa = motivo
+            establecimiento.save(update_fields=["recojo_tienda_activo", "recojo_tienda_mensaje_pausa"])
+            motivo_str = f"\nMotivo: *{motivo}*" if motivo else ""
+            resp = (
+                f"🔴 *Servicio de Recojo en Tienda PAUSADO*{motivo_str}\n\n"
+                f"El bot informará amablemente a los clientes que el retiro anticipado en mostrador está temporalmente pausado."
+            )
+        elif re.search(r"\b(?:on|activar|abrir|encender|abierto)\b", t_norm):
+            establecimiento.recojo_tienda_activo = True
+            establecimiento.recojo_tienda_mensaje_pausa = ""
+            establecimiento.save(update_fields=["recojo_tienda_activo", "recojo_tienda_mensaje_pausa"])
+            resp = (
+                f"🟢 *Servicio de Recojo en Tienda ACTIVADO*\n\n"
+                f"Los clientes de *{establecimiento.nombre}* ya pueden hacer pedidos en línea para retirar en mostrador."
+            )
+        else:
+            disp, motivo, msg_info = establecimiento.servicio_recojo_disponible()
+            resp = (
+                f"🛍️ *Estado del Servicio de Recojo en Tienda*\n\n"
+                f"• Interruptor: *{'🟢 ENCENDIDO' if establecimiento.recojo_tienda_activo else '🔴 APAGADO / PAUSADO'}*\n"
+                f"• Punto de recogida: *{establecimiento.direccion or 'Local Comercial'}*\n"
+                f"{'• Motivo de pausa: *' + establecimiento.recojo_tienda_mensaje_pausa + '*\n' if establecimiento.recojo_tienda_mensaje_pausa else ''}\n"
+                f"👉 *Comandos rápidos:*\n"
+                f"`/recojo on` - Activar recojo en tienda\n"
+                f"`/recojo off [motivo]` - Pausar recojo en tienda"
+            )
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
 
@@ -1384,9 +1430,27 @@ def _es_pregunta_horario_domicilios(texto: str) -> bool:
     return any(re.search(p, t_norm) for p in patrones)
 
 
+def _es_pregunta_recojo_tienda(texto: str) -> bool:
+    """Detecta si el mensaje es una consulta sobre la disponibilidad de pedidos para recoger en tienda o para llevar."""
+    t_norm = normalizar_texto(texto)
+    if any(k in t_norm for k in ["/recojo on", "/recojo off", "/recojos on", "/recojos off", "pausar recojo", "abrir recojo"]):
+        return False
+    if re.search(r"\b\d{1,2}:\d{2}\b", t_norm):
+        return False
+    patrones = [
+        r"\b(?:se puede|puedo|tienen|hacen|hay)\s+(?:pedidos?\s+)?(?:para\s+recoger|recojo|para\s+llevar|pasar\s+a\s+recoger|pasar\s+por\s+el)",
+        r"\b(?:como|donde)\s+(?:recojo|recojo\s+el\s+pedido|puedo\s+recoger)",
+        r"\b(?:puedo|se puede)\s+recoger\s+(?:en\s+tienda|en\s+el\s+local|en\s+mostrador)",
+        r"^/?recojo$",
+        r"^/?recoger$",
+        r"^/?para\s*llevar$",
+    ]
+    return any(re.search(p, t_norm) for p in patrones)
+
+
 def _es_mensaje_pedido_domicilio(establecimiento: Establecimiento, texto: str) -> bool:
-    """Detecta si un mensaje entrante corresponde a un pedido a domicilio o con dirección."""
-    if _es_pregunta_horario_domicilios(texto):
+    """Detecta si un mensaje entrante corresponde a un pedido a domicilio o para recoger en tienda."""
+    if _es_pregunta_horario_domicilios(texto) or _es_pregunta_recojo_tienda(texto):
         return False
 
     t_norm = normalizar_texto(texto)
@@ -1394,13 +1458,18 @@ def _es_mensaje_pedido_domicilio(establecimiento: Establecimiento, texto: str) -
     if t_norm.startswith((
         "/domicilio on", "/domicilios on", "/domicilio off", "/domicilios off",
         "/domicilio horario", "/domicilios horario", "/pausar_domicilio", "/abrir_domicilio",
-        "pausar domicilio", "abrir domicilio"
+        "pausar domicilio", "abrir domicilio",
+        "/recojo on", "/recojos on", "/recojo off", "/recojos off",
+        "pausar recojo", "abrir recojo"
     )):
         return False
-    if t_norm in ("/domicilio", "/domicilios", "domicilio", "domicilios"):
+    if t_norm in ("/domicilio", "/domicilios", "domicilio", "domicilios", "/recojo", "/recojos", "recojo", "recojos"):
         return False
 
-    if t_norm.startswith(("/pedido", "pedido", "/domicilio", "domicilio", "orden", "/orden")):
+    if t_norm.startswith((
+        "/pedido", "pedido", "/domicilio", "domicilio", "orden", "/orden",
+        "/recojo", "recojo", "/recoger", "recoger", "/llevar", "para llevar", "/parallevar", "/pickup"
+    )):
         return True
 
     tiene_direccion = bool(re.search(
@@ -1408,10 +1477,15 @@ def _es_mensaje_pedido_domicilio(establecimiento: Establecimiento, texto: str) -
         t_norm,
         re.IGNORECASE
     ))
-    if not tiene_direccion:
+    patrones_recojo_intencion = [
+        r"\b(?:para\s+recoger|recojo\s+en\s+tienda|recoger\s+en\s+tienda|recojo\s+en\s+el\s+local|recoger\s+en\s+el\s+local|para\s+llevar|paso\s+a\s+recoger|paso\s+por\s+el|paso\s+por\s+ellos|paso\s+a\s+buscar|lo\s+paso\s+a\s+buscar|voy\s+a\s+recoger|recojo\s+yo|lo\s+recojo|para\s+retirar|retiro\s+en\s+tienda|retiro\s+en\s+local|takeaway|pickup)\b"
+    ]
+    tiene_recojo = any(re.search(p, t_norm) for p in patrones_recojo_intencion)
+
+    if not tiene_direccion and not tiene_recojo:
         return False
 
-    tiene_intencion = any(w in t_norm for w in ["para llevar", "a domicilio", "enviar a", "mandar a", "despachar a", "llevar a", "traer a", "domicilio"])
+    tiene_intencion = any(w in t_norm for w in ["para llevar", "a domicilio", "enviar a", "mandar a", "despachar a", "llevar a", "traer a", "domicilio", "recoger", "recojo", "retirar"])
     prod_encontrado = buscar_producto_en_texto(establecimiento, texto)
     return bool(prod_encontrado or tiene_intencion)
 
@@ -1426,15 +1500,30 @@ def _procesar_pedido_conversacional(
     return_adjuntos: bool = False,
 ):
     key_sesion = (canal, identificador_externo)
+    t_orig_norm = normalizar_texto(texto)
 
-    # 0. Verificar si el servicio de domicilios está operativo en este momento
-    disponible, motivo, msg_info = establecimiento.servicio_domicilio_disponible()
+    # Detección de modalidad de entrega: Domicilio vs Recojo en Tienda
+    patrones_recojo = [
+        r"\b(?:para\s+recoger|recojo\s+en\s+tienda|recoger\s+en\s+tienda|recojo\s+en\s+el\s+local|recoger\s+en\s+el\s+local|para\s+llevar|paso\s+a\s+recoger|paso\s+por\s+el|paso\s+por\s+ellos|paso\s+por\s+ella|paso\s+a\s+buscar|lo\s+paso\s+a\s+buscar|voy\s+a\s+recoger|voy\s+por\s+el|recojo\s+yo|lo\s+recojo|para\s+retirar|retiro\s+en\s+tienda|retiro\s+en\s+local|takeaway|pickup)\b"
+    ]
+    es_recojo = (
+        any(re.search(p, t_orig_norm) for p in patrones_recojo)
+        or t_orig_norm.startswith(("/recojo", "recojo", "/recoger", "recoger", "/llevar", "para llevar", "/pickup"))
+    )
+    tipo_entrega = "recojo_tienda" if es_recojo else "domicilio"
+
+    # 0. Verificar si el servicio correspondiente está operativo en este momento
+    if tipo_entrega == "recojo_tienda":
+        disponible, motivo, msg_info = establecimiento.servicio_recojo_disponible()
+    else:
+        disponible, motivo, msg_info = establecimiento.servicio_domicilio_disponible()
+
     if not disponible:
         _cachear_respuesta(canal, identificador_mensaje, msg_info)
         return (msg_info, None, None) if return_adjuntos else msg_info
 
     # 1. Extraer teléfono si vino al inicio (ej: pedido 3146922087 ...)
-    match_tel = re.search(r"^(?:/pedido|pedido|/domicilio|domicilio)\s+(\d{10})\b", texto, re.IGNORECASE)
+    match_tel = re.search(r"^(?:/pedido|pedido|/domicilio|domicilio|/recojo|recojo|/recoger|recoger|/llevar|para llevar|orden|/orden)\s+(\d{10})\b", texto, re.IGNORECASE)
     if match_tel:
         telefono_destino = match_tel.group(1)
         texto_limpio = texto[match_tel.end():].strip()
@@ -1442,33 +1531,44 @@ def _procesar_pedido_conversacional(
         telefono_destino = "".join(c for c in identificador_externo if c.isdigit())
         if len(telefono_destino) == 12 and telefono_destino.startswith("57"):
             telefono_destino = telefono_destino[2:]
-        texto_limpio = re.sub(r"^(?:/pedido|pedido|/domicilio|domicilio|orden)\s*", "", texto, flags=re.IGNORECASE).strip()
+        texto_limpio = re.sub(r"^(?:/pedido|pedido|/domicilio|domicilio|/recojo|recojo|/recoger|recoger|/llevar|para llevar|orden|/orden)\s*", "", texto, flags=re.IGNORECASE).strip()
 
-    # 2. Separar productos y dirección
-    match_dir = re.search(
-        r"\b(?:calle|cll|carrera|cra|cr|kr|avenida|av|diagonal|diag|dg|transversal|trans|tv|manzana|mz|barrio|apto|apartamento)\b.*",
-        texto_limpio,
-        re.IGNORECASE
-    )
-    if match_dir:
-        texto_prods = texto_limpio[:match_dir.start()].strip()
-        direccion_raw = match_dir.group(0).strip()
+    # 2. Separar productos y dirección según la modalidad
+    if tipo_entrega == "recojo_tienda":
+        dir_entrega = f"Recojo en tienda - {establecimiento.direccion or 'Mostrador'}"
+        punto_ref = "Retira el cliente en tienda / mostrador"
+        # Limpiar frases de recojo del texto de productos
+        texto_prods = re.sub(
+            r"\b(?:recojo\s+en\s+tienda|recoger\s+en\s+tienda|recojo\s+en\s+el\s+local|recoger\s+en\s+el\s+local|en\s+tienda|en\s+el\s+local|para\s+recoger|para\s+llevar|paso\s+a\s+recoger|paso\s+por\s+el|paso\s+por\s+ellos|paso\s+por\s+ella|paso\s+a\s+buscar|lo\s+paso\s+a\s+buscar|voy\s+a\s+recoger|recojo\s+yo|lo\s+recojo|para\s+retirar|retiro\s+en\s+tienda|retiro\s+en\s+local|recojo|recoger|llevar|takeaway|pickup)\b",
+            " ",
+            texto_limpio,
+            flags=re.IGNORECASE
+        ).strip()
     else:
-        texto_prods = texto_limpio
-        direccion_raw = "Recoge en mostrador / Tienda"
+        match_dir = re.search(
+            r"\b(?:calle|cll|carrera|cra|cr|kr|avenida|av|diagonal|diag|dg|transversal|trans|tv|manzana|mz|barrio|apto|apartamento)\b.*",
+            texto_limpio,
+            re.IGNORECASE
+        )
+        if match_dir:
+            texto_prods = texto_limpio[:match_dir.start()].strip()
+            direccion_raw = match_dir.group(0).strip()
+        else:
+            texto_prods = texto_limpio
+            direccion_raw = "Recoge en mostrador / Tienda"
 
-    # Separar punto de referencia
-    m_ref = re.search(
-        r"\b(?:ref|referencia|punto de referencia|frente a|al frente|cerca a|casa|reja|porton|puerta|timbre|piso|segundo piso|primer piso|tercer piso)\b.*",
-        direccion_raw,
-        re.IGNORECASE
-    )
-    if m_ref and m_ref.start() > 3:
-        punto_ref = m_ref.group(0).strip(" ,-.")
-        dir_entrega = direccion_raw[:m_ref.start()].strip(" ,-.")
-    else:
-        punto_ref = ""
-        dir_entrega = direccion_raw
+        # Separar punto de referencia
+        m_ref = re.search(
+            r"\b(?:ref|referencia|punto de referencia|frente a|al frente|cerca a|casa|reja|porton|puerta|timbre|piso|segundo piso|primer piso|tercer piso)\b.*",
+            direccion_raw,
+            re.IGNORECASE
+        )
+        if m_ref and m_ref.start() > 3:
+            punto_ref = m_ref.group(0).strip(" ,-.")
+            dir_entrega = direccion_raw[:m_ref.start()].strip(" ,-.")
+        else:
+            punto_ref = ""
+            dir_entrega = direccion_raw
 
     # 3. Parsear líneas de productos
     lineas_datos = []
@@ -1509,17 +1609,22 @@ def _procesar_pedido_conversacional(
             })
 
     if not lineas_datos:
+        if tipo_entrega == "recojo_tienda":
+            ej_txt = "`recojo 2 libras pechuga y 1 aceite` o `pedido 2 pan para recoger`"
+        else:
+            ej_txt = "`pedido 2 libras pechuga y 1 aceite Calle 12 # 4-50 casa reja verde`"
         resp = (
             "❓ No reconocí los productos del pedido.\n\n"
-            "Ejemplo de formato:\n"
-            "`pedido 2 libras pechuga y 1 aceite Calle 12 # 4-50 casa reja verde`"
+            f"Ejemplo de formato:\n{ej_txt}"
         )
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
 
-    # 4. Totales y flete de domicilio
+    # 4. Totales y flete de entrega
     subtotal = sum((item["subtotal"] for item in lineas_datos), Decimal("0"))
-    if subtotal >= establecimiento.monto_minimo_domicilio_gratis:
+    if tipo_entrega == "recojo_tienda":
+        costo_domicilio = Decimal("0")
+    elif subtotal >= establecimiento.monto_minimo_domicilio_gratis:
         costo_domicilio = Decimal("0")
     else:
         costo_domicilio = establecimiento.costo_domicilio_defecto
@@ -1538,7 +1643,7 @@ def _procesar_pedido_conversacional(
                 punto_referencia=punto_ref,
             )
         else:
-            if dir_entrega and not cliente.direccion:
+            if dir_entrega and not cliente.direccion and tipo_entrega != "recojo_tienda":
                 cliente.direccion = dir_entrega
                 cliente.save(update_fields=["direccion"])
 
@@ -1548,6 +1653,7 @@ def _procesar_pedido_conversacional(
             establecimiento=establecimiento,
             cliente=cliente,
             canal_origen=canal,
+            tipo_entrega=tipo_entrega,
             telefono_contacto=telefono_destino or getattr(cliente, "telefono", ""),
             nombre_contacto=cliente.nombre if cliente else "",
             direccion_entrega=dir_entrega,
@@ -1583,24 +1689,37 @@ def _procesar_pedido_conversacional(
         items_texto.append(f"• {cant_fmt} {ld['unidad'].capitalize()} *{ld['nombre']}*: {subt_fmt}")
 
     items_block = "\n".join(items_texto)
-    domi_str = "¡GRATIS!" if costo_domicilio == 0 else f"${costo_domicilio:,.0f}".replace(",", ".")
     tot_str = f"${total:,.0f}".replace(",", ".")
 
-    resp = (
-        f"🛒 *Pedido #{pedido.numero_pedido:04d} Cotizado*\n\n"
-        f"{items_block}\n"
-        f"🛵 *Domicilio:* {domi_str}\n"
-        f"💰 *TOTAL A PAGAR: {tot_str} COP*\n"
-        f"📍 *Entrega en:* {dir_entrega}"
-    )
-    if punto_ref:
-        resp += f" ({punto_ref})"
+    if tipo_entrega == "recojo_tienda":
+        dir_punto = f" ({establecimiento.direccion})" if establecimiento.direccion else ""
+        resp = (
+            f"🛍️ *Pedido #{pedido.numero_pedido:04d} Cotizado (Recojo en Tienda)*\n\n"
+            f"{items_block}\n"
+            f"🏬 *Modalidad:* 🛍️ Recojo en Tienda (¡Sin costo de envío!)\n"
+            f"📍 *Punto de recogida:* {establecimiento.nombre}{dir_punto}\n"
+            f"💰 *TOTAL A PAGAR: {tot_str} COP*\n\n"
+            f"👉 *¿Cómo deseas pagar?*\n"
+            f"*[1]* 💵 *Efectivo* (en caja al momento de recoger)\n"
+            f"*[2]* ⚡ *Electrónico* (Bre-B, Nequi, Daviplata, Bancolombia)"
+        )
+    else:
+        domi_str = "¡GRATIS!" if costo_domicilio == 0 else f"${costo_domicilio:,.0f}".replace(",", ".")
+        resp = (
+            f"🛒 *Pedido #{pedido.numero_pedido:04d} Cotizado (Domicilio)*\n\n"
+            f"{items_block}\n"
+            f"🛵 *Domicilio:* {domi_str}\n"
+            f"💰 *TOTAL A PAGAR: {tot_str} COP*\n"
+            f"📍 *Entrega en:* {dir_entrega}"
+        )
+        if punto_ref:
+            resp += f" ({punto_ref})"
 
-    resp += (
-        f"\n\n👉 *¿Cómo deseas pagar?*\n"
-        f"*[1]* 💵 *Efectivo* (contra entrega al domiciliario)\n"
-        f"*[2]* ⚡ *Electrónico* (Bre-B, Nequi, Daviplata, Bancolombia)"
-    )
+        resp += (
+            f"\n\n👉 *¿Cómo deseas pagar?*\n"
+            f"*[1]* 💵 *Efectivo* (contra entrega al domiciliario)\n"
+            f"*[2]* ⚡ *Electrónico* (Bre-B, Nequi, Daviplata, Bancolombia)"
+        )
 
     _cachear_respuesta(canal, identificador_mensaje, resp)
     return (resp, None, None) if return_adjuntos else resp
@@ -1642,19 +1761,27 @@ def _procesar_respuesta_pedido_conversacional(
     # Paso 1: Selección de Medio de Pago
     if paso == "esperando_medio_pago":
         # Opción 1: Efectivo
-        if t_norm in ("1", "efectivo", "contra entrega", "en efectivo", "pago en efectivo", "monedas", "plata"):
+        if t_norm in ("1", "efectivo", "contra entrega", "en efectivo", "pago en efectivo", "monedas", "plata", "en caja", "caja"):
             pedido.medio_pago = "efectivo"
             pedido.save(update_fields=["medio_pago"])
             datos_sesion["paso"] = "esperando_vueltas"
             _PEDIDOS_PENDIENTES[key_sesion] = datos_sesion
 
             tot_str = f"${pedido.total:,.0f}".replace(",", ".")
-            resp = (
-                f"💵 *Pago en Efectivo Seleccionado*\n"
-                f"Total a pagar: *{tot_str} COP*.\n\n"
-                f"👉 *¿Con cuánto vas a pagar para mandarte las vueltas exactas?*\n"
-                f"_(Escribe el valor, ej: `50 mil`, `50000`, o escribe `exacto`)_:"
-            )
+            if pedido.tipo_entrega == "recojo_tienda":
+                resp = (
+                    f"💵 *Pago en Efectivo Seleccionado (En Caja)*\n"
+                    f"Total a pagar en mostrador: *{tot_str} COP*.\n\n"
+                    f"👉 *¿Deseas que te tengamos el cambio listo en caja?*\n"
+                    f"Escribe con cuánto vas a pagar (ej: `50 mil`, `20000`) o escribe `exacto` si pagas cabal en el mostrador:"
+                )
+            else:
+                resp = (
+                    f"💵 *Pago en Efectivo Seleccionado*\n"
+                    f"Total a pagar: *{tot_str} COP*.\n\n"
+                    f"👉 *¿Con cuánto vas a pagar para mandarte las vueltas exactas?*\n"
+                    f"_(Escribe el valor, ej: `50 mil`, `50000`, o escribe `exacto`)_:"
+                )
             _cachear_respuesta(canal, identificador_mensaje, resp)
             return (resp, None, None) if return_adjuntos else resp
 
@@ -1665,10 +1792,11 @@ def _procesar_respuesta_pedido_conversacional(
             pedido.medio_pago = "bre_b"
             pedido.estado = "esperando_pago"
 
+            mod_tag = "Recojo" if pedido.tipo_entrega == "recojo_tienda" else "Domi"
             tx, payload = generar_qr_dinamico_bre_b(
                 establecimiento=establecimiento,
                 monto=pedido.total,
-                comando_original=f"Pedido #{pedido.numero_pedido}",
+                comando_original=f"Pedido #{pedido.numero_pedido} ({mod_tag})",
             )
             pedido.transaccion_bre_b = tx
             pedido.save(update_fields=["medio_pago", "estado", "transaccion_bre_b"])
@@ -1677,13 +1805,23 @@ def _procesar_respuesta_pedido_conversacional(
             llave = establecimiento.llave_bre_b or establecimiento.telefono_contacto or "3146922087"
             tot_str = f"${pedido.total:,.0f} COP".replace(",", ".")
 
+            if pedido.tipo_entrega == "recojo_tienda":
+                encabezado = "⚡ *Cobro Electrónico Bre-B / Nequi (Recojo en Tienda)*\n\n"
+                punto_str = f"📍 *Punto de recogida:* {establecimiento.direccion or 'Local Comercial'}\n"
+                pedido_label = f"🛍️ *Pedido para Recoger:* #{pedido.numero_pedido:04d}\n"
+            else:
+                encabezado = "⚡ *Cobro Electrónico Bre-B / Nequi*\n\n"
+                punto_str = f"🛵 *Destino:* {pedido.direccion_entrega}\n"
+                pedido_label = f"📦 *Pedido:* #{pedido.numero_pedido:04d}\n"
+
             resp_texto = (
-                f"⚡ *Cobro Electrónico Bre-B / Nequi*\n\n"
+                f"{encabezado}"
                 f"💰 *Total a pagar:* {tot_str}\n"
                 f"🔑 *Llave / Celular:* `{llave}`\n"
                 f"🏢 *Comercio:* {establecimiento.nombre}\n"
+                f"{punto_str}"
                 f"🔖 *Token de Seguridad:* `{tx.token_visual_corto}`\n"
-                f"📦 *Pedido:* #{pedido.numero_pedido:04d}\n\n"
+                f"{pedido_label}\n"
                 f"👇 _A continuación te enviamos el código QR para escanear directo desde tu app bancaria (Nequi, Daviplata, Bancolombia, Dale):_"
             )
 
@@ -1700,7 +1838,7 @@ def _procesar_respuesta_pedido_conversacional(
         else:
             resp = (
                 "❓ Por favor responde con una opción válida:\n\n"
-                "*[1]* 💵 Efectivo (contra entrega)\n"
+                "*[1]* 💵 Efectivo (en mostrador / contra entrega)\n"
                 "*[2]* ⚡ Electrónico (Bre-B, Nequi, Bancolombia)"
             )
             _cachear_respuesta(canal, identificador_mensaje, resp)
@@ -1708,7 +1846,7 @@ def _procesar_respuesta_pedido_conversacional(
 
     # Paso 2: Con cuánto paga en Efectivo (Vueltas)
     elif paso == "esperando_vueltas":
-        if t_norm in ("exacto", "cabal", "justo", "no", "tengo el dinero exacto", "tengo sencillo"):
+        if t_norm in ("exacto", "cabal", "justo", "no", "tengo el dinero exacto", "tengo sencillo", "en caja", "mostrador"):
             paga_con = pedido.total
             vueltas = Decimal("0")
         else:
@@ -1731,14 +1869,26 @@ def _procesar_respuesta_pedido_conversacional(
         paga_str = f"${paga_con:,.0f}".replace(",", ".")
         vueltas_str = f"${vueltas:,.0f}".replace(",", ".")
 
-        resp = (
-            f"🛵 *¡Pedido #{pedido.numero_pedido:04d} Confirmado!*\n\n"
-            f"• *Total a entregar:* {tot_str}\n"
-            f"• *Pagas con:* {paga_str}\n"
-            f"• *Vueltas listas en bolsa:* {vueltas_str}\n"
-            f"📍 *Destino:* {pedido.direccion_entrega}\n\n"
-            f"🖨️ _Tu comanda ha sido enviada al mostrador y ya se está empacando._"
-        )
+        if pedido.tipo_entrega == "recojo_tienda":
+            dir_punto = f" ({establecimiento.direccion})" if establecimiento.direccion else ""
+            resp = (
+                f"🛍️ *¡Pedido #{pedido.numero_pedido:04d} Confirmado para Recoger en Tienda!*\n\n"
+                f"• *Total a pagar en caja:* {tot_str}\n"
+                f"• *Pagas con:* {paga_str}\n"
+                f"• *Vueltas preparadas:* {vueltas_str}\n"
+                f"🏬 *Punto de recogida:* {establecimiento.nombre}{dir_punto}\n\n"
+                f"🖨️ _Tu comanda ha sido enviada al mostrador y ya se está alistando._\n"
+                f"¡Te esperamos en nuestro local para entregártelo sin filas!"
+            )
+        else:
+            resp = (
+                f"🛵 *¡Pedido #{pedido.numero_pedido:04d} Confirmado!*\n\n"
+                f"• *Total a entregar:* {tot_str}\n"
+                f"• *Pagas con:* {paga_str}\n"
+                f"• *Vueltas listas en bolsa:* {vueltas_str}\n"
+                f"📍 *Destino:* {pedido.direccion_entrega}\n\n"
+                f"🖨️ _Tu comanda ha sido enviada al mostrador y ya se está empacando._"
+            )
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
 

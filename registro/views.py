@@ -3806,22 +3806,28 @@ def domicilios_lista(request):
         return redirect("inicio")
 
     estado_filtro = request.GET.get("estado", "").strip()
+    tipo_filtro = request.GET.get("tipo", "").strip()
     pedidos_qs = Pedido.objects.filter(establecimiento=est).select_related(
         "cliente", "transaccion_bre_b", "venta"
     ).prefetch_related("lineas")
 
     if estado_filtro:
-        pedidos = pedidos_qs.filter(estado=estado_filtro)
-    else:
-        pedidos = pedidos_qs
+        pedidos_qs = pedidos_qs.filter(estado=estado_filtro)
+    if tipo_filtro:
+        pedidos_qs = pedidos_qs.filter(tipo_entrega=tipo_filtro)
+
+    pedidos = pedidos_qs
 
     hoy = timezone.localdate()
     total_hoy = Pedido.objects.filter(establecimiento=est, fecha_creacion__date=hoy).count()
+    total_recojo_hoy = Pedido.objects.filter(establecimiento=est, fecha_creacion__date=hoy, tipo_entrega="recojo_tienda").count()
+    total_domi_hoy = Pedido.objects.filter(establecimiento=est, fecha_creacion__date=hoy, tipo_entrega="domicilio").count()
     esperando_pago = Pedido.objects.filter(establecimiento=est, estado="esperando_pago").count()
     en_preparacion = Pedido.objects.filter(establecimiento=est, estado__in=["pagado", "en_preparacion"]).count()
+    listos_recoger = Pedido.objects.filter(establecimiento=est, estado="listo_para_recoger").count()
     en_camino = Pedido.objects.filter(establecimiento=est, estado="en_camino").count()
     pendientes_impresion = Pedido.objects.filter(
-        establecimiento=est, impreso_pos=False, estado__in=["pagado", "en_preparacion", "cotizado", "esperando_pago"]
+        establecimiento=est, impreso_pos=False, estado__in=["pagado", "en_preparacion", "cotizado", "esperando_pago", "listo_para_recoger"]
     ).count()
 
     return render(
@@ -3830,9 +3836,13 @@ def domicilios_lista(request):
         {
             "pedidos": pedidos[:60],
             "estado_filtro": estado_filtro,
+            "tipo_filtro": tipo_filtro,
             "total_hoy": total_hoy,
+            "total_recojo_hoy": total_recojo_hoy,
+            "total_domi_hoy": total_domi_hoy,
             "esperando_pago": esperando_pago,
             "en_preparacion": en_preparacion,
+            "listos_recoger": listos_recoger,
             "en_camino": en_camino,
             "pendientes_impresion": pendientes_impresion,
             "est": est,
@@ -3844,7 +3854,7 @@ def domicilios_lista(request):
 @login_required
 def domicilio_cambiar_estado(request, pk, nuevo_estado):
     """
-    Cambia el estado del pedido (en_preparacion, en_camino, entregado, cancelado).
+    Cambia el estado del pedido (en_preparacion, listo_para_recoger, en_camino, entregado, cancelado).
     Si se marca como entregado y el pago era en efectivo, asienta la venta y descarga inventario.
     """
     perfil = _perfil(request.user)
@@ -3855,7 +3865,7 @@ def domicilio_cambiar_estado(request, pk, nuevo_estado):
 
     estados_validos = [
         "borrador", "cotizado", "esperando_pago", "pagado",
-        "en_preparacion", "en_camino", "entregado", "cancelado"
+        "en_preparacion", "listo_para_recoger", "en_camino", "entregado", "cancelado"
     ]
     if nuevo_estado in estados_validos:
         pedido.estado = nuevo_estado
@@ -3863,28 +3873,36 @@ def domicilio_cambiar_estado(request, pk, nuevo_estado):
             pedido.fecha_entrega = timezone.now()
             # Si el pago era efectivo y aún no tenía venta generada, asentar venta y descargar inventario
             if pedido.medio_pago == "efectivo" and not pedido.venta:
-                num_fac = est.siguiente_consecutivo_factura()
+                tipo_txt = "recojo en tienda" if pedido.tipo_entrega == "recojo_tienda" else "domicilio"
+                actividad = est.actividades.first()
                 venta = Venta.objects.create(
                     establecimiento=est,
                     usuario=request.user,
-                    numero_factura=num_fac,
-                    tipo_comprobante="ticket",
-                    fecha=timezone.now(),
+                    actividad=actividad,
+                    fecha=timezone.localdate(),
+                    fecha_hora=timezone.now(),
                     valor=pedido.total,
                     medio_pago="efectivo",
+                    concepto=f"Pedido {tipo_txt} #{pedido.numero_pedido:04d}"[:160],
+                    observacion=f"Entregado a {pedido.nombre_contacto or pedido.telefono_contacto}"[:160],
                     cliente=pedido.cliente,
-                    notas=f"Pedido domicilio #{pedido.numero_pedido:04d} entregado a {pedido.nombre_contacto or pedido.telefono_contacto}"
+                    ica_estimado=actividad.ica_de(pedido.total) if actividad else Decimal("0"),
                 )
                 pedido.venta = venta
                 for linea in pedido.lineas.all():
                     if linea.producto:
-                        procesar_salida_inventario(
-                            producto=linea.producto,
-                            cantidad=linea.cantidad,
-                            motivo=f"Entrega Pedido #{pedido.numero_pedido:04d}",
-                            usuario=request.user,
+                        prod = linea.producto
+                        cant_desc = linea.cantidad
+                        prod.stock_kilos = max(Decimal("0"), prod.stock_kilos - cant_desc)
+                        prod.save(update_fields=["stock_kilos"])
+                        Auditoria.objects.create(
                             establecimiento=est,
-                            id_venta=venta.pk
+                            usuario=request.user,
+                            entidad_afectada="Producto",
+                            id_registro=prod.pk,
+                            accion="salida_inventario_pedido",
+                            valor_nuevo=f"-{cant_desc} {prod.unidad_medida}",
+                            motivo=f"Entrega Pedido #{pedido.numero_pedido:04d}",
                         )
         elif nuevo_estado == "en_preparacion":
             # Reencolar para impresión si pasa a cocina/despacho
@@ -4038,6 +4056,15 @@ def domicilios_toggle_servicio(request):
             est.save(update_fields=["domicilios_activos", "domicilio_mensaje_pausa"])
             estado_txt = "ACTIVADOS" if est.domicilios_activos else "PAUSADOS"
             messages.success(request, f"🛵 Servicio de Domicilios {estado_txt} exitosamente.")
+        elif accion == "toggle_recojo":
+            est.recojo_tienda_activo = not est.recojo_tienda_activo
+            if est.recojo_tienda_activo:
+                est.recojo_tienda_mensaje_pausa = ""
+            else:
+                est.recojo_tienda_mensaje_pausa = request.POST.get("motivo_pausa", "").strip()
+            est.save(update_fields=["recojo_tienda_activo", "recojo_tienda_mensaje_pausa"])
+            estado_txt = "ACTIVADO" if est.recojo_tienda_activo else "PAUSADO"
+            messages.success(request, f"🛍️ Servicio de Recojo en Tienda {estado_txt} exitosamente.")
         elif accion == "horario":
             h_ini = request.POST.get("hora_apertura", "").strip()
             h_fin = request.POST.get("hora_cierre", "").strip()
