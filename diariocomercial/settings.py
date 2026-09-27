@@ -199,4 +199,13 @@ SAAS_LLAVE_PAGOS_BRE_B = "3028530041"      # Llave Bre-B / BanRep / Nequi oficia
 SAAS_WHATSAPP_CONTACTO = "3146922087"      # WhatsApp técnico y de contacto soporte de la plataforma
 SAAS_TARIFA_MENSUAL_COP = 19900            # Tarifa plana de suscripción mensual ($19.900 COP)
 
+# ============================================================================
+# META WHATSAPP BUSINESS CLOUD API OFICIAL
+# ============================================================================
+META_WHATSAPP_TOKEN = os.environ.get('META_WHATSAPP_TOKEN', '')
+META_WHATSAPP_PHONE_ID = os.environ.get('META_WHATSAPP_PHONE_ID', '')
+META_WHATSAPP_WABA_ID = os.environ.get('META_WHATSAPP_WABA_ID', '')
+META_WHATSAPP_VERIFY_TOKEN = os.environ.get('META_WHATSAPP_VERIFY_TOKEN', 'diariocomercial_token_2026')
+
+
 
