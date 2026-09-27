@@ -151,6 +151,20 @@ class Establecimiento(models.Model):
         help_text="Fecha y hora de la última ejecución automática de despacho de reporte"
     )
 
+    # Parámetros Domicilios y Despacho Automático POS
+    costo_domicilio_defecto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("3000"),
+        help_text="Tarifa base de domicilio de barrio en pesos COP"
+    )
+    monto_minimo_domicilio_gratis = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("50000"),
+        help_text="Monto mínimo para envío gratis (upselling en WhatsApp)"
+    )
+    impresion_automatica_pedidos = models.BooleanField(
+        default=True,
+        help_text="Habilita el encolamiento automático de comandas térmicas para la impresora POS"
+    )
+
     def siguiente_consecutivo_factura(self):
         from django.db import transaction
         with transaction.atomic():
@@ -789,6 +803,136 @@ class TransaccionBreB(models.Model):
 
     def __str__(self):
         return f"Bre-B {self.referencia_unica[-8:]} ${self.monto} ({self.estado})"
+
+
+# ============================================================================
+# FASE 7: MÓDULO DE PEDIDOS A DOMICILIO, PAGOS OMNICANAL & COMANDAS POS
+# ============================================================================
+
+class Pedido(models.Model):
+    """
+    Gestión de pedidos a domicilio y mostrador con despacho omnicanal (WhatsApp/Telegram/Web).
+    Soporta pagos en Efectivo contra entrega (con cálculo de vueltas) y Bre-B/Nequi con
+    confirmación en tiempo real e impresión automática en comandas POS térmicas.
+    """
+    ESTADOS = (
+        ("borrador", "Borrador"),
+        ("cotizado", "Cotizado / Esperando Confirmación"),
+        ("esperando_pago", "Esperando Pago Digital"),
+        ("pagado", "Pagado / En Preparación"),
+        ("en_preparacion", "En Preparación"),
+        ("en_camino", "En Camino / Despachado"),
+        ("entregado", "Entregado y Liquidado"),
+        ("cancelado", "Cancelado"),
+    )
+    MEDIOS_PAGO = (
+        ("pendiente", "Pendiente por definir"),
+        ("efectivo", "Efectivo Contra Entrega"),
+        ("bre_b", "Bre-B (Interoperable BanRep)"),
+        ("nequi", "Nequi"),
+        ("daviplata", "Daviplata"),
+        ("transferencia", "Transferencia Bancaria"),
+    )
+    CANALES = (
+        ("whatsapp", "WhatsApp"),
+        ("telegram", "Telegram"),
+        ("web", "Panel Web / KDS"),
+        ("mostrador", "Mostrador / Teléfono"),
+    )
+
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="pedidos")
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_domicilio")
+    numero_pedido = models.PositiveIntegerField(db_index=True)
+    canal_origen = models.CharField(max_length=20, choices=CANALES, default="whatsapp")
+
+    # Destino y ubicación
+    telefono_contacto = models.CharField(max_length=25, db_index=True, help_text="Celular WhatsApp del cliente")
+    nombre_contacto = models.CharField(max_length=120, blank=True)
+    direccion_entrega = models.CharField(max_length=200, help_text="Dirección o barrio de entrega")
+    punto_referencia = models.CharField(max_length=200, blank=True, help_text="Casa reja verde, frente al poste, etc.")
+
+    # Valores económicos y vueltas
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    costo_domicilio = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+
+    medio_pago = models.CharField(max_length=20, choices=MEDIOS_PAGO, default="pendiente")
+    paga_con = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Monto con el que paga en efectivo (ej: 50.000) para calcular vueltas"
+    )
+    vueltas = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal("0"),
+        help_text="Vueltas a enviar al cliente (paga_con - total)"
+    )
+
+    estado = models.CharField(max_length=25, choices=ESTADOS, default="borrador", db_index=True)
+
+    # Vínculos transaccionales
+    transaccion_bre_b = models.OneToOneField(
+        TransaccionBreB, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedido"
+    )
+    venta = models.OneToOneField(
+        Venta, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedido"
+    )
+
+    # Impresión automática POS
+    impreso_pos = models.BooleanField(default=False, db_index=True, help_text="True si ya fue impreso en el POS")
+    fecha_impresion = models.DateTimeField(null=True, blank=True)
+    veces_impreso = models.PositiveSmallIntegerField(default=0)
+
+    # Domiciliario asignado y notas
+    nombre_domiciliario = models.CharField(max_length=80, blank=True, help_text="Nombre de quien entrega el pedido")
+    notas_operativas = models.TextField(blank=True, help_text="Instrucciones especiales de cocina o empaque")
+
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    fecha_entrega = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion"]
+        indexes = [
+            models.Index(fields=["establecimiento", "estado", "fecha_creacion"], name="pedido_est_fec_idx"),
+            models.Index(fields=["establecimiento", "impreso_pos"], name="pedido_imp_pos_idx"),
+        ]
+
+    def __str__(self):
+        return f"Pedido #{self.numero_pedido:04d} - {self.establecimiento.nombre} (${self.total:,.0f})"
+
+    def save(self, *args, **kwargs):
+        if not self.numero_pedido:
+            ultimo = Pedido.objects.filter(establecimiento=self.establecimiento).order_by("-numero_pedido").first()
+            self.numero_pedido = (ultimo.numero_pedido + 1) if ultimo else 1
+        super().save(*args, **kwargs)
+
+    def calcular_totales(self):
+        subt = sum((linea.subtotal for linea in self.lineas.all()), Decimal("0"))
+        self.subtotal = subt
+        self.total = subt + (self.costo_domicilio or Decimal("0"))
+        if self.paga_con and self.paga_con > self.total:
+            self.vueltas = self.paga_con - self.total
+        else:
+            self.vueltas = Decimal("0")
+
+
+class LineaPedido(models.Model):
+    """Ítem individual dentro de un pedido a domicilio o mostrador."""
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name="lineas")
+    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True)
+    nombre_producto = models.CharField(max_length=120)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=3, default=Decimal("1.000"))
+    unidad_medida = models.CharField(max_length=15, default="und")
+    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    notas = models.CharField(max_length=140, blank=True, help_text="Ej: 'bien tajado', 'poca grasa'")
+
+    def save(self, *args, **kwargs):
+        if not self.subtotal:
+            self.subtotal = (self.cantidad * self.precio_unitario).quantize(Decimal("1"))
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.cantidad} {self.unidad_medida} x {self.nombre_producto} (${self.subtotal})"
 
 
 # ============================================================================

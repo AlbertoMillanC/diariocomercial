@@ -14,7 +14,7 @@ from reportlab.graphics.barcode.qr import QrCodeWidget
 from django.conf import settings
 from django.utils import timezone
 
-from .models import Venta, Establecimiento, TransaccionBreB
+from .models import Venta, Establecimiento, TransaccionBreB, Pedido
 from .bre_b_service import generar_qr_dinamico_bre_b, generar_payload_emvco_saas
 
 
@@ -734,6 +734,299 @@ def generar_pdf_etiquetas_qr_masivo(establecimiento, productos=None, solo_sin_co
         # Pie
         c.setFont("Helvetica-Bold", 6.5)
         c.drawCentredString(29 * mm, 4.5 * mm, f"SKU: {codigo_val} • QR DE TIENDA")
+
+    c.save()
+    return buf.getvalue()
+
+
+# ============================================================================
+# FASE 7: COMANDAS TÉRMICAS DE DESPACHO Y DOMICILIOS (ESC/POS & TEXTO)
+# ============================================================================
+
+def generar_comanda_termica_texto(pedido: Pedido, ancho: int = 42) -> str:
+    """
+    Genera el texto formateado de la comanda de empaque y domicilio para impresoras térmicas
+    de 58mm (ancho=32) o 80mm (ancho=42).
+    Incluye checkboxes de empaque [ ], teléfono grande, puntos de referencia,
+    aviso anti-estafa de Bre-B o desglose de vueltas en efectivo.
+    """
+    est = pedido.establecimiento
+    linea_sep = "=" * ancho
+    linea_guion = "-" * ancho
+
+    hora_str = timezone.localtime(pedido.fecha_creacion).strftime("%d/%m/%Y %I:%M %p")
+    nombre_cli = (pedido.nombre_contacto or (pedido.cliente.nombre if pedido.cliente else "Cliente")).upper()
+    tel_cli = pedido.telefono_contacto or (pedido.cliente.telefono if pedido.cliente else "No registra")
+
+    lineas = [
+        linea_sep,
+        "DIARIOCOMERCIAL - COMANDA DE DESPACHO".center(ancho),
+        (est.nombre or "COMERCIO").upper()[:ancho].center(ancho),
+        linea_sep,
+        f"PEDIDO #{pedido.numero_pedido:04d}   HORA: {hora_str}",
+        f"CLIENTE: {nombre_cli[:30]}",
+        f"TEL: [ {tel_cli} ]",
+        linea_guion,
+        "DESTINO DE ENTREGA:",
+        f"  {pedido.direccion_entrega or 'Recoge en mostrador'}",
+    ]
+
+    if pedido.punto_referencia:
+        lineas.extend([
+            "PUNTOS DE REFERENCIA:",
+            f"  * {pedido.punto_referencia}",
+        ])
+
+    lineas.extend([
+        linea_guion,
+        "PRODUCTOS A EMPACAR:",
+    ])
+
+    for linea in pedido.lineas.all():
+        cant_str = f"{linea.cantidad:,.0f}" if linea.cantidad == int(linea.cantidad) else f"{linea.cantidad:.2f}"
+        prod_str = f"[ ] {cant_str} {linea.unidad_medida} {linea.nombre_producto}"[:ancho - 10]
+        precio_str = f"${linea.subtotal:,.0f}".replace(",", ".")
+        espacios = ancho - len(prod_str) - len(precio_str)
+        if espacios < 1:
+            espacios = 1
+        lineas.append(f"{prod_str}{' ' * espacios}{precio_str}")
+        if linea.notas:
+            lineas.append(f"    Nota: {linea.notas[:ancho - 10]}")
+
+    lineas.append(linea_guion)
+    subt_fmt = f"${pedido.subtotal:,.0f}".replace(",", ".")
+    domi_fmt = f"${pedido.costo_domicilio:,.0f}".replace(",", ".")
+    tot_fmt = f"${pedido.total:,.0f} COP".replace(",", ".")
+
+    lineas.append(f"SUBTOTAL:{subt_fmt.rjust(ancho - 9)}")
+    if pedido.costo_domicilio > 0:
+        lineas.append(f"DOMICILIO:{domi_fmt.rjust(ancho - 10)}")
+    lineas.append(f"TOTAL A PAGAR:{tot_fmt.rjust(ancho - 14)}")
+    lineas.append(linea_sep)
+
+    # Estado de Pago & Anti-Estafa
+    lineas.append("ESTADO DE PAGO:".center(ancho))
+    if pedido.medio_pago in ("bre_b", "nequi", "daviplata", "transferencia") and pedido.estado in ("pagado", "en_preparacion", "en_camino", "entregado"):
+        ref = pedido.transaccion_bre_b.token_visual_corto if pedido.transaccion_bre_b else f"OK-{pedido.pk}"
+        lineas.extend([
+            "*" * ancho,
+            f"[ X ] PAGADO CON {pedido.medio_pago.upper()} ({ref})".center(ancho),
+            ">>> NO COBRAR NADA AL CLIENTE <<<".center(ancho),
+            "*" * ancho,
+        ])
+    elif pedido.medio_pago == "efectivo":
+        paga_con_fmt = f"${pedido.paga_con:,.0f}".replace(",", ".") if pedido.paga_con else "Exacto"
+        vueltas_fmt = f"${pedido.vueltas:,.0f}".replace(",", ".")
+        lineas.extend([
+            f"[ $ ] COBRAR EN EFECTIVO: {tot_fmt}",
+            f"      CLIENTE PAGA CON:   {paga_con_fmt}",
+            f"      >>> ENVIAR VUELTAS: {vueltas_fmt} <<<",
+        ])
+    else:
+        lineas.append(f"[ ! ] ESTADO: {pedido.get_estado_display().upper()}".center(ancho))
+
+    lineas.extend([
+        linea_sep,
+        f"DOMICILIARIO: {pedido.nombre_domiciliario or '[           ]'}",
+        linea_sep,
+        "\n\n",
+    ])
+
+    return "\n".join(lineas)
+
+
+def generar_bytes_escpos_comanda(pedido: Pedido) -> bytes:
+    """
+    Genera el búfer binario de comandos ESC/POS nativos para impresoras térmicas
+    (58mm y 80mm - Xprinter, Epson, Bixolon, etc.).
+    Incluye inicialización, doble tamaño para teléfono/pedido, corte automático y pitido buzzer.
+    """
+    ESC = b"\x1b"
+    GS = b"\x1d"
+
+    buf = bytearray()
+    # 1. Inicializar impresora
+    buf += ESC + b"@"
+
+    # 2. Encabezado centrado
+    buf += ESC + b"a\x01"  # Centrado
+    buf += ESC + b"!\x08"  # Negrita
+    buf += b"DIARIOCOMERCIAL - COMANDA DE DESPACHO\n"
+    est_nombre = (pedido.establecimiento.nombre or "COMERCIO").upper()[:32]
+    buf += ESC + b"!\x20"  # Doble alto
+    buf += est_nombre.encode("cp850", "replace") + b"\n"
+    buf += ESC + b"!\x00"  # Normal
+
+    # 3. Número de pedido y teléfono (Doble ancho/alto para el domiciliario)
+    hora_str = timezone.localtime(pedido.fecha_creacion).strftime("%d/%m/%Y %I:%M %p")
+    buf += f"PEDIDO #{pedido.numero_pedido:04d}  {hora_str}\n".encode("cp850")
+    buf += b"==========================================\n"
+    buf += ESC + b"a\x00"  # Alineación izquierda
+    tel_cli = pedido.telefono_contacto or (pedido.cliente.telefono if pedido.cliente else "")
+    if tel_cli:
+        buf += ESC + b"!\x30"  # Doble alto y ancho
+        buf += f"TEL: {tel_cli}\n".encode("cp850")
+        buf += ESC + b"!\x00"  # Normal
+
+    nombre_cli = (pedido.nombre_contacto or (pedido.cliente.nombre if pedido.cliente else "Cliente")).upper()
+    buf += f"CLIENTE: {nombre_cli[:35]}\n".encode("cp850", "replace")
+    buf += f"DESTINO: {pedido.direccion_entrega}\n".encode("cp850", "replace")
+    if pedido.punto_referencia:
+        buf += f"REF: {pedido.punto_referencia}\n".encode("cp850", "replace")
+    buf += b"------------------------------------------\n"
+
+    # 4. Ítems a empacar con checkbox [ ]
+    buf += ESC + b"!\x08"  # Negrita
+    buf += b"PRODUCTOS A EMPACAR:\n"
+    buf += ESC + b"!\x00"
+    for linea in pedido.lineas.all():
+        cant_str = f"{linea.cantidad:,.0f}" if linea.cantidad == int(linea.cantidad) else f"{linea.cantidad:.2f}"
+        prod_line = f"[ ] {cant_str} {linea.unidad_medida} {linea.nombre_producto}"[:30]
+        precio_line = f"${linea.subtotal:,.0f}".replace(",", ".")
+        espacio = 42 - len(prod_line) - len(precio_line)
+        if espacio < 1:
+            espacio = 1
+        buf += f"{prod_line}{' ' * espacio}{precio_line}\n".encode("cp850", "replace")
+        if linea.notas:
+            buf += f"    Nota: {linea.notas[:35]}\n".encode("cp850", "replace")
+
+    buf += b"------------------------------------------\n"
+    tot_fmt = f"${pedido.total:,.0f} COP".replace(",", ".")
+    buf += ESC + b"!\x20"  # Doble alto
+    buf += f"TOTAL: {tot_fmt}\n".encode("cp850")
+    buf += ESC + b"!\x00"
+
+    # 5. Estado de Pago
+    if pedido.medio_pago in ("bre_b", "nequi", "daviplata", "transferencia") and pedido.estado in ("pagado", "en_preparacion", "en_camino", "entregado"):
+        buf += ESC + b"a\x01"  # Centrado
+        buf += b"******************************************\n"
+        buf += ESC + b"!\x08"
+        buf += f"[ X ] PAGADO CON {pedido.medio_pago.upper()}\n".encode("cp850")
+        buf += b">>> NO COBRAR NADA AL CLIENTE <<<\n"
+        buf += b"******************************************\n"
+    elif pedido.medio_pago == "efectivo":
+        paga_con_fmt = f"${pedido.paga_con:,.0f}".replace(",", ".") if pedido.paga_con else "Exacto"
+        vueltas_fmt = f"${pedido.vueltas:,.0f}".replace(",", ".")
+        buf += ESC + b"!\x08"
+        buf += f"[ $ ] COBRAR EFECTIVO: {tot_fmt}\n".encode("cp850")
+        buf += f"      PAGA CON:   {paga_con_fmt}\n".encode("cp850")
+        buf += f"      >>> VUELTAS LISTAS: {vueltas_fmt} <<<\n".encode("cp850")
+
+    buf += ESC + b"a\x00"
+    buf += b"==========================================\n"
+    buf += f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                     ]'}\n".encode("cp850", "replace")
+    buf += b"\n\n\n"
+
+    # 6. Corte de papel automático (GS V 65 0)
+    buf += GS + b"V\x41\x00"
+
+    # 7. Pitido buzzer (3 beeps) para alertar empaque
+    buf += ESC + b"B\x03\x02"
+
+    return bytes(buf)
+
+
+def generar_pdf_comanda_pedido(pedido: Pedido) -> bytes:
+    """
+    Genera un PDF en formato de rollo térmico de 80mm de ancho con longitud adaptable
+    para vista previa en navegador o impresión en impresoras térmicas virtuales.
+    """
+    from reportlab.lib.pagesizes import mm
+
+    ancho_pt = 80 * mm
+    # Estimar altura según líneas
+    n_lineas = max(1, pedido.lineas.count())
+    alto_pt = (140 + n_lineas * 20 + 90) * mm
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(ancho_pt, alto_pt))
+    est = pedido.establecimiento
+
+    y = alto_pt - 15 * mm
+
+    # Título
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(ancho_pt / 2, y, "COMANDA DE DESPACHO")
+    y -= 5 * mm
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(ancho_pt / 2, y, (est.nombre or "COMERCIO").upper()[:28])
+    y -= 6 * mm
+
+    hora_str = timezone.localtime(pedido.fecha_creacion).strftime("%d/%m/%Y %I:%M %p")
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(ancho_pt / 2, y, f"Pedido #{pedido.numero_pedido:04d} • {hora_str}")
+    y -= 4 * mm
+    c.setLineWidth(0.5)
+    c.line(4 * mm, y, ancho_pt - 4 * mm, y)
+    y -= 6 * mm
+
+    # Teléfono y Cliente
+    tel_cli = pedido.telefono_contacto or (pedido.cliente.telefono if pedido.cliente else "")
+    if tel_cli:
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(6 * mm, y, f"TEL: {tel_cli}")
+        y -= 6 * mm
+
+    nombre_cli = (pedido.nombre_contacto or (pedido.cliente.nombre if pedido.cliente else "Cliente")).upper()
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(6 * mm, y, f"CLIENTE: {nombre_cli[:28]}")
+    y -= 5 * mm
+
+    c.setFont("Helvetica", 8)
+    c.drawString(6 * mm, y, f"DESTINO: {pedido.direccion_entrega[:35]}")
+    y -= 5 * mm
+    if pedido.punto_referencia:
+        c.drawString(6 * mm, y, f"REF: {pedido.punto_referencia[:35]}")
+        y -= 5 * mm
+
+    c.line(4 * mm, y, ancho_pt - 4 * mm, y)
+    y -= 6 * mm
+
+    # Lista de productos
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(6 * mm, y, "PRODUCTOS A EMPACAR:")
+    y -= 5 * mm
+
+    c.setFont("Helvetica", 8)
+    for linea in pedido.lineas.all():
+        cant_str = f"{linea.cantidad:,.0f}" if linea.cantidad == int(linea.cantidad) else f"{linea.cantidad:.2f}"
+        item_text = f"[ ] {cant_str} {linea.unidad_medida} {linea.nombre_producto}"[:30]
+        subt_text = f"${linea.subtotal:,.0f}".replace(",", ".")
+        c.drawString(6 * mm, y, item_text)
+        c.drawRightString(ancho_pt - 6 * mm, y, subt_text)
+        y -= 4.5 * mm
+
+    c.line(4 * mm, y, ancho_pt - 4 * mm, y)
+    y -= 6 * mm
+
+    # Totales
+    tot_fmt = f"${pedido.total:,.0f} COP".replace(",", ".")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(6 * mm, y, "TOTAL:")
+    c.drawRightString(ancho_pt - 6 * mm, y, tot_fmt)
+    y -= 7 * mm
+
+    # Pago
+    if pedido.medio_pago in ("bre_b", "nequi", "daviplata", "transferencia") and pedido.estado in ("pagado", "en_preparacion", "en_camino", "entregado"):
+        c.setFillColorRGB(0.05, 0.4, 0.15)
+        c.rect(5 * mm, y - 8 * mm, ancho_pt - 10 * mm, 10 * mm, fill=1, stroke=0)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(ancho_pt / 2, y - 3 * mm, f"PAGADO CON {pedido.medio_pago.upper()}")
+        c.drawCentredString(ancho_pt / 2, y - 6.5 * mm, "NO COBRAR NADA AL CLIENTE")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 12 * mm
+    elif pedido.medio_pago == "efectivo":
+        paga_con_fmt = f"${pedido.paga_con:,.0f}".replace(",", ".") if pedido.paga_con else "Exacto"
+        vueltas_fmt = f"${pedido.vueltas:,.0f}".replace(",", ".")
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(6 * mm, y, f"COBRAR EN EFECTIVO: {tot_fmt}")
+        y -= 4.5 * mm
+        c.drawString(6 * mm, y, f"PAGA CON: {paga_con_fmt} | VUELTAS: {vueltas_fmt}")
+        y -= 6 * mm
+
+    c.setFont("Helvetica", 7.5)
+    c.drawString(6 * mm, y, f"DOMICILIARIO: {pedido.nombre_domiciliario or '[                      ]'}")
 
     c.save()
     return buf.getvalue()

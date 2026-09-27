@@ -26,6 +26,8 @@ from .models import (
     Compra,
     Producto,
     ItemPedido,
+    Pedido,
+    LineaPedido,
     VinculoCanal,
     TokenVinculacion,
     MensajeProcesado,
@@ -56,6 +58,10 @@ _VENTAS_PENDIENTES_FACTURA: Dict[Tuple[str, str], Dict[str, Any]] = {}
 # Buffer para tickets de mostrador que están esperando número de documento de cliente
 # Estructura: {(canal, id_externo): {"venta_id": int, "tipo_doc": Optional[str], "fecha": datetime}}
 _VENTAS_PENDIENTES_DOCUMENTO: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+# Buffer para flujo conversacional de pedidos a domicilio y despacho
+# Estructura: {(canal, id_externo): {"pedido_id": int, "paso": str, "fecha": datetime}}
+_PEDIDOS_PENDIENTES: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
 
 def _get_doc_pend_filepath(key_sesion: Tuple[str, str]) -> str:
@@ -143,6 +149,7 @@ def despachar_mensaje(
     username_externo: str = "",
     nombre_remitente: str = "",
     return_adjuntos: bool = False,
+    establecimiento: Optional[Establecimiento] = None,
 ) -> Any:
     """
     Punto de entrada único agnóstico para Telegram, WhatsApp o simuladores.
@@ -156,6 +163,7 @@ def despachar_mensaje(
     canal = canal.lower().strip()
     identificador_externo = str(identificador_externo).strip()
     texto = (texto_mensaje or "").strip()
+    key_sesion = (canal, identificador_externo)
 
     # 1. Filtro de Idempotencia si viene identificador_mensaje
     if identificador_mensaje:
@@ -220,6 +228,43 @@ def despachar_mensaje(
             resp = "❌ Código de vinculación inválido o expirado. Genera uno nuevo en el panel de Configuración."
             _cachear_respuesta(canal, identificador_mensaje, resp)
             return (resp, None, None) if return_adjuntos else resp
+
+    # 3.1 Intercepción de Flujo Conversacional de Pedidos a Domicilio (respuestas a pago o vueltas)
+    if key_sesion in _PEDIDOS_PENDIENTES:
+        datos_ses = _PEDIDOS_PENDIENTES[key_sesion]
+        ped = Pedido.objects.filter(pk=datos_ses.get("pedido_id")).select_related("establecimiento").first()
+        est_ped = ped.establecimiento if ped else (establecimiento or (vinculo.establecimiento if vinculo else None))
+        if not est_ped:
+            est_ped = Establecimiento.objects.filter(estado="activo").first()
+        usr_ped = vinculo.usuario if vinculo else (est_ped.propietario_creador if est_ped else None)
+        resultado_ped = _procesar_respuesta_pedido_conversacional(
+            establecimiento=est_ped,
+            usuario=usr_ped,
+            texto=texto,
+            canal=canal,
+            identificador_externo=identificador_externo,
+            identificador_mensaje=identificador_mensaje,
+            return_adjuntos=return_adjuntos,
+        )
+        if resultado_ped is not None:
+            return resultado_ped
+
+    # 3.2 Detección de Nuevo Pedido a Domicilio (WhatsApp/Telegram Delivery)
+    target_est = establecimiento or (vinculo.establecimiento if vinculo else None)
+    if not target_est:
+        target_est = Establecimiento.objects.filter(estado="activo").first()
+
+    if target_est and _es_mensaje_pedido_domicilio(target_est, texto):
+        resultado = _procesar_pedido_conversacional(
+            establecimiento=target_est,
+            usuario=vinculo.usuario if vinculo else target_est.propietario_creador,
+            texto=texto,
+            canal=canal,
+            identificador_externo=identificador_externo,
+            identificador_mensaje=identificador_mensaje,
+            return_adjuntos=return_adjuntos,
+        )
+        return resultado
 
     # Si no está vinculado, rechazo amable con instrucciones y enlaces directos
     if not vinculo:
@@ -300,6 +345,20 @@ def despachar_mensaje(
                 return (resp, None, None) if return_adjuntos else resp
             else:
                 _VENTAS_PENDIENTES_FACTURA.pop(key_sesion, None)
+
+    # 4.0.0 Interceptación de Flujo Conversacional de Pedidos a Domicilio
+    if key_sesion in _PEDIDOS_PENDIENTES:
+        resultado_ped = _procesar_respuesta_pedido_conversacional(
+            establecimiento=establecimiento,
+            usuario=usuario,
+            texto=texto,
+            canal=canal,
+            identificador_externo=identificador_externo,
+            identificador_mensaje=identificador_mensaje,
+            return_adjuntos=return_adjuntos,
+        )
+        if resultado_ped is not None:
+            return resultado_ped
 
     # 4.0.1 Interceptación de Flujo de Documento de Cliente Pendiente para Ticket
     datos_doc = _obtener_pendiente_documento(key_sesion)
@@ -589,6 +648,25 @@ def despachar_mensaje(
         resp = _emitir_factura_electronica_bot(establecimiento, usuario, texto, canal_sesion=key_sesion)
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
+
+    # 4.3.1 Confirmación de Pedidos por el Tendero
+    if t_norm.startswith(("/confirmar_pedido", "confirmar pedido", "/despachar", "despachar pedido")):
+        resp = _confirmar_pedido_bot(establecimiento, usuario, texto)
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    # 4.3.2 Detección y Cotización de Pedidos a Domicilio y Despacho
+    if _es_mensaje_pedido_domicilio(establecimiento, texto):
+        resultado = _procesar_pedido_conversacional(
+            establecimiento=establecimiento,
+            usuario=usuario,
+            texto=texto,
+            canal=canal,
+            identificador_externo=identificador_externo,
+            identificador_mensaje=identificador_mensaje,
+            return_adjuntos=return_adjuntos,
+        )
+        return resultado
 
     # 4.4 Registro de Venta (Flujo Natural del Mostrador)
     resp, venta_creada = _registrar_venta(establecimiento, usuario, texto, canal_sesion=key_sesion)
@@ -1213,3 +1291,395 @@ def _generar_ayuda(es_propietario: bool) -> str:
             "• `/anular <ticket> <motivo>`: Anulación segura con auditoría\n"
         )
     return ayuda
+
+
+# ============================================================================
+# FASE 7: MOTOR DE PEDIDOS A DOMICILIO, PAGOS OMNICANAL & COMANDAS POS
+# ============================================================================
+
+def _es_mensaje_pedido_domicilio(establecimiento: Establecimiento, texto: str) -> bool:
+    """Detecta si un mensaje entrante corresponde a un pedido a domicilio o con dirección."""
+    t_norm = normalizar_texto(texto)
+    if t_norm.startswith(("/pedido", "pedido", "/domicilio", "domicilio", "orden", "/orden")):
+        return True
+
+    tiene_direccion = bool(re.search(
+        r"\b(?:calle|cll|carrera|cra|cr|kr|avenida|av|diagonal|diag|dg|transversal|trans|tv|manzana|mz|barrio|apto|apartamento)\s+\d+",
+        t_norm,
+        re.IGNORECASE
+    ))
+    if not tiene_direccion:
+        return False
+
+    tiene_intencion = any(w in t_norm for w in ["para llevar", "a domicilio", "enviar a", "mandar a", "despachar a", "llevar a", "traer a", "domicilio"])
+    prod_encontrado = buscar_producto_en_texto(establecimiento, texto)
+    return bool(prod_encontrado or tiene_intencion)
+
+
+def _procesar_pedido_conversacional(
+    establecimiento: Establecimiento,
+    usuario: User,
+    texto: str,
+    canal: str,
+    identificador_externo: str,
+    identificador_mensaje: Optional[str] = None,
+    return_adjuntos: bool = False,
+):
+    key_sesion = (canal, identificador_externo)
+
+    # 1. Extraer teléfono si vino al inicio (ej: pedido 3146922087 ...)
+    match_tel = re.search(r"^(?:/pedido|pedido|/domicilio|domicilio)\s+(\d{10})\b", texto, re.IGNORECASE)
+    if match_tel:
+        telefono_destino = match_tel.group(1)
+        texto_limpio = texto[match_tel.end():].strip()
+    else:
+        telefono_destino = "".join(c for c in identificador_externo if c.isdigit())
+        if len(telefono_destino) == 12 and telefono_destino.startswith("57"):
+            telefono_destino = telefono_destino[2:]
+        texto_limpio = re.sub(r"^(?:/pedido|pedido|/domicilio|domicilio|orden)\s*", "", texto, flags=re.IGNORECASE).strip()
+
+    # 2. Separar productos y dirección
+    match_dir = re.search(
+        r"\b(?:calle|cll|carrera|cra|cr|kr|avenida|av|diagonal|diag|dg|transversal|trans|tv|manzana|mz|barrio|apto|apartamento)\b.*",
+        texto_limpio,
+        re.IGNORECASE
+    )
+    if match_dir:
+        texto_prods = texto_limpio[:match_dir.start()].strip()
+        direccion_raw = match_dir.group(0).strip()
+    else:
+        texto_prods = texto_limpio
+        direccion_raw = "Recoge en mostrador / Tienda"
+
+    # Separar punto de referencia
+    m_ref = re.search(
+        r"\b(?:ref|referencia|punto de referencia|frente a|al frente|cerca a|casa|reja|porton|puerta|timbre|piso|segundo piso|primer piso|tercer piso)\b.*",
+        direccion_raw,
+        re.IGNORECASE
+    )
+    if m_ref and m_ref.start() > 3:
+        punto_ref = m_ref.group(0).strip(" ,-.")
+        dir_entrega = direccion_raw[:m_ref.start()].strip(" ,-.")
+    else:
+        punto_ref = ""
+        dir_entrega = direccion_raw
+
+    # 3. Parsear líneas de productos
+    lineas_datos = []
+    chunks = re.split(r"(?:\n|\r|\s+y\s+|\s*,\s*|\s*\+\s*)", texto_prods)
+    for chunk in chunks:
+        ch = chunk.strip()
+        if not ch:
+            continue
+        res_inv = procesar_salida_inventario(establecimiento, ch)
+        if res_inv and res_inv.producto and res_inv.valor_final and res_inv.valor_final > 0:
+            if getattr(res_inv, "bloqueado_sin_stock", False):
+                resp = f"🚫 *No podemos procesar el pedido:*\n{res_inv.motivo_bloqueo}"
+                _cachear_respuesta(canal, identificador_mensaje, resp)
+                return (resp, None, None) if return_adjuntos else resp
+            lineas_datos.append({
+                "producto": res_inv.producto,
+                "nombre": res_inv.producto.nombre,
+                "cantidad": res_inv.cantidad if res_inv.cantidad > 0 else Decimal("1"),
+                "unidad": res_inv.unidad_medida or "und",
+                "precio_unitario": res_inv.producto.precio_kilo,
+                "subtotal": res_inv.valor_final,
+            })
+
+    if not lineas_datos:
+        res_inv = procesar_salida_inventario(establecimiento, texto_prods)
+        if res_inv and res_inv.producto and res_inv.valor_final and res_inv.valor_final > 0:
+            if getattr(res_inv, "bloqueado_sin_stock", False):
+                resp = f"🚫 *No podemos procesar el pedido:*\n{res_inv.motivo_bloqueo}"
+                _cachear_respuesta(canal, identificador_mensaje, resp)
+                return (resp, None, None) if return_adjuntos else resp
+            lineas_datos.append({
+                "producto": res_inv.producto,
+                "nombre": res_inv.producto.nombre,
+                "cantidad": res_inv.cantidad if res_inv.cantidad > 0 else Decimal("1"),
+                "unidad": res_inv.unidad_medida or "und",
+                "precio_unitario": res_inv.producto.precio_kilo,
+                "subtotal": res_inv.valor_final,
+            })
+
+    if not lineas_datos:
+        resp = (
+            "❓ No reconocí los productos del pedido.\n\n"
+            "Ejemplo de formato:\n"
+            "`pedido 2 libras pechuga y 1 aceite Calle 12 # 4-50 casa reja verde`"
+        )
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    # 4. Totales y flete de domicilio
+    subtotal = sum((item["subtotal"] for item in lineas_datos), Decimal("0"))
+    if subtotal >= establecimiento.monto_minimo_domicilio_gratis:
+        costo_domicilio = Decimal("0")
+    else:
+        costo_domicilio = establecimiento.costo_domicilio_defecto
+    total = subtotal + costo_domicilio
+
+    # 5. Cliente CRM
+    cliente = None
+    if telefono_destino:
+        cliente = Cliente.objects.filter(establecimiento=establecimiento, telefono=telefono_destino).first()
+        if not cliente:
+            cliente = Cliente.objects.create(
+                establecimiento=establecimiento,
+                telefono=telefono_destino,
+                nombre=f"Cliente {telefono_destino[-4:]}",
+                direccion=dir_entrega,
+                punto_referencia=punto_ref,
+            )
+        else:
+            if dir_entrega and not cliente.direccion:
+                cliente.direccion = dir_entrega
+                cliente.save(update_fields=["direccion"])
+
+    # 6. Crear Pedido y líneas
+    with transaction.atomic():
+        pedido = Pedido.objects.create(
+            establecimiento=establecimiento,
+            cliente=cliente,
+            canal_origen=canal,
+            telefono_contacto=telefono_destino or getattr(cliente, "telefono", ""),
+            nombre_contacto=cliente.nombre if cliente else "",
+            direccion_entrega=dir_entrega,
+            punto_referencia=punto_ref,
+            subtotal=subtotal,
+            costo_domicilio=costo_domicilio,
+            total=total,
+            estado="cotizado",
+        )
+        for ld in lineas_datos:
+            LineaPedido.objects.create(
+                pedido=pedido,
+                producto=ld["producto"],
+                nombre_producto=ld["nombre"],
+                cantidad=ld["cantidad"],
+                unidad_medida=ld["unidad"],
+                precio_unitario=ld["precio_unitario"],
+                subtotal=ld["subtotal"],
+            )
+
+    # 7. Sesión conversacional
+    _PEDIDOS_PENDIENTES[key_sesion] = {
+        "pedido_id": pedido.pk,
+        "paso": "esperando_medio_pago",
+        "fecha": timezone.now(),
+    }
+
+    # 8. Cotización formateada
+    items_texto = []
+    for ld in lineas_datos:
+        cant_fmt = f"{ld['cantidad']:,.0f}" if ld["cantidad"] == int(ld["cantidad"]) else f"{ld['cantidad']:.2f}"
+        subt_fmt = f"${ld['subtotal']:,.0f}".replace(",", ".")
+        items_texto.append(f"• {cant_fmt} {ld['unidad'].capitalize()} *{ld['nombre']}*: {subt_fmt}")
+
+    items_block = "\n".join(items_texto)
+    domi_str = "¡GRATIS!" if costo_domicilio == 0 else f"${costo_domicilio:,.0f}".replace(",", ".")
+    tot_str = f"${total:,.0f}".replace(",", ".")
+
+    resp = (
+        f"🛒 *Pedido #{pedido.numero_pedido:04d} Cotizado*\n\n"
+        f"{items_block}\n"
+        f"🛵 *Domicilio:* {domi_str}\n"
+        f"💰 *TOTAL A PAGAR: {tot_str} COP*\n"
+        f"📍 *Entrega en:* {dir_entrega}"
+    )
+    if punto_ref:
+        resp += f" ({punto_ref})"
+
+    resp += (
+        f"\n\n👉 *¿Cómo deseas pagar?*\n"
+        f"*[1]* 💵 *Efectivo* (contra entrega al domiciliario)\n"
+        f"*[2]* ⚡ *Electrónico* (Bre-B, Nequi, Daviplata, Bancolombia)"
+    )
+
+    _cachear_respuesta(canal, identificador_mensaje, resp)
+    return (resp, None, None) if return_adjuntos else resp
+
+
+def _procesar_respuesta_pedido_conversacional(
+    establecimiento: Establecimiento,
+    usuario: User,
+    texto: str,
+    canal: str,
+    identificador_externo: str,
+    identificador_mensaje: Optional[str] = None,
+    return_adjuntos: bool = False,
+):
+    key_sesion = (canal, identificador_externo)
+    datos_sesion = _PEDIDOS_PENDIENTES.get(key_sesion)
+    if not datos_sesion:
+        return None
+
+    pedido_id = datos_sesion.get("pedido_id")
+    pedido = Pedido.objects.filter(pk=pedido_id, establecimiento=establecimiento).first()
+    if not pedido:
+        _PEDIDOS_PENDIENTES.pop(key_sesion, None)
+        return None
+
+    t_norm = normalizar_texto(texto)
+
+    # Cancelación
+    if t_norm in ("cancelar", "cancel", "anular", "no quiero", "descartar"):
+        _PEDIDOS_PENDIENTES.pop(key_sesion, None)
+        pedido.estado = "cancelado"
+        pedido.save(update_fields=["estado"])
+        resp = f"❌ *Pedido #{pedido.numero_pedido:04d} Cancelado.*"
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    paso = datos_sesion.get("paso")
+
+    # Paso 1: Selección de Medio de Pago
+    if paso == "esperando_medio_pago":
+        # Opción 1: Efectivo
+        if t_norm in ("1", "efectivo", "contra entrega", "en efectivo", "pago en efectivo", "monedas", "plata"):
+            pedido.medio_pago = "efectivo"
+            pedido.save(update_fields=["medio_pago"])
+            datos_sesion["paso"] = "esperando_vueltas"
+            _PEDIDOS_PENDIENTES[key_sesion] = datos_sesion
+
+            tot_str = f"${pedido.total:,.0f}".replace(",", ".")
+            resp = (
+                f"💵 *Pago en Efectivo Seleccionado*\n"
+                f"Total a pagar: *{tot_str} COP*.\n\n"
+                f"👉 *¿Con cuánto vas a pagar para mandarte las vueltas exactas?*\n"
+                f"_(Escribe el valor, ej: `50 mil`, `50000`, o escribe `exacto`)_:"
+            )
+            _cachear_respuesta(canal, identificador_mensaje, resp)
+            return (resp, None, None) if return_adjuntos else resp
+
+        # Opción 2: Electrónico (Bre-B / Nequi / Daviplata / Bancolombia)
+        elif t_norm in ("2", "electronico", "bre-b", "breb", "bre b", "nequi", "daviplata", "transferencia", "bancolombia") or any(w in t_norm for w in ["bre", "nequi", "daviplata", "transfer"]):
+            from .bre_b_service import generar_qr_dinamico_bre_b
+
+            pedido.medio_pago = "bre_b"
+            pedido.estado = "esperando_pago"
+
+            tx, payload = generar_qr_dinamico_bre_b(
+                establecimiento=establecimiento,
+                monto=pedido.total,
+                comando_original=f"Pedido #{pedido.numero_pedido}",
+            )
+            pedido.transaccion_bre_b = tx
+            pedido.save(update_fields=["medio_pago", "estado", "transaccion_bre_b"])
+            _PEDIDOS_PENDIENTES.pop(key_sesion, None)
+
+            llave = establecimiento.llave_bre_b or establecimiento.telefono_contacto or "3146922087"
+            tot_str = f"${pedido.total:,.0f} COP".replace(",", ".")
+
+            resp_texto = (
+                f"⚡ *Cobro Electrónico Bre-B / Nequi*\n\n"
+                f"💰 *Total a pagar:* {tot_str}\n"
+                f"🔑 *Llave / Celular:* `{llave}`\n"
+                f"🏢 *Comercio:* {establecimiento.nombre}\n"
+                f"🔖 *Token de Seguridad:* `{tx.token_visual_corto}`\n"
+                f"📦 *Pedido:* #{pedido.numero_pedido:04d}\n\n"
+                f"👇 _A continuación te enviamos el código QR para escanear directo desde tu app bancaria (Nequi, Daviplata, Bancolombia, Dale):_"
+            )
+
+            cobro_info = {
+                "monto": pedido.total,
+                "tx": tx,
+                "payload": payload,
+                "establecimiento": establecimiento,
+                "pedido": pedido,
+            }
+            _cachear_respuesta(canal, identificador_mensaje, resp_texto)
+            return (resp_texto, None, cobro_info) if return_adjuntos else resp_texto
+
+        else:
+            resp = (
+                "❓ Por favor responde con una opción válida:\n\n"
+                "*[1]* 💵 Efectivo (contra entrega)\n"
+                "*[2]* ⚡ Electrónico (Bre-B, Nequi, Bancolombia)"
+            )
+            _cachear_respuesta(canal, identificador_mensaje, resp)
+            return (resp, None, None) if return_adjuntos else resp
+
+    # Paso 2: Con cuánto paga en Efectivo (Vueltas)
+    elif paso == "esperando_vueltas":
+        if t_norm in ("exacto", "cabal", "justo", "no", "tengo el dinero exacto", "tengo sencillo"):
+            paga_con = pedido.total
+            vueltas = Decimal("0")
+        else:
+            val_paga, _ = parsear_dinero(texto)
+            if val_paga and val_paga >= pedido.total:
+                paga_con = val_paga
+                vueltas = val_paga - pedido.total
+            else:
+                paga_con = pedido.total
+                vueltas = Decimal("0")
+
+        pedido.paga_con = paga_con
+        pedido.vueltas = vueltas
+        pedido.estado = "en_preparacion"
+        pedido.impreso_pos = False  # Encola la comanda automática en la cola del POS
+        pedido.save(update_fields=["paga_con", "vueltas", "estado", "impreso_pos"])
+        _PEDIDOS_PENDIENTES.pop(key_sesion, None)
+
+        tot_str = f"${pedido.total:,.0f}".replace(",", ".")
+        paga_str = f"${paga_con:,.0f}".replace(",", ".")
+        vueltas_str = f"${vueltas:,.0f}".replace(",", ".")
+
+        resp = (
+            f"🛵 *¡Pedido #{pedido.numero_pedido:04d} Confirmado!*\n\n"
+            f"• *Total a entregar:* {tot_str}\n"
+            f"• *Pagas con:* {paga_str}\n"
+            f"• *Vueltas listas en bolsa:* {vueltas_str}\n"
+            f"📍 *Destino:* {pedido.direccion_entrega}\n\n"
+            f"🖨️ _Tu comanda ha sido enviada al mostrador y ya se está empacando._"
+        )
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    return None
+
+
+def _confirmar_pedido_bot(establecimiento: Establecimiento, usuario: User, texto: str) -> str:
+    """Permite al tendero confirmar y despachar un pedido manualmente con `/confirmar_pedido <id>`."""
+    match = re.search(r"\d+", texto)
+    if not match:
+        return "❓ Especifica el número de pedido. Ejemplo: `/confirmar_pedido 1`."
+    num_p = int(match.group(0))
+    pedido = Pedido.objects.filter(establecimiento=establecimiento, numero_pedido=num_p).first()
+    if not pedido:
+        return f"❌ No se encontró el pedido #{num_p:04d}."
+
+    if pedido.estado == "entregado":
+        return f"ℹ️ El pedido #{pedido.numero_pedido:04d} ya fue entregado y liquidado."
+
+    pedido.estado = "pagado"
+    pedido.impreso_pos = False  # Encola reimpresión
+    pedido.save(update_fields=["estado", "impreso_pos"])
+
+    # Crear venta contable si no existe
+    if not pedido.venta:
+        actividad = establecimiento.actividades.first()
+        venta = Venta.objects.create(
+            establecimiento=establecimiento,
+            usuario=usuario,
+            actividad=actividad,
+            cliente=pedido.cliente,
+            fecha=timezone.localdate(),
+            fecha_hora=timezone.now(),
+            valor=pedido.total,
+            concepto=f"Pedido #{pedido.numero_pedido:04d} ({pedido.direccion_entrega[:30]})",
+            medio_pago=pedido.medio_pago if pedido.medio_pago != "pendiente" else "efectivo",
+            estado="vigente",
+        )
+        pedido.venta = venta
+        pedido.save(update_fields=["venta"])
+
+    tot_fmt = f"${pedido.total:,.0f} COP".replace(",", ".")
+    return (
+        f"✅ *Pedido #{pedido.numero_pedido:04d} Confirmado*\n"
+        f"• Total: {tot_fmt}\n"
+        f"• Medio de pago: {pedido.get_medio_pago_display()}\n"
+        f"• Venta registrada: #{pedido.venta.pk}\n"
+        f"🖨️ Comanda enviada a cola de impresión POS."
+    )
+

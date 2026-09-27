@@ -183,6 +183,14 @@ def procesar_confirmacion_bre_b(
         tx.fecha_confirmacion = timezone.now()
         tx.save()
 
+        # Si la transacción está vinculada a un Pedido a domicilio, actualizarlo y encolar comanda POS
+        if hasattr(tx, "pedido") and tx.pedido:
+            pedido = tx.pedido
+            pedido.estado = "pagado"
+            pedido.venta = venta
+            pedido.impreso_pos = False  # Encola para impresión desatendida en el POS
+            pedido.save(update_fields=["estado", "venta", "impreso_pos"])
+
     monto_fmt = f"{int(monto_acreditado):,}".replace(",", ".")
     texto_voz = f"¡Bre-B recibido: {monto_fmt} pesos de {nombre_pagador}!"
     return True, texto_voz, venta, tx

@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% load dinero %}
+{% block title %}KDS & Monitor de Domicilios - DiarioComercial{% endblock %}
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <div>
+    <h2 style="margin:0; font-size:22px; display:flex; align-items:center; gap:8px;">
+      🛵 KDS & Monitor de Domicilios y Comandas POS
+    </h2>
+    <p class="lead" style="margin:4px 0 0 0; color:var(--muted); font-size:13px;">
+      Recepción omnicanal de pedidos por WhatsApp y Telegram con cotización automática, pagos Bre-B / Efectivo e impresión térmica desatendida.
+    </p>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer; background:#1e293b; padding:6px 12px; border-radius:6px; border:1px solid #334155;">
+      <input type="checkbox" id="chk-autorefresh" onchange="toggleAutoRefresh(this)" style="cursor:pointer;">
+      <span>🔄 Auto-actualizar (15s)</span>
+    </label>
+    <a href="{% url 'domicilios_lista' %}" class="btn" style="background:#334155; color:#fff; text-decoration:none; padding:7px 14px; border-radius:6px; font-size:13px;">
+      Actualizar Ahora
+    </a>
+  </div>
+</div>
+
+<!-- MÉTRICAS DE OPERACIÓN DE DOMICILIOS -->
+<div class="cards" style="margin-bottom:16px;">
+  <div class="card">
+    <span>Pedidos Hoy</span>
+    <strong style="color:#38bdf8;">{{ total_hoy }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Registrados en la jornada</small>
+  </div>
+  <div class="card">
+    <span>Esperando Pago</span>
+    <strong style="color:#f59e0b;">{{ esperando_pago }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Pendiente Bre-B / QR</small>
+  </div>
+  <div class="card">
+    <span>En Preparación</span>
+    <strong style="color:#a855f7;">{{ en_preparacion }}</strong>
+    <small style="color:var(--muted); font-size:11px;">En cocina o alistamiento</small>
+  </div>
+  <div class="card">
+    <span>En Camino</span>
+    <strong style="color:#06b6d4;">{{ en_camino }}</strong>
+    <small style="color:var(--muted); font-size:11px;">Con el domiciliario</small>
+  </div>
+  <div class="card" style="{% if pendientes_impresion > 0 %}border:1px solid #f97316; background:rgba(249,115,22,0.1);{% endif %}">
+    <span>Cola Impresión POS</span>
+    <strong style="color:{% if pendientes_impresion > 0 %}#f97316{% else %}#10b981{% endif %};">
+      {{ pendientes_impresion }}
+    </strong>
+    <small style="color:var(--muted); font-size:11px;">Comandas térmicas por salir</small>
+  </div>
+</div>
+
+<!-- BANNER EXPLICATIVO DEL FLUJO DESATENDIDO -->
+<div style="background:#0f172a; border:1px solid #1e293b; border-left:4px solid #f59e0b; border-radius:8px; padding:14px 16px; margin-bottom:18px; color:#f8fafc;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+    <div>
+      <h4 style="margin:0 0 4px 0; font-size:14px; color:#fbbf24; display:flex; align-items:center; gap:8px;">
+        ⚡ Flujo Industrial de Pedidos a Domicilio (Cero clics, Cero Datáfonos)
+      </h4>
+      <p style="margin:0; font-size:12px; color:#94a3b8; line-height:1.4;">
+        1. El cliente pide por WhatsApp o Telegram &bull; 2. El bot cotiza con domicilio (${{ est.costo_domicilio_defecto|floatformat:0 }} o gratis > ${{ est.monto_minimo_domicilio_gratis|floatformat:0 }}) &bull; 3. Si paga Efectivo, pide valor del billete y calcula vueltas; si paga Bre-B, manda llave y QR por separado &bull; 4. Al confirmar, la impresora térmica del mostrador pita, imprime la comanda y corta el papel automáticamente.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- FILTROS POR ESTADO -->
+<div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:16px;">
+  <a href="{% url 'domicilios_lista' %}" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if not estado_filtro %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    Todos los pedidos
+  </a>
+  <a href="{% url 'domicilios_lista' %}?estado=esperando_pago" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'esperando_pago' %}background:#f59e0b; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    ⏳ Esperando Pago ({{ esperando_pago }})
+  </a>
+  <a href="{% url 'domicilios_lista' %}?estado=en_preparacion" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'en_preparacion' %}background:#a855f7; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    🍳 En Preparación ({{ en_preparacion }})
+  </a>
+  <a href="{% url 'domicilios_lista' %}?estado=en_camino" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'en_camino' %}background:#06b6d4; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    🛵 En Camino ({{ en_camino }})
+  </a>
+  <a href="{% url 'domicilios_lista' %}?estado=entregado" class="btn" style="padding:6px 14px; border-radius:20px; font-size:12px; text-decoration:none; {% if estado_filtro == 'entregado' %}background:#10b981; color:#fff; font-weight:600;{% else %}background:#1e293b; color:#94a3b8; border:1px solid #334155;{% endif %}">
+    ✅ Entregados
+  </a>
+</div>
+
+<!-- LISTADO DE PEDIDOS / TARJETAS KDS -->
+{% if pedidos %}
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px;">
+    {% for ped in pedidos %}
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:16px; display:flex; flex-direction:column; justify-content:space-between; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
+        
+        <!-- CABECERA DE LA TARJETA -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #334155; padding-bottom:8px;">
+            <div>
+              <span style="font-size:17px; font-weight:700; color:#f8fafc;">
+                #{{ ped.numero_pedido|stringformat:"04d" }}
+              </span>
+              <span style="font-size:11px; color:#94a3b8; margin-left:6px;">
+                {{ ped.fecha_creacion|date:"h:i A" }}
+              </span>
+              <span style="font-size:10px; text-transform:uppercase; padding:2px 6px; border-radius:4px; margin-left:4px; {% if ped.canal_origen == 'whatsapp' %}background:#065f46; color:#a7f3d0;{% elif ped.canal_origen == 'telegram' %}background:#0369a1; color:#bae6fd;{% else %}background:#334155; color:#cbd5e1;{% endif %}">
+                {{ ped.get_canal_origen_display }}
+              </span>
+            </div>
+
+            <!-- ESTADO DEL PEDIDO -->
+            <div>
+              {% if ped.estado == 'borrador' or ped.estado == 'cotizado' %}
+                <span style="background:#1e3a8a; color:#93c5fd; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">Cotizado</span>
+              {% elif ped.estado == 'esperando_pago' %}
+                <span style="background:#78350f; color:#fde68a; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">⏳ Esperando Bre-B</span>
+              {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
+                <span style="background:#581c87; color:#e9d5ff; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">🍳 En Preparación</span>
+              {% elif ped.estado == 'en_camino' %}
+                <span style="background:#164e63; color:#a5f3fc; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">🛵 En Camino</span>
+              {% elif ped.estado == 'entregado' %}
+                <span style="background:#064e3b; color:#a7f3d0; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">✅ Entregado</span>
+              {% elif ped.estado == 'cancelado' %}
+                <span style="background:#7f1d1d; color:#fecaca; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">❌ Cancelado</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- DATOS DEL CLIENTE Y DIRECCIÓN -->
+          <div style="background:#0f172a; padding:10px 12px; border-radius:8px; border:1px solid #1e293b; margin-bottom:12px;">
+            <div style="font-size:14px; font-weight:700; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+              📍 {{ ped.direccion_entrega }}
+            </div>
+            {% if ped.punto_referencia %}
+              <div style="font-size:12px; color:#cbd5e1; margin-top:2px;">
+                🔎 <em>Ref: {{ ped.punto_referencia }}</em>
+              </div>
+            {% endif %}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;">
+              <span style="color:#94a3b8;">
+                👤 {{ ped.nombre_contacto|default:"Cliente WhatsApp" }}
+              </span>
+              <a href="https://wa.me/57{{ ped.telefono_contacto }}" target="_blank" style="color:#22c55e; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+                💬 {{ ped.telefono_contacto }}
+              </a>
+            </div>
+          </div>
+
+          <!-- LISTA DE PRODUCTOS -->
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px; letter-spacing:0.5px;">
+              Items del Pedido
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              {% for linea in ped.lineas.all %}
+                <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:#f1f5f9; padding:3px 0; border-bottom:1px dashed #334155;">
+                  <div>
+                    <strong style="color:#fbbf24;">{{ linea.cantidad }} {{ linea.unidad_medida }}</strong>
+                    <span>{{ linea.nombre_producto }}</span>
+                    {% if linea.notas %}
+                      <small style="color:#94a3b8; display:block; font-size:11px;">({{ linea.notas }})</small>
+                    {% endif %}
+                  </div>
+                  <span style="color:#cbd5e1; font-weight:600;">
+                    ${{ linea.subtotal|floatformat:0 }}
+                  </span>
+                </div>
+              {% empty %}
+                <div style="color:#94a3b8; font-size:12px; font-style:italic;">Sin ítems registrados</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- DESGLOSE ECONÓMICO Y PAGO -->
+          <div style="background:#0f172a; padding:10px 12px; border-radius:8px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-bottom:2px;">
+              <span>Subtotal:</span>
+              <span>${{ ped.subtotal|floatformat:0 }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-bottom:4px;">
+              <span>Costo Domicilio:</span>
+              <span>{% if ped.costo_domicilio > 0 %}${{ ped.costo_domicilio|floatformat:0 }}{% else %}<strong style="color:#10b981;">GRATIS</strong>{% endif %}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:700; color:#f8fafc; border-top:1px solid #334155; padding-top:4px;">
+              <span>TOTAL A COBRAR:</span>
+              <span style="color:#10b981;">${{ ped.total|floatformat:0 }}</span>
+            </div>
+
+            <!-- BADGE DE MEDIO DE PAGO & VUELTAS -->
+            <div style="margin-top:8px; padding-top:6px; border-top:1px dashed #1e293b; font-size:12px;">
+              {% if ped.medio_pago == 'efectivo' %}
+                <div style="background:#78350f; color:#fde68a; padding:6px 8px; border-radius:6px; font-weight:600;">
+                  💵 PAGO EN EFECTIVO AL ENTREGAR
+                  {% if ped.paga_con %}
+                    <div style="font-size:11px; margin-top:2px; color:#fef08a;">
+                      Paga con: ${{ ped.paga_con|floatformat:0 }} &bull; <strong>LLEVAR VUELTAS: ${{ ped.vueltas|floatformat:0 }}</strong>
+                    </div>
+                  {% endif %}
+                </div>
+              {% elif ped.medio_pago == 'bre_b' %}
+                <div style="background:#065f46; color:#a7f3d0; padding:6px 8px; border-radius:6px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                  <span>⚡ PAGADO CON BRE-B (BANREP)</span>
+                  <small style="background:#047857; color:#fff; padding:1px 4px; border-radius:4px; font-size:10px;">VERIFICADO</small>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                  &gt;&gt; No cobrar nada en la puerta &lt;&lt;
+                </div>
+              {% else %}
+                <div style="color:#cbd5e1;">
+                  Medio de Pago: <strong>{{ ped.get_medio_pago_display }}</strong>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- ACCIONES Y CONTROL DE COMANDAS -->
+        <div>
+          <!-- ESTADO DE IMPRESIÓN POS -->
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:10px; background:#0f172a; padding:6px 10px; border-radius:6px;">
+            <div>
+              {% if ped.impreso_pos %}
+                <span style="color:#10b981; font-weight:600;">🖨️ Impreso en POS</span>
+                <span style="color:#64748b;">({{ ped.veces_impreso }}x)</span>
+              {% else %}
+                <span style="color:#f97316; font-weight:600;">⏳ En cola de impresión POS</span>
+              {% endif %}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <a href="{% url 'domicilio_reimprimir_pos' ped.pk %}" class="btn" style="background:#334155; color:#cbd5e1; text-decoration:none; padding:3px 8px; border-radius:4px; font-size:11px;" title="Volver a enviar comanda a la impresora">
+                Reimprimir
+              </a>
+              <a href="{% url 'domicilio_comanda_pdf' ped.pk %}" target="_blank" class="btn" style="background:#1e293b; color:#38bdf8; text-decoration:none; padding:3px 8px; border-radius:4px; font-size:11px; border:1px solid #0284c7;" title="Ver PDF continuo de comanda">
+                PDF
+              </a>
+            </div>
+          </div>
+
+          <!-- BOTONES DE TRANSICIÓN DE ESTADO -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            {% if ped.estado == 'cotizado' or ped.estado == 'esperando_pago' %}
+              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_preparacion' %}" class="btn" style="flex:1; text-align:center; background:#8b5cf6; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
+                🍳 Pasar a Cocina
+              </a>
+            {% elif ped.estado == 'pagado' or ped.estado == 'en_preparacion' %}
+              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'en_camino' %}" class="btn" style="flex:1; text-align:center; background:#0284c7; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;">
+                🛵 Despachar (En Camino)
+              </a>
+            {% elif ped.estado == 'en_camino' %}
+              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'entregado' %}" class="btn" style="flex:1; text-align:center; background:#059669; color:#fff; text-decoration:none; padding:8px 6px; border-radius:6px; font-size:12px; font-weight:600;" onclick="return confirm('¿Confirmas que el pedido fue entregado y liquidado?');">
+                ✅ Marcar Entregado
+              </a>
+            {% endif %}
+
+            {% if ped.estado != 'entregado' and ped.estado != 'cancelado' %}
+              <a href="{% url 'domicilio_cambiar_estado' ped.pk 'cancelado' %}" class="btn" style="background:#334155; color:#ef4444; text-decoration:none; padding:8px 10px; border-radius:6px; font-size:12px;" onclick="return confirm('¿Estás seguro de cancelar este pedido?');">
+                ✕
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div style="text-align:center; padding:48px 16px; background:#1e293b; border-radius:10px; border:1px solid #334155; color:#94a3b8;">
+    <div style="font-size:36px; margin-bottom:8px;">🛵</div>
+    <h3 style="margin:0 0 6px 0; color:#f8fafc; font-size:16px;">No hay pedidos en este momento</h3>
+    <p style="margin:0; font-size:13px;">
+      Los pedidos recibidos a través del bot de WhatsApp o Telegram aparecerán automáticamente aquí.
+    </p>
+  </div>
+{% endif %}
+
+<script>
+  let refreshTimer = null;
+  function toggleAutoRefresh(cb) {
+    if (cb.checked) {
+      localStorage.setItem("kds_auto_refresh", "1");
+      refreshTimer = setTimeout(() => window.location.reload(), 15000);
+    } else {
+      localStorage.removeItem("kds_auto_refresh");
+      if (refreshTimer) clearTimeout(refreshTimer);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const cb = document.getElementById("chk-autorefresh");
+    if (localStorage.getItem("kds_auto_refresh") === "1") {
+      cb.checked = true;
+      refreshTimer = setTimeout(() => window.location.reload(), 15000);
+    }
+  });
+</script>
+
+{% endblock %}

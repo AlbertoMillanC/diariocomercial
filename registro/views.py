@@ -71,11 +71,18 @@ from .models import (
     ConfiguracionPlataformaSaaS,
     ConfiguracionSaaSMunicipio,
     obtener_configuracion_saas,
+    Pedido,
+    LineaPedido,
 )
 from .email_service import enviar_correo_plataforma
 from .bot_service import generar_token_vinculacion
 from .bre_b_service import generar_qr_dinamico_bre_b, procesar_confirmacion_bre_b
 from .print_service import generar_bytes_escpos_recibo
+from .recibo_service import (
+    generar_comanda_termica_texto,
+    generar_bytes_escpos_comanda,
+    generar_pdf_comanda_pedido,
+)
 from .tax_engine import (
     liquidar_declaracion_sugerida_ica,
     generar_resumen_exogena_anual,
@@ -3778,6 +3785,233 @@ def webhook_whatsapp(request):
             return HttpResponse(f"Error procesando webhook: {e}", status=200)
 
     return HttpResponse("Método no permitido", status=405)
+
+
+# ============================================================================
+# FASE 7: DOMICILIOS, KDS Y COLA DE IMPRESIÓN POS (ESC/POS)
+# ============================================================================
+
+@login_required
+def domicilios_lista(request):
+    """
+    KDS / Panel de Control de Domicilios y Pedidos Omnicanal (WhatsApp, Telegram, Web).
+    Monitoreo en tiempo real de pedidos, medios de pago (Bre-B vs Efectivo con vueltas),
+    gestión de estados de despacho y control de cola de impresión térmica POS.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    if not est:
+        return redirect("inicio")
+
+    estado_filtro = request.GET.get("estado", "").strip()
+    pedidos_qs = Pedido.objects.filter(establecimiento=est).select_related(
+        "cliente", "transaccion_bre_b", "venta"
+    ).prefetch_related("lineas")
+
+    if estado_filtro:
+        pedidos = pedidos_qs.filter(estado=estado_filtro)
+    else:
+        pedidos = pedidos_qs
+
+    hoy = timezone.localdate()
+    total_hoy = Pedido.objects.filter(establecimiento=est, fecha_creacion__date=hoy).count()
+    esperando_pago = Pedido.objects.filter(establecimiento=est, estado="esperando_pago").count()
+    en_preparacion = Pedido.objects.filter(establecimiento=est, estado__in=["pagado", "en_preparacion"]).count()
+    en_camino = Pedido.objects.filter(establecimiento=est, estado="en_camino").count()
+    pendientes_impresion = Pedido.objects.filter(
+        establecimiento=est, impreso_pos=False, estado__in=["pagado", "en_preparacion", "cotizado", "esperando_pago"]
+    ).count()
+
+    return render(
+        request,
+        "domicilios_lista.html",
+        {
+            "pedidos": pedidos[:60],
+            "estado_filtro": estado_filtro,
+            "total_hoy": total_hoy,
+            "esperando_pago": esperando_pago,
+            "en_preparacion": en_preparacion,
+            "en_camino": en_camino,
+            "pendientes_impresion": pendientes_impresion,
+            "est": est,
+            "es_propietario": perfil.es_propietario() if perfil else True,
+        }
+    )
+
+
+@login_required
+def domicilio_cambiar_estado(request, pk, nuevo_estado):
+    """
+    Cambia el estado del pedido (en_preparacion, en_camino, entregado, cancelado).
+    Si se marca como entregado y el pago era en efectivo, asienta la venta y descarga inventario.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    pedido = get_object_or_404(Pedido, pk=pk, establecimiento=est)
+
+    estados_validos = [
+        "borrador", "cotizado", "esperando_pago", "pagado",
+        "en_preparacion", "en_camino", "entregado", "cancelado"
+    ]
+    if nuevo_estado in estados_validos:
+        pedido.estado = nuevo_estado
+        if nuevo_estado == "entregado":
+            pedido.fecha_entrega = timezone.now()
+            # Si el pago era efectivo y aún no tenía venta generada, asentar venta y descargar inventario
+            if pedido.medio_pago == "efectivo" and not pedido.venta:
+                num_fac = est.siguiente_consecutivo_factura()
+                venta = Venta.objects.create(
+                    establecimiento=est,
+                    usuario=request.user,
+                    numero_factura=num_fac,
+                    tipo_comprobante="ticket",
+                    fecha=timezone.now(),
+                    valor=pedido.total,
+                    medio_pago="efectivo",
+                    cliente=pedido.cliente,
+                    notas=f"Pedido domicilio #{pedido.numero_pedido:04d} entregado a {pedido.nombre_contacto or pedido.telefono_contacto}"
+                )
+                pedido.venta = venta
+                for linea in pedido.lineas.all():
+                    if linea.producto:
+                        procesar_salida_inventario(
+                            producto=linea.producto,
+                            cantidad=linea.cantidad,
+                            motivo=f"Entrega Pedido #{pedido.numero_pedido:04d}",
+                            usuario=request.user,
+                            establecimiento=est,
+                            id_venta=venta.pk
+                        )
+        elif nuevo_estado == "en_preparacion":
+            # Reencolar para impresión si pasa a cocina/despacho
+            pedido.impreso_pos = False
+
+        pedido.save()
+        messages.success(request, f"Pedido #{pedido.numero_pedido:04d} actualizado a '{pedido.get_estado_display()}'.")
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "nuevo_estado": pedido.estado, "estado_display": pedido.get_estado_display()})
+
+    return redirect("domicilios_lista")
+
+
+@login_required
+def domicilio_reimprimir_pos(request, pk):
+    """
+    Reencola la comanda para impresión automática en el POS de mostrador.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    pedido = get_object_or_404(Pedido, pk=pk, establecimiento=est)
+    pedido.impreso_pos = False
+    pedido.save(update_fields=["impreso_pos"])
+    messages.success(request, f"🖨️ Pedido #{pedido.numero_pedido:04d} reencolado para impresión automática en el POS.")
+    return redirect("domicilios_lista")
+
+
+@login_required
+def domicilio_comanda_pdf(request, pk):
+    """
+    Genera y descarga/previsualiza la comanda térmica en formato PDF de 80mm continuo.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    pedido = get_object_or_404(Pedido, pk=pk, establecimiento=est)
+    pdf_bytes = generar_pdf_comanda_pedido(pedido)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="comanda_pedido_{pedido.numero_pedido:04d}.pdf"'
+    return response
+
+
+@csrf_exempt
+def api_cola_impresion_pos(request):
+    """
+    API Spooler para Agente de Impresión Térmica Local (Print Daemon).
+    Sondea este endpoint para despachar comandas automáticamente con ESC/POS nativo,
+    corte de papel y activación de buzzer sin intervención humana.
+    """
+    import base64
+
+    est = None
+    token = request.GET.get("token") or request.headers.get("X-Printer-Token")
+    if token:
+        token_obj = TokenVinculacion.objects.filter(token=token).select_related("establecimiento").first()
+        if token_obj and token_obj.es_valido():
+            est = token_obj.establecimiento
+        else:
+            est = Establecimiento.objects.filter(nit=token).first()
+    elif request.user.is_authenticated:
+        perfil = _perfil(request.user)
+        if perfil:
+            est = perfil.establecimiento
+
+    if not est:
+        return JsonResponse({"error": "No autorizado para consultar la cola de impresión"}, status=401)
+
+    pedidos_pendientes = Pedido.objects.filter(
+        establecimiento=est,
+        impreso_pos=False,
+        estado__in=["pagado", "en_preparacion", "cotizado", "esperando_pago", "en_camino"]
+    ).prefetch_related("lineas")
+
+    cola = []
+    for ped in pedidos_pendientes:
+        bytes_escpos = generar_bytes_escpos_comanda(ped)
+        texto_termico = generar_comanda_termica_texto(ped)
+        cola.append({
+            "id": ped.pk,
+            "numero_pedido": ped.numero_pedido,
+            "fecha": ped.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S"),
+            "cliente": ped.nombre_contacto or ped.telefono_contacto,
+            "telefono": ped.telefono_contacto,
+            "direccion": ped.direccion_entrega,
+            "medio_pago": ped.medio_pago,
+            "total": float(ped.total),
+            "vueltas": float(ped.vueltas),
+            "texto_termico": texto_termico,
+            "escpos_base64": base64.b64encode(bytes_escpos).decode("ascii"),
+        })
+
+    return JsonResponse({
+        "establecimiento": est.nombre,
+        "pendientes_count": len(cola),
+        "trabajos": cola,
+    })
+
+
+@csrf_exempt
+def api_ack_impresion_pos(request, pk):
+    """
+    Acuse de recibo (ACK) del Print Daemon.
+    Marca el pedido como impreso para evitar reimpresiones duplicadas.
+    """
+    if request.method not in ["POST", "GET"]:
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    pedido = Pedido.objects.filter(pk=pk).first()
+    if not pedido:
+        return JsonResponse({"error": "Pedido no encontrado"}, status=404)
+
+    pedido.impreso_pos = True
+    pedido.fecha_impresion = timezone.now()
+    pedido.veces_impreso += 1
+    pedido.save(update_fields=["impreso_pos", "fecha_impresion", "veces_impreso"])
+
+    return JsonResponse({
+        "ok": True,
+        "pedido_id": pedido.pk,
+        "numero_pedido": pedido.numero_pedido,
+        "mensaje": "Impresión confirmada exitosamente",
+        "veces_impreso": pedido.veces_impreso
+    })
 
 
 

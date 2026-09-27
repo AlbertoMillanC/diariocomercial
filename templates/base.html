@@ -59,6 +59,7 @@
       <a href="{% url 'retencion_nueva' %}" class="{% if request.resolver_match.url_name == 'retencion_nueva' %}activo{% endif %}">Retenciones</a>
       <a href="{% url 'historial' %}" class="{% if request.resolver_match.url_name == 'historial' %}activo{% endif %}">Historial</a>
       <a href="{% url 'pagos_electronicos' %}" class="{% if request.resolver_match.url_name == 'pagos_electronicos' %}activo{% endif %}" style="color:#38bdf8;">💳 Pagos Electrónicos</a>
+      <a href="{% url 'domicilios_lista' %}" class="{% if request.resolver_match.url_name == 'domicilios_lista' %}activo{% endif %}" style="color:#f59e0b;">🛵 Domicilios</a>
       <a href="{% url 'clientes_lista' %}" class="{% if request.resolver_match.url_name == 'clientes_lista' %}activo{% endif %}">👥 Clientes</a>
       <a href="{% url 'inventario' %}" class="{% if request.resolver_match.url_name == 'inventario' %}activo{% endif %}">Inventario</a>
       <a href="{% url 'pedidos' %}" class="{% if request.resolver_match.url_name == 'pedidos' %}activo{% endif %}">Lista Compras</a>

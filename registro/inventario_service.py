@@ -23,24 +23,64 @@ def parsear_dinero(texto: str) -> Tuple[Optional[Decimal], str]:
       - '40 mil' o '40mil' -> 40000
       - '40k' -> 40000
       - '40 lucas' -> 40000
+      - 'mil de pan' o 'mil pan' -> 1000
+      - 'dos mil de pan' -> 2000
       - '40.000' o '40000' o '$40000' -> 40000
     Retorna: (valor_decimal, texto_limpio_sin_cifra)
     """
     t = normalizar_texto(texto)
 
-    # 1. Patrón con 'mil', 'k', 'lucas': ej "40 mil", "40mil", "40k", "40 lucas", "12.5 mil"
+    # 1. Patrón con dígitos y 'mil', 'k', 'lucas': ej "40 mil", "40mil", "40k", "40 lucas", "12.5 mil"
     m_mil = re.search(r"(?:\$|\b)(\d+(?:[\.,]\d+)?)\s*(?:mil|k|lucas)\b", t)
     if m_mil:
         num_str = m_mil.group(1).replace(",", ".")
         try:
             val = (Decimal(num_str) * Decimal("1000")).quantize(Decimal("1"))
             texto_restante = t.replace(m_mil.group(0), " ").strip()
-            texto_restante = re.sub(r"^(de\s+|para\s+)", "", texto_restante).strip()
+            texto_restante = re.sub(r"^(pesos\s+de\s+|pesos\s+|de\s+|para\s+|en\s+)", "", texto_restante).strip()
             return val, texto_restante
         except Exception:
             pass
 
-    # 2. Cifra de dinero con puntos o formato numérico >= 3 dígitos: ej "$40.000", "40000"
+    # 2. Palabras de números combinadas con 'mil': ej "dos mil", "cinco mil", "diez mil"
+    palabras_a_miles = {
+        "un": Decimal("1"), "uno": Decimal("1"), "una": Decimal("1"), "dos": Decimal("2"),
+        "tres": Decimal("3"), "cuatro": Decimal("4"), "cinco": Decimal("5"), "seis": Decimal("6"),
+        "siete": Decimal("7"), "ocho": Decimal("8"), "nueve": Decimal("9"), "diez": Decimal("10"),
+        "once": Decimal("11"), "doce": Decimal("12"), "trece": Decimal("13"), "catorce": Decimal("14"),
+        "quince": Decimal("15"), "dieciseis": Decimal("16"), "diecisiete": Decimal("17"),
+        "dieciocho": Decimal("18"), "diecinueve": Decimal("19"), "veinte": Decimal("20"),
+        "veinticinco": Decimal("25"), "treinta": Decimal("30"), "cuarenta": Decimal("40"),
+        "cincuenta": Decimal("50"), "sesenta": Decimal("60"), "setenta": Decimal("70"),
+        "ochenta": Decimal("80"), "noventa": Decimal("90"), "cien": Decimal("100"),
+        "ciento": Decimal("100"), "doscientos": Decimal("200"), "trescientos": Decimal("300"),
+        "cuatrocientos": Decimal("400"), "quinientos": Decimal("500"),
+    }
+    pattern_pal = r"\b(" + "|".join(palabras_a_miles.keys()) + r")\s+mil\b(?!\s*(?:hojas?|ilitros?|gramos?|gr\b|g\b|kilos?|kg\b|libras?|lb\b))"
+    m_pal = re.search(pattern_pal, t, re.IGNORECASE)
+    if m_pal:
+        p_word = m_pal.group(1).lower()
+        val = (palabras_a_miles[p_word] * Decimal("1000")).quantize(Decimal("1"))
+        texto_restante = t[:m_pal.start()] + " " + t[m_pal.end():]
+        texto_restante = re.sub(r"\s+", " ", texto_restante).strip()
+        texto_restante = re.sub(r"^(pesos\s+de\s+|pesos\s+|de\s+|para\s+|en\s+)", "", texto_restante).strip()
+        return val, texto_restante
+
+    # 3. Palabra 'mil' o 'un mil' por sí sola como monto ($1.000 COP)
+    # ej: "mil de pan", "mil pan", "un mil de pan", "$mil" (evitando "mil hojas", "mililitros", etc.)
+    m_solo_mil = re.search(
+        r"(?:\$|\b)(?:un\s+)?mil\b(?!\s*(?:hojas?|ilitros?|gramos?|gr\b|g\b|kilos?|kg\b|libras?|lb\b|unidades?|und\b))",
+        t,
+        re.IGNORECASE,
+    )
+    if m_solo_mil:
+        val = Decimal("1000")
+        texto_restante = t[:m_solo_mil.start()] + " " + t[m_solo_mil.end():]
+        texto_restante = re.sub(r"\s+", " ", texto_restante).strip()
+        texto_restante = re.sub(r"^(pesos\s+de\s+|pesos\s+|de\s+|para\s+|en\s+)", "", texto_restante).strip()
+        return val, texto_restante
+
+    # 4. Cifra de dinero con puntos o formato numérico >= 3 dígitos: ej "$40.000", "40000"
     m_cifra = re.search(
         r"(?:\$|\b)(\d{1,3}(?:\.\d{3})+|\d{3,})\b(?!\s*(?:mililitros?|ml|cc|gramos?|gr|g|kilos?|kg|libras?|lb|litros?|lts?|lt|unidades?|und|paquetes?|pqts?|cajas?|cubetas?|botellas?)\b)",
         t,
@@ -49,7 +89,7 @@ def parsear_dinero(texto: str) -> Tuple[Optional[Decimal], str]:
         raw = m_cifra.group(1).replace(".", "").replace(",", "")
         val = Decimal(raw)
         texto_restante = t.replace(m_cifra.group(0), " ").strip()
-        texto_restante = re.sub(r"^(de\s+|para\s+)", "", texto_restante).strip()
+        texto_restante = re.sub(r"^(pesos\s+de\s+|pesos\s+|de\s+|para\s+|en\s+)", "", texto_restante).strip()
         return val, texto_restante
 
     return None, t
