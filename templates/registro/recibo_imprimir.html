@@ -113,6 +113,7 @@
     </div>
     <div style="display:flex; gap:6px;">
       <button onclick="window.print();" class="btn-print">🖨️ Imprimir</button>
+      <button type="button" onclick="enviarPorWhatsApp()" style="background:#16a34a; color:#fff;" title="Enviar recibo por WhatsApp al cliente">📲 WhatsApp</button>
       {% if establecimiento.cajon_monedero_activo %}
       <button onclick="abrirCajonManual()" style="background:#ca8a04; color:#fff;" title="Pulsar para abrir gaveta/cajón monedero">💵 Cajón</button>
       {% endif %}
@@ -215,6 +216,41 @@
   </div>
 
   <script>
+    function enviarPorWhatsApp() {
+      const telPorDefecto = "{{ venta.cliente.telefono|default:'' }}";
+      const tel = prompt("📲 Ingresa el número de WhatsApp del cliente (ej: 3146922087):", telPorDefecto);
+      if (!tel) return;
+
+      const btn = event.target;
+      const textoOrig = btn.innerHTML;
+      btn.innerHTML = "⏳ Enviando...";
+      btn.disabled = true;
+
+      fetch("{% url 'venta_recibo_whatsapp' venta.pk %}", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": "{{ csrf_token }}",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "telefono=" + encodeURIComponent(tel)
+      })
+      .then(r => r.json())
+      .then(data => {
+        btn.innerHTML = textoOrig;
+        btn.disabled = false;
+        if (data.ok) {
+          alert("✅ " + data.mensaje);
+        } else {
+          alert("❌ Error: " + (data.error || "No se pudo enviar"));
+        }
+      })
+      .catch(err => {
+        btn.innerHTML = textoOrig;
+        btn.disabled = false;
+        alert("❌ Error de conexión al despachar WhatsApp.");
+      });
+    }
+
     function abrirCajonManual() {
       fetch("{% url 'cajon_monedero_abrir' %}", {
         method: "POST",

@@ -2165,6 +2165,33 @@ def venta_recibo_pdf(request, pk):
 
 
 @login_required
+def venta_recibo_enviar_whatsapp(request, pk):
+    """Despacha el recibo de venta oficial por Meta WhatsApp Cloud API al celular indicado."""
+    perfil = _perfil(request.user)
+    if not perfil and not request.user.is_superuser:
+        return JsonResponse({"ok": False, "error": "No autorizado"}, status=403)
+
+    est = perfil.establecimiento if perfil else None
+    if request.user.is_superuser:
+        venta = get_object_or_404(Venta, pk=pk)
+    else:
+        venta = get_object_or_404(Venta, pk=pk, establecimiento=est)
+
+    telefono = request.POST.get("telefono", "").strip() or (venta.cliente.telefono if venta.cliente else "")
+    nombre = request.POST.get("nombre", "").strip() or (venta.cliente.nombre if venta.cliente else "")
+
+    if not telefono:
+        return JsonResponse({"ok": False, "error": "Número de teléfono requerido"}, status=400)
+
+    from .notification_service import despachar_recibo_venta_whatsapp
+    exito = despachar_recibo_venta_whatsapp(venta, telefono, nombre)
+    if exito:
+        return JsonResponse({"ok": True, "mensaje": f"Recibo enviado con éxito al WhatsApp {telefono}."})
+    else:
+        return JsonResponse({"ok": False, "error": "No se pudo enviar por WhatsApp. Revisa el token o número."}, status=500)
+
+
+@login_required
 def configuracion_probar_impresora(request):
     """Página de prueba para verificar que la impresora conectada (Epson o térmica) responda."""
     perfil = _perfil(request.user)

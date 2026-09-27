@@ -148,3 +148,46 @@ def enviar_mensaje_whatsapp_meta(
         logging.getLogger(__name__).warning("Aviso enviando WhatsApp Meta a %s: %s", tel_limpio, e)
         return False
 
+
+def despachar_recibo_venta_whatsapp(
+    venta: Venta,
+    telefono_cliente: str,
+    nombre_cliente: str = "",
+) -> bool:
+    """
+    Construye y envía el recibo digital de una venta a través de WhatsApp Meta Cloud API.
+    """
+    est = venta.establecimiento
+    nom_cli = nombre_cliente or (venta.cliente.nombre if venta.cliente else "Cliente Mostrador")
+    total_fmt = f"${venta.valor:,.0f} COP".replace(",", ".")
+    medio_pago_fmt = dict(Venta.MEDIOS_PAGO).get(venta.medio_pago, venta.medio_pago).capitalize()
+    fecha_str = timezone.localtime(venta.fecha_hora).strftime("%d/%m/%Y %I:%M %p")
+
+    if venta.solicita_factura_electronica and venta.numero_factura_electronica:
+        titulo_doc = f"🧾 *FACTURA ELECTRÓNICA DE VENTA #{venta.numero_factura_electronica}*"
+    else:
+        titulo_doc = f"🧾 *COMPROBANTE DE COMPRA — TICKET #{venta.pk:05d}*"
+
+    mensaje = (
+        f"{titulo_doc}\n"
+        f"📍 *{est.nombre}*\n"
+        f"NIT: {est.nit or '891800846-1'}\n"
+        f"📅 Fecha: {fecha_str}\n"
+        f"👤 Cliente: {nom_cli}\n"
+        f"────────────────────────\n"
+        f"📦 *Concepto:* {venta.concepto or 'Consumo Mostrador'}\n"
+        f"💳 *Medio de pago:* {medio_pago_fmt}\n"
+        f"💰 *TOTAL PAGADO:* *{total_fmt}*\n"
+    )
+    if venta.ica_estimado and venta.ica_estimado > 0:
+        ica_fmt = f"${venta.ica_estimado:,.0f} COP".replace(",", ".")
+        mensaje += f"🏛️ _ICA Tunja liquidado: {ica_fmt}_\n"
+
+    mensaje += (
+        f"────────────────────────\n"
+        f"¡Muchas gracias por su compra!\n"
+        f"🌐 _DiarioComercial POS & Gestión_"
+    )
+    return enviar_mensaje_whatsapp_meta(telefono_cliente, mensaje)
+
+

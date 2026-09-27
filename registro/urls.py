@@ -40,6 +40,7 @@ urlpatterns = [
     path("ventas/<int:pk>/ticket-escpos/<int:ancho>/", views.imprimir_ticket_escpos, name="ticket_escpos"),
     path("ventas/<int:pk>/recibo/imprimir/", views.venta_recibo_imprimir_html, name="venta_recibo_imprimir"),
     path("ventas/<int:pk>/recibo/pdf/", views.venta_recibo_pdf, name="venta_recibo_pdf"),
+    path("ventas/<int:pk>/recibo/whatsapp/", views.venta_recibo_enviar_whatsapp, name="venta_recibo_whatsapp"),
     path("configuracion/probar-impresora/", views.configuracion_probar_impresora, name="configuracion_probar_impresora"),
     path("cajon-monedero/abrir/", views.cajon_monedero_abrir_manual, name="cajon_monedero_abrir"),
     # Administrador Multi-Tienda (Empresario & Store Switcher)
