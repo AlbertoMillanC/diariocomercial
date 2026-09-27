@@ -249,11 +249,17 @@ def despachar_mensaje(
         if resultado_ped is not None:
             return resultado_ped
 
-    # 3.2 Detección de Nuevo Pedido a Domicilio (WhatsApp/Telegram Delivery)
+    # 3.2 Consulta de Estado u Horario de Domicilios (Pregunta de Cliente o Bot)
     target_est = establecimiento or (vinculo.establecimiento if vinculo else None)
     if not target_est:
         target_est = Establecimiento.objects.filter(estado="activo").first()
 
+    if target_est and _es_pregunta_horario_domicilios(texto):
+        _, _, msg_info = target_est.servicio_domicilio_disponible()
+        _cachear_respuesta(canal, identificador_mensaje, msg_info)
+        return (msg_info, None, None) if return_adjuntos else msg_info
+
+    # 3.3 Detección de Nuevo Pedido a Domicilio (WhatsApp/Telegram Delivery)
     if target_est and _es_mensaje_pedido_domicilio(target_est, texto):
         resultado = _procesar_pedido_conversacional(
             establecimiento=target_est,
@@ -652,6 +658,65 @@ def despachar_mensaje(
     # 4.3.1 Confirmación de Pedidos por el Tendero
     if t_norm.startswith(("/confirmar_pedido", "confirmar pedido", "/despachar", "despachar pedido")):
         resp = _confirmar_pedido_bot(establecimiento, usuario, texto)
+        _cachear_respuesta(canal, identificador_mensaje, resp)
+        return (resp, None, None) if return_adjuntos else resp
+
+    # 4.3.2 Control Operativo de Domicilios (Comandos para Tendero / Propietario / Cajero)
+    if t_norm.startswith(("/domicilio", "/pausar_domicilio", "/abrir_domicilio", "pausar domicilio", "abrir domicilio")):
+        if re.search(r"\b(?:off|pausar|cerrar|apagar|pausa)\b", t_norm):
+            partes = texto.split(maxsplit=2)
+            motivo = partes[2].strip() if len(partes) > 2 else ""
+            establecimiento.domicilios_activos = False
+            establecimiento.domicilio_mensaje_pausa = motivo
+            establecimiento.save(update_fields=["domicilios_activos", "domicilio_mensaje_pausa"])
+            motivo_str = f"\nMotivo: *{motivo}*" if motivo else ""
+            resp = (
+                f"🔴 *Servicio de Domicilios PAUSADO*{motivo_str}\n\n"
+                f"El bot informará amablemente a los clientes que el servicio está en pausa temporal y no aceptará nuevos pedidos."
+            )
+        elif re.search(r"\b(?:on|activar|abrir|encender|abierto)\b", t_norm):
+            establecimiento.domicilios_activos = True
+            establecimiento.domicilio_mensaje_pausa = ""
+            establecimiento.save(update_fields=["domicilios_activos", "domicilio_mensaje_pausa"])
+            resp = (
+                f"🟢 *Servicio de Domicilios ACTIVADO*\n\n"
+                f"Los clientes de *{establecimiento.nombre}* ya pueden enviar pedidos y serán recibidos en la cola del KDS y POS."
+            )
+        elif "horario" in t_norm:
+            horas = re.findall(r"\b(\d{1,2}:\d{2})\b", texto)
+            if len(horas) >= 2:
+                from datetime import datetime
+                try:
+                    h_ini = datetime.strptime(horas[0], "%H:%M").time()
+                    h_fin = datetime.strptime(horas[1], "%H:%M").time()
+                    establecimiento.domicilio_hora_apertura = h_ini
+                    establecimiento.domicilio_hora_cierre = h_fin
+                    establecimiento.domicilio_programar_horario = True
+                    establecimiento.save(update_fields=["domicilio_hora_apertura", "domicilio_hora_cierre", "domicilio_programar_horario"])
+                    resp = (
+                        f"⏰ *Horario de Domicilios Actualizado*\n\n"
+                        f"Nuevo horario configurado: *{h_ini.strftime('%I:%M %p')} a {h_fin.strftime('%I:%M %p')}*.\n"
+                        f"Control automático por horario: *ACTIVADO*."
+                    )
+                except ValueError:
+                    resp = "⚠️ Formato de hora inválido. Usa formato 24 horas (ej: `/domicilios horario 08:00 20:30`)."
+            else:
+                resp = "ℹ️ Para configurar horario usa: `/domicilios horario [HORA_INICIO] [HORA_FIN]` (ej: `/domicilios horario 08:00 21:00`)."
+        else:
+            disp, motivo, msg_info = establecimiento.servicio_domicilio_disponible()
+            prog_str = "Activo" if establecimiento.domicilio_programar_horario else "Desactivado (Siempre activo si está encendido)"
+            resp = (
+                f"🛵 *Estado del Servicio de Domicilios*\n\n"
+                f"• Interruptor maestro: *{'🟢 ENCENDIDO' if establecimiento.domicilios_activos else '🔴 APAGADO / PAUSADO'}*\n"
+                f"• Programación horaria: *{prog_str}*\n"
+                f"• Horario configurado: *{establecimiento.domicilio_hora_apertura.strftime('%I:%M %p')} a {establecimiento.domicilio_hora_cierre.strftime('%I:%M %p')}*\n"
+                f"{'• Motivo de pausa: *' + establecimiento.domicilio_mensaje_pausa + '*\n' if establecimiento.domicilio_mensaje_pausa else ''}\n"
+                f"👉 *Comandos rápidos:*\n"
+                f"`/domicilios on` - Activar despachos\n"
+                f"`/domicilios off [motivo]` - Pausar despachos\n"
+                f"`/domicilios horario 08:00 20:00` - Configurar horas"
+            )
+
         _cachear_respuesta(canal, identificador_mensaje, resp)
         return (resp, None, None) if return_adjuntos else resp
 
@@ -1297,9 +1362,44 @@ def _generar_ayuda(es_propietario: bool) -> str:
 # FASE 7: MOTOR DE PEDIDOS A DOMICILIO, PAGOS OMNICANAL & COMANDAS POS
 # ============================================================================
 
+def _es_pregunta_horario_domicilios(texto: str) -> bool:
+    """Detecta si el mensaje es una consulta sobre el estado u horario de atención de domicilios."""
+    t_norm = normalizar_texto(texto)
+    # Comandos de personal autorizado no son preguntas
+    if any(k in t_norm for k in ["/domicilio", "/domicilios", "/pausar_domicilio", "/abrir_domicilio"]):
+        return False
+    # Si viene con horas (ej: 08:30 21:30) o dirección específica de entrega, no es una pregunta simple
+    if re.search(r"\b\d{1,2}:\d{2}\b", t_norm) or any(k in t_norm for k in ["calle", "cll", "carrera", "cra", "kr", "avenida", "av", "apto", "barrio"]):
+        return False
+
+    patrones = [
+        r"\b(?:hay|tienen|hacen|estan haciendo|haciendo)\s+domicilio",
+        r"\bhorario\s+(?:de\s+)?domicilio",
+        r"\bdomicilio(?:s)?\s+(?:activo|abierto|horario|disponible|hoy|ahora)",
+        r"\b(?:a que hora|a que horas|cuando)\s+(?:abren|cierran|atienden|reparten)",
+        r"\bestan\s+(?:abiertos|atendiendo|despachando|en servicio)",
+        r"^/?domicilio(?:s)?$",
+        r"^/?horario(?:s)?$",
+    ]
+    return any(re.search(p, t_norm) for p in patrones)
+
+
 def _es_mensaje_pedido_domicilio(establecimiento: Establecimiento, texto: str) -> bool:
     """Detecta si un mensaje entrante corresponde a un pedido a domicilio o con dirección."""
+    if _es_pregunta_horario_domicilios(texto):
+        return False
+
     t_norm = normalizar_texto(texto)
+    # Comandos de gestión operativa (on, off, horario, pausa) no son pedidos
+    if t_norm.startswith((
+        "/domicilio on", "/domicilios on", "/domicilio off", "/domicilios off",
+        "/domicilio horario", "/domicilios horario", "/pausar_domicilio", "/abrir_domicilio",
+        "pausar domicilio", "abrir domicilio"
+    )):
+        return False
+    if t_norm in ("/domicilio", "/domicilios", "domicilio", "domicilios"):
+        return False
+
     if t_norm.startswith(("/pedido", "pedido", "/domicilio", "domicilio", "orden", "/orden")):
         return True
 
@@ -1326,6 +1426,12 @@ def _procesar_pedido_conversacional(
     return_adjuntos: bool = False,
 ):
     key_sesion = (canal, identificador_externo)
+
+    # 0. Verificar si el servicio de domicilios está operativo en este momento
+    disponible, motivo, msg_info = establecimiento.servicio_domicilio_disponible()
+    if not disponible:
+        _cachear_respuesta(canal, identificador_mensaje, msg_info)
+        return (msg_info, None, None) if return_adjuntos else msg_info
 
     # 1. Extraer teléfono si vino al inicio (ej: pedido 3146922087 ...)
     match_tel = re.search(r"^(?:/pedido|pedido|/domicilio|domicilio)\s+(\d{10})\b", texto, re.IGNORECASE)

@@ -23,6 +23,57 @@
   </div>
 </div>
 
+<!-- BARRA DE CONTROL DE DISPONIBILIDAD Y HORARIOS DE DOMICILIOS -->
+<div style="background:{% if est.domicilios_activos %}#064e3b{% else %}#7f1d1d{% endif %}; border:1px solid {% if est.domicilios_activos %}#059669{% else %}#dc2626{% endif %}; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#fff; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div style="font-size:24px;">
+      {% if est.domicilios_activos %}🟢{% else %}🔴{% endif %}
+    </div>
+    <div>
+      <div style="font-size:15px; font-weight:700;">
+        {% if est.domicilios_activos %}
+          SERVICIO DE DOMICILIOS ACTIVO
+        {% else %}
+          SERVICIO DE DOMICILIOS PAUSADO / APAGADO
+        {% endif %}
+      </div>
+      <div style="font-size:12px; opacity:0.9; margin-top:2px;">
+        ⏰ <strong>Horario de atención:</strong> {{ est.domicilio_hora_apertura|time:"g:i A" }} a {{ est.domicilio_hora_cierre|time:"g:i A" }}
+        {% if est.domicilio_programar_horario %}
+          <span style="background:rgba(255,255,255,0.2); padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Restricción horaria activa</span>
+        {% else %}
+          <span style="background:rgba(255,255,255,0.2); padding:1px 6px; border-radius:4px; font-size:11px; margin-left:4px;">Horario libre</span>
+        {% endif %}
+        {% if not est.domicilios_activos and est.domicilio_mensaje_pausa %}
+          &bull; Motivo informado a clientes: <em>"{{ est.domicilio_mensaje_pausa }}"</em>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <!-- BOTÓN APAGAR / ENCENDER (1 CLIC) -->
+    {% if est.domicilios_activos %}
+      <button type="button" onclick="document.getElementById('modal-pausa-domicilio').style.display='flex';" style="background:#dc2626; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+        ⏸️ Pausar Domicilios
+      </button>
+    {% else %}
+      <form method="post" action="{% url 'domicilios_toggle_servicio' %}" style="margin:0; display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="toggle">
+        <button type="submit" style="background:#10b981; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+          ▶️ Reactivar Domicilios Ahora
+        </button>
+      </form>
+    {% endif %}
+
+    <!-- BOTÓN PROGRAMAR HORARIOS -->
+    <button type="button" onclick="document.getElementById('modal-horarios-domicilio').style.display='flex';" style="background:#1e293b; color:#cbd5e1; border:1px solid #475569; padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+      ⚙️ Programar Horas y Tarifas
+    </button>
+  </div>
+</div>
+
 <!-- MÉTRICAS DE OPERACIÓN DE DOMICILIOS -->
 <div class="cards" style="margin-bottom:16px;">
   <div class="card">
@@ -272,6 +323,103 @@
     </p>
   </div>
 {% endif %}
+
+<!-- MODAL PAUSA DE DOMICILIOS -->
+<div id="modal-pausa-domicilio" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:440px; width:100%; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 8px 0; color:#f8fafc; font-size:17px; display:flex; align-items:center; gap:8px;">
+      ⏸️ Pausar Servicio de Domicilios
+    </h3>
+    <p style="margin:0 0 16px 0; font-size:13px; color:#94a3b8; line-height:1.4;">
+      El bot informará amablemente a los clientes que intenten pedir que el servicio está en pausa temporal y no aceptará nuevos pedidos.
+    </p>
+
+    <form method="post" action="{% url 'domicilios_toggle_servicio' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="toggle">
+      
+      <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:6px;">
+        Motivo temporal (opcional, para informar al cliente):
+      </label>
+      <input type="text" name="motivo_pausa" placeholder="Ej: Alta congestión en cocina, lluvia fuerte..." style="width:100%; padding:8px 12px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; margin-bottom:18px; box-sizing:border-box;">
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-pausa-domicilio').style.display='none';" style="background:#334155; color:#cbd5e1; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">
+          Cancelar
+        </button>
+        <button type="submit" style="background:#dc2626; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+          Confirmar Pausa
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL PROGRAMAR HORARIOS Y TARIFAS -->
+<div id="modal-horarios-domicilio" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; max-width:480px; width:100%; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 8px 0; color:#f8fafc; font-size:17px; display:flex; align-items:center; gap:8px;">
+      ⚙️ Programar Horas y Tarifas de Domicilio
+    </h3>
+    <p style="margin:0 0 16px 0; font-size:13px; color:#94a3b8; line-height:1.4;">
+      Define el rango horario en el cual el bot toma pedidos y calcula las tarifas de despacho.
+    </p>
+
+    <form method="post" action="{% url 'domicilios_toggle_servicio' %}">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="horario">
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div>
+          <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">
+            Hora Apertura Domicilios:
+          </label>
+          <input type="time" name="hora_apertura" value="{{ est.domicilio_hora_apertura|time:'H:i' }}" required style="width:100%; padding:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">
+            Hora Cierre Domicilios:
+          </label>
+          <input type="time" name="hora_cierre" value="{{ est.domicilio_hora_cierre|time:'H:i' }}" required style="width:100%; padding:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px; background:#0f172a; padding:10px; border-radius:6px; border:1px solid #334155;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#f8fafc; cursor:pointer;">
+          <input type="checkbox" name="programar_horario" {% if est.domicilio_programar_horario %}checked{% endif %} style="cursor:pointer;">
+          <span><strong>Activar restricción automática por horario</strong></span>
+        </label>
+        <small style="display:block; color:#94a3b8; font-size:11px; margin-top:4px; margin-left:24px;">
+          Si está activo, fuera de estas horas el bot no aceptará pedidos e informará al cliente cuándo abren de nuevo.
+        </small>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
+        <div>
+          <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">
+            Tarifa Base Domicilio ($ COP):
+          </label>
+          <input type="number" step="100" name="costo_defecto" value="{{ est.costo_domicilio_defecto|floatformat:0 }}" required style="width:100%; padding:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">
+            Envío Gratis desde ($ COP):
+          </label>
+          <input type="number" step="1000" name="minimo_gratis" value="{{ est.monto_minimo_domicilio_gratis|floatformat:0 }}" required style="width:100%; padding:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:13px; box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="document.getElementById('modal-horarios-domicilio').style.display='none';" style="background:#334155; color:#cbd5e1; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">
+          Cancelar
+        </button>
+        <button type="submit" style="background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">
+          Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
   let refreshTimer = null;

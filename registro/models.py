@@ -165,6 +165,102 @@ class Establecimiento(models.Model):
         help_text="Habilita el encolamiento automático de comandas térmicas para la impresora POS"
     )
 
+    # Control de Disponibilidad y Horarios de Domicilios
+    domicilios_activos = models.BooleanField(
+        default=True,
+        help_text="Interruptor maestro para encender o apagar el servicio de domicilios"
+    )
+    domicilio_programar_horario = models.BooleanField(
+        default=False,
+        help_text="Activa el control automático por franja horaria de atención"
+    )
+    domicilio_hora_apertura = models.TimeField(
+        default="07:00:00",
+        help_text="Hora de inicio del servicio de domicilios (ej: 07:00)"
+    )
+    domicilio_hora_cierre = models.TimeField(
+        default="21:00:00",
+        help_text="Hora de finalización del servicio de domicilios (ej: 21:00)"
+    )
+    domicilio_mensaje_pausa = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Motivo temporal de pausa opcional (ej: 'Alta congestión por lluvia')"
+    )
+
+    def servicio_domicilio_disponible(self, dt=None):
+        """
+        Evalúa si el servicio de domicilios está operativo en este momento.
+        Retorna: (disponible: bool, motivo: str, mensaje_informativo: str)
+        """
+        now = dt or timezone.localtime(timezone.now())
+        hora_actual = now.time()
+
+        from datetime import datetime, time
+        if isinstance(self.domicilio_hora_apertura, str):
+            try:
+                h_apertura = datetime.strptime(self.domicilio_hora_apertura, "%H:%M:%S").time()
+            except ValueError:
+                h_apertura = datetime.strptime(self.domicilio_hora_apertura, "%H:%M").time()
+        else:
+            h_apertura = self.domicilio_hora_apertura
+
+        if isinstance(self.domicilio_hora_cierre, str):
+            try:
+                h_cierre = datetime.strptime(self.domicilio_hora_cierre, "%H:%M:%S").time()
+            except ValueError:
+                h_cierre = datetime.strptime(self.domicilio_hora_cierre, "%H:%M").time()
+        else:
+            h_cierre = self.domicilio_hora_cierre
+
+        hora_apertura_str = h_apertura.strftime("%I:%M %p").lstrip("0")
+        hora_cierre_str = h_cierre.strftime("%I:%M %p").lstrip("0")
+        horario_texto = f"{hora_apertura_str} a {hora_cierre_str}"
+
+        # 1. Interruptor Maestro Apagado
+        if not self.domicilios_activos:
+            motivo_extra = f" ({self.domicilio_mensaje_pausa})" if self.domicilio_mensaje_pausa.strip() else ""
+            msg = (
+                f"🛵 *Servicio de Domicilios Temporalmente Pausado*{motivo_extra}\n\n"
+                f"Hola, en este momento el servicio de entregas a domicilio en *{self.nombre}* "
+                f"se encuentra pausado temporalmente.\n\n"
+                f"⏰ *Horario habitual de domicilios:* {horario_texto}.\n"
+                f"📍 Puedes visitarnos directamente en nuestro local{' (' + self.direccion + ')' if self.direccion else ''}.\n\n"
+                f"¡Disculpa las molestias, te avisaremos tan pronto reactivemos los despachos!"
+            )
+            return False, "pausado", msg
+
+        # 2. Control por Horario Programado
+        if self.domicilio_programar_horario:
+            inicio = h_apertura
+            fin = h_cierre
+
+            if inicio <= fin:
+                en_horario = (inicio <= hora_actual <= fin)
+            else:
+                # Cruza medianoche (ej: 18:00 a 02:00)
+                en_horario = (hora_actual >= inicio or hora_actual <= fin)
+
+            if not en_horario:
+                hora_actual_fmt = hora_actual.strftime("%I:%M %p").lstrip("0")
+                msg = (
+                    f"🌙 *Servicio de Domicilios Cerrado en este momento*\n\n"
+                    f"Hola, en este momento nos encontramos fuera del horario de atención para entregas a domicilio en *{self.nombre}*.\n\n"
+                    f"⏰ *Horario de Domicilios:* {horario_texto}.\n"
+                    f"⌚ *Hora actual:* {hora_actual_fmt}.\n\n"
+                    f"Con gusto tomaremos tu pedido dentro de nuestro horario habitual. ¡Te esperamos!"
+                )
+                return False, "fuera_de_horario", msg
+
+        msg_activo = (
+            f"🟢 *Servicio de Domicilios ACTIVO*\n\n"
+            f"En *{self.nombre}* estamos tomando y despachando pedidos.\n"
+            f"⏰ *Horario de atención:* {horario_texto}.\n"
+            f"Tarifa base: ${self.costo_domicilio_defecto:,.0f} COP (Gratis en compras superiores a ${self.monto_minimo_domicilio_gratis:,.0f}).".replace(",", ".")
+        )
+        return True, "activo", msg_activo
+
     def siguiente_consecutivo_factura(self):
         from django.db import transaction
         with transaction.atomic():

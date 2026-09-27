@@ -83,6 +83,7 @@ urlpatterns = [
     path("webhook/whatsapp/", views.webhook_whatsapp, name="webhook_whatsapp"),
     # Módulo de Domicilios, KDS y Cola de Impresión Térmica POS
     path("domicilios/", views.domicilios_lista, name="domicilios_lista"),
+    path("domicilios/configurar-servicio/", views.domicilios_toggle_servicio, name="domicilios_toggle_servicio"),
     path("domicilios/<int:pk>/estado/<str:nuevo_estado>/", views.domicilio_cambiar_estado, name="domicilio_cambiar_estado"),
     path("domicilios/<int:pk>/reimprimir/", views.domicilio_reimprimir_pos, name="domicilio_reimprimir_pos"),
     path("domicilios/<int:pk>/comanda.pdf", views.domicilio_comanda_pdf, name="domicilio_comanda_pdf"),

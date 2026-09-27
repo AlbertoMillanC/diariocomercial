@@ -4014,6 +4014,58 @@ def api_ack_impresion_pos(request, pk):
     })
 
 
+@login_required
+def domicilios_toggle_servicio(request):
+    """
+    Interruptor rápido en el KDS para encender/apagar o pausar el servicio de domicilios
+    en tiempo real y configurar horarios y tarifas.
+    """
+    perfil = _perfil(request.user)
+    if not perfil:
+        return redirect("inicio")
+    est = perfil.establecimiento
+    if not est:
+        return redirect("inicio")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "").strip()
+        if accion == "toggle":
+            est.domicilios_activos = not est.domicilios_activos
+            if est.domicilios_activos:
+                est.domicilio_mensaje_pausa = ""
+            else:
+                est.domicilio_mensaje_pausa = request.POST.get("motivo_pausa", "").strip()
+            est.save(update_fields=["domicilios_activos", "domicilio_mensaje_pausa"])
+            estado_txt = "ACTIVADOS" if est.domicilios_activos else "PAUSADOS"
+            messages.success(request, f"🛵 Servicio de Domicilios {estado_txt} exitosamente.")
+        elif accion == "horario":
+            h_ini = request.POST.get("hora_apertura", "").strip()
+            h_fin = request.POST.get("hora_cierre", "").strip()
+            prog = request.POST.get("programar_horario") == "on"
+            if h_ini:
+                est.domicilio_hora_apertura = h_ini
+            if h_fin:
+                est.domicilio_hora_cierre = h_fin
+            est.domicilio_programar_horario = prog
+            costo_raw = request.POST.get("costo_defecto")
+            if costo_raw:
+                try:
+                    est.costo_domicilio_defecto = Decimal(costo_raw)
+                except Exception:
+                    pass
+            min_raw = request.POST.get("minimo_gratis")
+            if min_raw:
+                try:
+                    est.monto_minimo_domicilio_gratis = Decimal(min_raw)
+                except Exception:
+                    pass
+            est.save()
+            messages.success(request, "⏰ Horario y tarifas de domicilio guardados correctamente.")
+
+    return redirect("domicilios_lista")
+
+
+
 
 
 

@@ -275,3 +275,139 @@ class PedidosDomicilioTestCase(TestCase):
         pdf_buf = generar_pdf_comanda_pedido(pedido)
         self.assertIsNotNone(pdf_buf)
         self.assertTrue(len(pdf_buf) > 500)
+
+    def test_servicio_domicilio_disponible_metodo(self):
+        """Prueba la lógica de negocio del método servicio_domicilio_disponible en Establecimiento."""
+        from datetime import datetime, time
+        est = self.est
+
+        # 1. Por defecto activo
+        est.domicilios_activos = True
+        est.domicilio_programar_horario = False
+        disp, mot, msg = est.servicio_domicilio_disponible()
+        self.assertTrue(disp)
+        self.assertEqual(mot, "activo")
+        self.assertIn("ACTIVO", msg)
+
+        # 2. Pausado manualmente con motivo
+        est.domicilios_activos = False
+        est.domicilio_mensaje_pausa = "Lluvia torrencial en Tunja"
+        disp, mot, msg = est.servicio_domicilio_disponible()
+        self.assertFalse(disp)
+        self.assertEqual(mot, "pausado")
+        self.assertIn("Pausado", msg)
+        self.assertIn("Lluvia torrencial", msg)
+        self.assertIn("Horario habitual", msg)
+
+        # 3. Control por horario: dentro de horario
+        est.domicilios_activos = True
+        est.domicilio_programar_horario = True
+        est.domicilio_hora_apertura = time(8, 0)
+        est.domicilio_hora_cierre = time(20, 0)
+
+        dt_dentro = timezone.now().replace(hour=14, minute=30)
+        disp, mot, msg = est.servicio_domicilio_disponible(dt=dt_dentro)
+        self.assertTrue(disp)
+
+        # 4. Control por horario: fuera de horario (ej: 22:30)
+        dt_fuera = timezone.now().replace(hour=22, minute=30)
+        disp, mot, msg = est.servicio_domicilio_disponible(dt=dt_fuera)
+        self.assertFalse(disp)
+        self.assertEqual(mot, "fuera_de_horario")
+        self.assertIn("Cerrado", msg)
+        self.assertIn("Horario de Domicilios", msg)
+
+    def test_bloqueo_pedido_cuando_domicilios_pausados(self):
+        """Prueba que el bot no tome pedidos cuando el servicio esté pausado e informe al cliente."""
+        self.est.domicilios_activos = False
+        self.est.domicilio_mensaje_pausa = "Cocina saturada por evento"
+        self.est.save()
+
+        telefono_cliente = "3129998877"
+        msg = "pedido 2 libras de carne Calle 12 # 4-50 casa reja verde"
+        resp, _, _ = despachar_mensaje(canal="whatsapp", identificador_externo=telefono_cliente, texto_mensaje=msg, return_adjuntos=True)
+
+        self.assertIn("Pausado", resp)
+        self.assertIn("Cocina saturada", resp)
+        self.assertIn("Horario habitual", resp)
+
+        # Verificar que no se creó pedido
+        self.assertFalse(Pedido.objects.filter(telefono_contacto=telefono_cliente).exists())
+
+    def test_cliente_pregunta_horario_domicilios(self):
+        """Prueba que cuando un cliente pregunta si hay servicio o los horarios, el bot responde el estado."""
+        telefono_cliente = "3191234567"
+        resp, _, _ = despachar_mensaje(canal="whatsapp", identificador_externo=telefono_cliente, texto_mensaje="¿Hay servicio de domicilios hoy?", return_adjuntos=True)
+
+        self.assertIn("Domicilios ACTIVO", resp)
+        self.assertIn("Horario de atención", resp)
+
+    def test_comandos_staff_domicilios_bot(self):
+        """Prueba los comandos /domicilios off, on y horario para el comerciante."""
+        from registro.models import VinculoCanal
+        id_staff = "99887766"
+        VinculoCanal.objects.create(
+            canal="telegram",
+            identificador_externo=id_staff,
+            usuario=self.user,
+            establecimiento=self.est,
+            activo=True,
+        )
+
+        # Pausar con motivo
+        resp_off, _, _ = despachar_mensaje(canal="telegram", identificador_externo=id_staff, texto_mensaje="/domicilios off Congestión", return_adjuntos=True)
+        self.assertIn("PAUSADO", resp_off)
+        self.est.refresh_from_db()
+        self.assertFalse(self.est.domicilios_activos)
+        self.assertEqual(self.est.domicilio_mensaje_pausa, "Congestión")
+
+        # Reactivar
+        resp_on, _, _ = despachar_mensaje(canal="telegram", identificador_externo=id_staff, texto_mensaje="/domicilios on", return_adjuntos=True)
+        self.assertIn("ACTIVADO", resp_on)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.domicilios_activos)
+
+        # Cambiar horario
+        resp_horario, _, _ = despachar_mensaje(canal="telegram", identificador_externo=id_staff, texto_mensaje="/domicilios horario 08:30 21:30", return_adjuntos=True)
+        self.assertIn("Actualizado", resp_horario)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.domicilio_programar_horario)
+        self.assertEqual(self.est.domicilio_hora_apertura.strftime("%H:%M"), "08:30")
+        self.assertEqual(self.est.domicilio_hora_cierre.strftime("%H:%M"), "21:30")
+
+    def test_kds_toggle_servicio_endpoint(self):
+        """Prueba el endpoint web para encender/apagar y configurar horario desde el panel KDS."""
+        client = HttpClient()
+        client.force_login(self.user)
+
+        # 1. Toggle a pausado
+        url = reverse("domicilios_toggle_servicio")
+        resp = client.post(url, {"accion": "toggle", "motivo_pausa": "Lluvia"})
+        self.assertEqual(resp.status_code, 302)
+        self.est.refresh_from_db()
+        self.assertFalse(self.est.domicilios_activos)
+        self.assertEqual(self.est.domicilio_mensaje_pausa, "Lluvia")
+
+        # 2. Toggle a activo
+        resp2 = client.post(url, {"accion": "toggle"})
+        self.assertEqual(resp2.status_code, 302)
+        self.est.refresh_from_db()
+        self.assertTrue(self.est.domicilios_activos)
+
+        # 3. Guardar horario
+        resp3 = client.post(url, {
+            "accion": "horario",
+            "hora_apertura": "09:00",
+            "hora_cierre": "22:00",
+            "programar_horario": "on",
+            "costo_defecto": "4000",
+            "minimo_gratis": "60000",
+        })
+        self.assertEqual(resp3.status_code, 302)
+        self.est.refresh_from_db()
+        self.assertEqual(self.est.domicilio_hora_apertura.strftime("%H:%M"), "09:00")
+        self.assertEqual(self.est.domicilio_hora_cierre.strftime("%H:%M"), "22:00")
+        self.assertTrue(self.est.domicilio_programar_horario)
+        self.assertEqual(self.est.costo_domicilio_defecto, Decimal("4000"))
+        self.assertEqual(self.est.monto_minimo_domicilio_gratis, Decimal("60000"))
+
